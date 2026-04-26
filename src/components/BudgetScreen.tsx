@@ -76,8 +76,9 @@ function ItemRow({ catKey, item, onUpdateAmount, onRemoveItem, onRenameItem }: {
   )
 }
 
-function CategoryCard({ cat, onUpdateAmount, onAddItem, onRemoveItem, onRenameItem, onRenameCategory, onDeleteCategory }: {
+function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem, onRenameItem, onRenameCategory, onDeleteCategory }: {
   cat: Category
+  ownerName: string
   onUpdateAmount: (catKey: string, itemId: string, v: number) => void
   onAddItem: (catKey: string, label: string) => void
   onRemoveItem: (catKey: string, itemId: string) => void
@@ -94,13 +95,10 @@ function CategoryCard({ cat, onUpdateAmount, onAddItem, onRemoveItem, onRenameIt
   const { bg, text } = typeColor(cat.type)
   const color = ownerColor(cat.owner)
   const submitItem = () => {
-    if (newItemLabel.trim()) {
-      onAddItem(cat.key, newItemLabel.trim())
-      setNewItemLabel('')
-      setAddingItem(false)
-    }
+    if (newItemLabel.trim()) { onAddItem(cat.key, newItemLabel.trim()); setNewItemLabel(''); setAddingItem(false) }
   }
   const commitName = () => { onRenameCategory(cat.key, nameDraft); setEditingName(false) }
+
   return (
     <div className="card fade-up" style={{ marginBottom: 8, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderLeft: '3px solid ' + color, background: open ? 'var(--card)' : 'var(--surface)' }}>
@@ -115,19 +113,22 @@ function CategoryCard({ cat, onUpdateAmount, onAddItem, onRemoveItem, onRenameIt
           </>
         ) : (
           <>
-            <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>
-              {cat.label}
-              {cat.note && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>{'— ' + cat.note}</span>}
-            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>
+                {cat.label}
+                {cat.note && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>{'— ' + cat.note}</span>}
+              </div>
+              <div style={{ fontSize: 11, color: color, fontWeight: 500, marginTop: 1 }}>{ownerName}</div>
+            </div>
             <button onClick={() => { setNameDraft(cat.label); setEditingName(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 2 }}>
               <Pencil size={13} />
             </button>
           </>
         )}
-        <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: bg, color: text, fontWeight: 600 }}>
+        <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: bg, color: text, fontWeight: 600, flexShrink: 0 }}>
           {cat.type === 'INCOME' ? 'Income' : cat.type === 'EXPENSE' ? 'Expense' : 'Savings'}
         </span>
-        <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 14, minWidth: 56, textAlign: 'right' }}>
+        <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 14, minWidth: 56, textAlign: 'right', flexShrink: 0 }}>
           {total > 0 ? fmt(total) : '—'}
         </span>
         <button onClick={() => setOpen(o => !o)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 2 }}>
@@ -188,7 +189,7 @@ function PersonSummary({ name, inc, exp, sav, debt, hjExp, hjSav, hjDebt, color 
   )
   return (
     <div className="card" style={{ padding: '12px 14px', borderLeft: '3px solid ' + color }}>
-      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>{name}</div>
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, color }}>{name}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <Row label="Income" value={inc} c="var(--income-text)" />
         <Row label="Personal exp." value={exp} c="var(--expense-text)" />
@@ -204,21 +205,36 @@ function PersonSummary({ name, inc, exp, sav, debt, hjExp, hjSav, hjDebt, color 
   )
 }
 
+const OWNER_ORDER: Owner[] = ['NIAMH', 'RUPERT', 'JOINT']
+
 export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budget: BudgetHook; tab: TabFilter; onNavigateToDebts: () => void }) {
   const { data, totals, updateItemAmount, addItem, removeItem, renameItem, renameCategory, deleteCategory, addCategory } = budget
   const [addingCat, setAddingCat] = useState(false)
   const [newCatLabel, setNewCatLabel] = useState('')
   const [newCatOwner, setNewCatOwner] = useState<Owner>('JOINT')
   const [newCatType, setNewCatType] = useState<EntryType>('EXPENSE')
-  const filtered = data.categories.filter(c => tab === 'ALL' || c.owner === tab)
-  const grouped = { INCOME: filtered.filter(c => c.type === 'INCOME'), EXPENSE: filtered.filter(c => c.type === 'EXPENSE'), SAVINGS: filtered.filter(c => c.type === 'SAVINGS') }
-  const submitCat = () => {
-    if (newCatLabel.trim()) {
-      addCategory(newCatOwner, newCatType, newCatLabel.trim())
-      setNewCatLabel('')
-      setAddingCat(false)
-    }
+
+  const ownerName = (o: Owner) => o === 'NIAMH' ? data.nameNiamh : o === 'RUPERT' ? data.nameRupert : data.nameJoint
+
+  const filtered = data.categories
+    .filter(c => tab === 'ALL' || c.owner === tab)
+    .sort((a, b) => {
+      const ownerDiff = OWNER_ORDER.indexOf(a.owner) - OWNER_ORDER.indexOf(b.owner)
+      if (ownerDiff !== 0) return ownerDiff
+      const typeOrder = ['INCOME', 'EXPENSE', 'SAVINGS']
+      return typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type)
+    })
+
+  const grouped = {
+    INCOME: filtered.filter(c => c.type === 'INCOME'),
+    EXPENSE: filtered.filter(c => c.type === 'EXPENSE'),
+    SAVINGS: filtered.filter(c => c.type === 'SAVINGS'),
   }
+
+  const submitCat = () => {
+    if (newCatLabel.trim()) { addCategory(newCatOwner, newCatType, newCatLabel.trim()); setNewCatLabel(''); setAddingCat(false) }
+  }
+
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: 16 }}>
       <SummaryBar totals={totals} />
@@ -234,7 +250,7 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
             {type === 'INCOME' ? 'Income' : type === 'EXPENSE' ? 'Expenses' : 'Savings'}
           </div>
           {grouped[type].map(cat => (
-            <CategoryCard key={cat.key} cat={cat} onUpdateAmount={updateItemAmount} onAddItem={addItem} onRemoveItem={removeItem} onRenameItem={renameItem} onRenameCategory={renameCategory} onDeleteCategory={deleteCategory} />
+            <CategoryCard key={cat.key} cat={cat} ownerName={ownerName(cat.owner)} onUpdateAmount={updateItemAmount} onAddItem={addItem} onRemoveItem={removeItem} onRenameItem={renameItem} onRenameCategory={renameCategory} onDeleteCategory={deleteCategory} />
           ))}
         </div>
       ))}
