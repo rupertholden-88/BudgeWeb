@@ -131,3 +131,5 @@ export function calcTotals(budget: BudgetData): Totals {
 
 export const fmt = (n: number) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(n)
+export type TabFilter = 'ALL' | 'NIAMH' | 'RUPERT' | 'JOINT'
+export type TabFilter = 'ALL' | 'NIAMH' | 'RUPERT' | 'JOINT'
