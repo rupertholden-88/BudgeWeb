@@ -37,11 +37,51 @@ function AmountCell({ value, onChange }: { value: number; onChange: (v: number) 
   )
 }
 
-function CategoryCard({ cat, onUpdateAmount, onAddItem, onRemoveItem, onRenameCategory, onDeleteCategory }: {
+function ItemRow({ catKey, item, onUpdateAmount, onRemoveItem, onRenameItem }: {
+  catKey: string
+  item: { id: string; label: string; amount: number }
+  onUpdateAmount: (catKey: string, itemId: string, v: number) => void
+  onRemoveItem: (catKey: string, itemId: string) => void
+  onRenameItem: (catKey: string, itemId: string, label: string) => void
+}) {
+  const [editingLabel, setEditingLabel] = useState(false)
+  const [labelDraft, setLabelDraft] = useState(item.label)
+  const commitLabel = () => { onRenameItem(catKey, item.id, labelDraft); setEditingLabel(false) }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+      {editingLabel ? (
+        <>
+          <input value={labelDraft} onChange={e => setLabelDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') commitLabel() }}
+            onBlur={commitLabel}
+            style={{ flex: 1, fontSize: 13, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', outline: 'none' }}
+            autoFocus />
+          <button onClick={commitLabel} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', display: 'flex' }}>
+            <Check size={12} />
+          </button>
+        </>
+      ) : (
+        <>
+          <span style={{ flex: 1, fontSize: 13, color: 'var(--muted)' }}>{item.label}</span>
+          <button onClick={() => { setLabelDraft(item.label); setEditingLabel(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--border)', display: 'flex', padding: 2 }}>
+            <Pencil size={11} />
+          </button>
+        </>
+      )}
+      <AmountCell value={item.amount} onChange={v => onUpdateAmount(catKey, item.id, v)} />
+      <button onClick={() => onRemoveItem(catKey, item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--border)', display: 'flex', padding: 2 }}>
+        <Trash2 size={12} />
+      </button>
+    </div>
+  )
+}
+
+function CategoryCard({ cat, onUpdateAmount, onAddItem, onRemoveItem, onRenameItem, onRenameCategory, onDeleteCategory }: {
   cat: Category
   onUpdateAmount: (catKey: string, itemId: string, v: number) => void
   onAddItem: (catKey: string, label: string) => void
   onRemoveItem: (catKey: string, itemId: string) => void
+  onRenameItem: (catKey: string, itemId: string, label: string) => void
   onRenameCategory: (catKey: string, label: string) => void
   onDeleteCategory: (catKey: string) => void
 }) {
@@ -60,10 +100,7 @@ function CategoryCard({ cat, onUpdateAmount, onAddItem, onRemoveItem, onRenameCa
       setAddingItem(false)
     }
   }
-  const commitName = () => {
-    onRenameCategory(cat.key, nameDraft)
-    setEditingName(false)
-  }
+  const commitName = () => { onRenameCategory(cat.key, nameDraft); setEditingName(false) }
   return (
     <div className="card fade-up" style={{ marginBottom: 8, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderLeft: '3px solid ' + color, background: open ? 'var(--card)' : 'var(--surface)' }}>
@@ -100,13 +137,7 @@ function CategoryCard({ cat, onUpdateAmount, onAddItem, onRemoveItem, onRenameCa
       {open && (
         <div style={{ padding: '0 12px 8px' }}>
           {cat.items.map(item => (
-            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ flex: 1, fontSize: 13, color: 'var(--muted)' }}>{item.label}</span>
-              <AmountCell value={item.amount} onChange={v => onUpdateAmount(cat.key, item.id, v)} />
-              <button onClick={() => onRemoveItem(cat.key, item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--border)', display: 'flex', padding: 2 }}>
-                <Trash2 size={12} />
-              </button>
-            </div>
+            <ItemRow key={item.id} catKey={cat.key} item={item} onUpdateAmount={onUpdateAmount} onRemoveItem={onRemoveItem} onRenameItem={onRenameItem} />
           ))}
           {addingItem ? (
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
@@ -203,7 +234,7 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
             {type === 'INCOME' ? 'Income' : type === 'EXPENSE' ? 'Expenses' : 'Savings'}
           </div>
           {grouped[type].map(cat => (
-            <CategoryCard key={cat.key} cat={cat} onUpdateAmount={updateItemAmount} onAddItem={addItem} onRemoveItem={removeItem} onRenameCategory={renameCategory} onDeleteCategory={deleteCategory} />
+            <CategoryCard key={cat.key} cat={cat} onUpdateAmount={updateItemAmount} onAddItem={addItem} onRemoveItem={removeItem} onRenameItem={renameItem} onRenameCategory={renameCategory} onDeleteCategory={deleteCategory} />
           ))}
         </div>
       ))}
