@@ -6,16 +6,18 @@ import BudgetScreen from '@/components/BudgetScreen'
 import ChartsScreen from '@/components/ChartsScreen'
 import SavingsScreen from '@/components/SavingsScreen'
 import DebtsScreen from '@/components/DebtsScreen'
+import SettingsScreen from '@/components/SettingsScreen'
 import { TabFilter } from '@/lib/models'
-import { LayoutDashboard, BarChart3, PiggyBank, CreditCard, User, RefreshCw } from 'lucide-react'
+import { LayoutDashboard, BarChart3, PiggyBank, CreditCard, User, RefreshCw, Settings } from 'lucide-react'
 
-type Screen = 'budget' | 'charts' | 'savings' | 'debts'
+type Screen = 'budget' | 'charts' | 'savings' | 'debts' | 'settings'
 
 const NAV = [
-  { id: 'budget'  as Screen, label: 'Budget',   Icon: LayoutDashboard },
-  { id: 'charts'  as Screen, label: 'Analysis', Icon: BarChart3 },
-  { id: 'savings' as Screen, label: 'Assets',   Icon: PiggyBank },
-  { id: 'debts'   as Screen, label: 'Debts',    Icon: CreditCard },
+  { id: 'budget'   as Screen, label: 'Budget',   Icon: LayoutDashboard },
+  { id: 'charts'   as Screen, label: 'Analysis', Icon: BarChart3 },
+  { id: 'savings'  as Screen, label: 'Assets',   Icon: PiggyBank },
+  { id: 'debts'    as Screen, label: 'Debts',    Icon: CreditCard },
+  { id: 'settings' as Screen, label: 'Settings', Icon: Settings },
 ]
 
 export default function HomePage() {
@@ -59,10 +61,11 @@ export default function HomePage() {
       )}
 
       <main style={{ flex: 1, overflow: 'hidden' }}>
-        {screen === 'budget'  && <BudgetScreen  budget={budget} tab={tab} onNavigateToDebts={() => setScreen('debts')} />}
-        {screen === 'charts'  && <ChartsScreen  budget={budget} />}
-        {screen === 'savings' && <SavingsScreen budget={budget} />}
-        {screen === 'debts'   && <DebtsScreen   budget={budget} />}
+        {screen === 'budget'   && <BudgetScreen   budget={budget} tab={tab} onNavigateToDebts={() => setScreen('debts')} />}
+        {screen === 'charts'   && <ChartsScreen   budget={budget} />}
+        {screen === 'savings'  && <SavingsScreen  budget={budget} />}
+        {screen === 'debts'    && <DebtsScreen    budget={budget} />}
+        {screen === 'settings' && <SettingsScreen budget={budget} />}
       </main>
 
       <nav style={{ background: 'var(--card)', borderTop: '1px solid var(--border)', display: 'flex', flexShrink: 0 }}>
