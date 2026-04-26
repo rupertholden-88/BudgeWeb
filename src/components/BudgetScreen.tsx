@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Category, TabFilter, Owner, EntryType, fmt, calcTotals, BudgetData } from '@/lib/models'
-import { Plus, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
+import { Category, TabFilter, Owner, EntryType, fmt, calcTotals } from '@/lib/models'
+import { Plus, ChevronDown, ChevronUp, Trash2, Pencil, Check } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -60,24 +60,37 @@ function CategoryCard({ cat, onUpdateAmount, onAddItem, onRemoveItem, onRenameCa
       setAddingItem(false)
     }
   }
+  const commitName = () => {
+    onRenameCategory(cat.key, nameDraft)
+    setEditingName(false)
+  }
   return (
     <div className="card fade-up" style={{ marginBottom: 8, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderLeft: '3px solid ' + color, background: open ? 'var(--card)' : 'var(--surface)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderLeft: '3px solid ' + color, background: open ? 'var(--card)' : 'var(--surface)' }}>
         {editingName ? (
-          <input value={nameDraft} onChange={e => setNameDraft(e.target.value)}
-            onBlur={() => { onRenameCategory(cat.key, nameDraft); setEditingName(false) }}
-            onKeyDown={e => { if (e.key === 'Enter') { onRenameCategory(cat.key, nameDraft); setEditingName(false) } }}
-            style={{ flex: 1, fontSize: 14, fontWeight: 600, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', outline: 'none' }} autoFocus />
+          <>
+            <input value={nameDraft} onChange={e => setNameDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') commitName() }}
+              style={{ flex: 1, fontSize: 14, fontWeight: 600, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '4px 8px', outline: 'none' }} autoFocus />
+            <button onClick={commitName} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex' }}>
+              <Check size={14} />
+            </button>
+          </>
         ) : (
-          <span style={{ flex: 1, fontSize: 14, fontWeight: 600, cursor: 'pointer' }} onDoubleClick={() => { setNameDraft(cat.label); setEditingName(true) }}>
-            {cat.label}
-            {cat.note && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>{'— ' + cat.note}</span>}
-          </span>
+          <>
+            <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>
+              {cat.label}
+              {cat.note && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>{'— ' + cat.note}</span>}
+            </span>
+            <button onClick={() => { setNameDraft(cat.label); setEditingName(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 2 }}>
+              <Pencil size={13} />
+            </button>
+          </>
         )}
         <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: bg, color: text, fontWeight: 600 }}>
           {cat.type === 'INCOME' ? 'Income' : cat.type === 'EXPENSE' ? 'Expense' : 'Savings'}
         </span>
-        <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 14, minWidth: 64, textAlign: 'right' }}>
+        <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 14, minWidth: 56, textAlign: 'right' }}>
           {total > 0 ? fmt(total) : '—'}
         </span>
         <button onClick={() => setOpen(o => !o)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 2 }}>
