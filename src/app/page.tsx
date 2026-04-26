@@ -20,11 +20,84 @@ const NAV = [
   { id: 'settings' as Screen, label: 'Settings', Icon: Settings },
 ]
 
+function SetupScreen({ onDone, updateOwnerName, signIn }: {
+  onDone: () => void
+  updateOwnerName: (owner: 'NIAMH' | 'RUPERT' | 'JOINT', name: string) => void
+  signIn: () => void
+}) {
+  const [name1, setName1] = useState('')
+  const [name2, setName2] = useState('')
+
+  const submit = () => {
+    if (name1.trim()) updateOwnerName('NIAMH', name1.trim())
+    if (name2.trim()) updateOwnerName('RUPERT', name2.trim())
+    if (!name1.trim()) updateOwnerName('NIAMH', 'Person 1')
+    if (!name2.trim()) updateOwnerName('RUPERT', 'Person 2')
+    onDone()
+  }
+
+  return (
+    <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, background: 'var(--surface)' }}>
+      <h1 style={{ fontFamily: 'DM Serif Display, serif', fontSize: 36, margin: '0 0 8px', color: 'var(--ink)' }}>Budge</h1>
+      <p style={{ color: 'var(--muted)', fontSize: 15, marginBottom: 40, textAlign: 'center' }}>
+        A shared household budget for two.
+      </p>
+
+      <div className="card" style={{ width: '100%', maxWidth: 360, padding: 24 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16, color: 'var(--ink)' }}>Who's using Budge?</div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Person 1</label>
+            <input
+              value={name1}
+              onChange={e => setName1(e.target.value)}
+              placeholder="e.g. Niamh"
+              style={{ width: '100%', fontSize: 15, border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px 12px', outline: 'none', background: 'var(--card)' }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Person 2</label>
+            <input
+              value={name2}
+              onChange={e => setName2(e.target.value)}
+              placeholder="e.g. Rupert"
+              onKeyDown={e => { if (e.key === 'Enter') submit() }}
+              style={{ width: '100%', fontSize: 15, border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px 12px', outline: 'none', background: 'var(--card)' }}
+            />
+          </div>
+        </div>
+
+        <button onClick={submit} style={{ width: '100%', background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 8, padding: '12px', cursor: 'pointer', fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
+          Get started
+        </button>
+
+        <button onClick={signIn} style={{ width: '100%', background: 'none', color: 'var(--muted)', border: '1.5px solid var(--border)', borderRadius: 8, padding: '12px', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <User size={15} /> Sign in to restore existing budget
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function HomePage() {
   const budget = useBudget()
   const [screen, setScreen] = useState<Screen>('budget')
   const [tab, setTab] = useState<TabFilter>('ALL')
-  const { data, user, savedAt, isRefreshing, signIn, signOutUser, refreshFromCloud } = budget
+  const [setupDone, setSetupDone] = useState(false)
+  const { data, user, savedAt, isRefreshing, signIn, signOutUser, refreshFromCloud, updateOwnerName } = budget
+
+  const needsSetup = !setupDone && !user && !data.nameNiamh && !data.nameRupert
+
+  if (needsSetup) {
+    return (
+      <SetupScreen
+        onDone={() => setSetupDone(true)}
+        updateOwnerName={updateOwnerName}
+        signIn={() => { signIn(); setSetupDone(true) }}
+      />
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: 'var(--surface)' }}>
@@ -50,7 +123,7 @@ export default function HomePage() {
       {screen === 'budget' && (
         <div style={{ background: 'var(--card)', borderBottom: '1px solid var(--border)', padding: '8px 16px', display: 'flex', gap: 8, flexShrink: 0, overflowX: 'auto' }}>
           {(['ALL', 'NIAMH', 'RUPERT', 'JOINT'] as TabFilter[]).map(t => {
-            const label = t === 'ALL' ? 'All' : t === 'NIAMH' ? data.nameNiamh : t === 'RUPERT' ? data.nameRupert : data.nameJoint
+            const label = t === 'ALL' ? 'All' : t === 'NIAMH' ? (data.nameNiamh || 'Person 1') : t === 'RUPERT' ? (data.nameRupert || 'Person 2') : (data.nameJoint || 'Joint')
             return (
               <button key={t} onClick={() => setTab(t)} className={tab === t ? `chip chip-${t.toLowerCase()}` : 'chip chip-inactive'}>
                 {label}

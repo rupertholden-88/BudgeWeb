@@ -14,7 +14,7 @@ export interface Totals { incN: number; incR: number; expN: number; expR: number
 
 export function defaultBudgetData(): BudgetData {
   return {
-    nameNiamh: 'Niamh', nameRupert: 'Rupert', nameJoint: 'Joint',
+    nameNiamh: '', nameRupert: '', nameJoint: 'Joint',
     savedAt: '', savingsHistory: [], debts: [],
     categories: [
       { key: 'inc_n', owner: 'NIAMH', type: 'INCOME', label: 'Income', items: [
@@ -132,3 +132,7 @@ export function calcTotals(budget: BudgetData): Totals {
 export const fmt = (n: number) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(n)
 export type TabFilter = 'ALL' | 'NIAMH' | 'RUPERT' | 'JOINT'
+
+export function isFirstRun(data: BudgetData): boolean {
+  return !data.nameNiamh && !data.nameRupert
+}
