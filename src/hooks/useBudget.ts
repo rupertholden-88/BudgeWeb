@@ -4,9 +4,18 @@ import { useState, useEffect, useRef } from 'react'
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore'
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth'
 import { db, auth, provider } from '@/lib/firebase'
-import { BudgetData, Asset, Debt, Owner, EntryType, AssetType, DebtType, defaultBudgetData, calcTotals, Totals } from '@/lib/models'
+import { BudgetData, Debt, Owner, EntryType, AssetType, DebtType, defaultBudgetData, calcTotals, Totals } from '@/lib/models'
 
 function uuid() { return crypto.randomUUID() }
+
+function mergeNames(incoming: BudgetData, current: BudgetData): BudgetData {
+  return {
+    ...incoming,
+    nameNiamh:  incoming.nameNiamh  || current.nameNiamh  || 'Niamh',
+    nameRupert: incoming.nameRupert || current.nameRupert || 'Rupert',
+    nameJoint:  incoming.nameJoint  || current.nameJoint  || 'Joint',
+  }
+}
 
 export function useBudget() {
   const [data, setData]               = useState<BudgetData>(defaultBudgetData())
@@ -16,6 +25,7 @@ export function useBudget() {
   const lastSavedAt                   = useRef<number>(0)
   const saveTimer                     = useRef<ReturnType<typeof setTimeout> | null>(null)
   const unsubscribeCloud              = useRef<(() => void) | null>(null)
+  const currentData                   = useRef<BudgetData>(defaultBudgetData())
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
@@ -24,6 +34,9 @@ export function useBudget() {
       else { unsubscribeCloud.current?.(); unsubscribeCloud.current = null }
     })
   }, [])
+
+  // Keep ref in sync so cloud listener can access latest local data
+  useEffect(() => { currentData.current = data }, [data])
 
   const signIn = () => signInWithPopup(auth, provider)
   const signOutUser = () => signOut(auth)
@@ -38,7 +51,8 @@ export function useBudget() {
         const cloudTs = new Date(cloudData.savedAt || '1970-01-01').getTime()
         if (cloudTs > lastSavedAt.current) {
           lastSavedAt.current = cloudTs
-          setData(cloudData)
+          const merged = mergeNames(cloudData, currentData.current)
+          setData(merged)
           setSavedAt(cloudData.savedAt)
         }
       } catch { }
@@ -58,7 +72,9 @@ export function useBudget() {
       const snap = await getDoc(doc(db, 'users', user.email))
       if (snap.exists()) {
         const cloudData: BudgetData = JSON.parse(snap.data().json)
-        setData(cloudData); setSavedAt(cloudData.savedAt)
+        const merged = mergeNames(cloudData, currentData.current)
+        setData(merged)
+        setSavedAt(cloudData.savedAt)
       }
     } finally { setRefreshing(false) }
   }
@@ -155,7 +171,12 @@ export function useBudget() {
 
   const getJsonString = () => JSON.stringify(data, null, 2)
   const importFromJson = (json: string): boolean => {
-    try { setData(JSON.parse(json)); return true } catch { return false }
+    try {
+      const parsed = JSON.parse(json)
+      const merged = mergeNames(parsed, currentData.current)
+      setData(merged)
+      return true
+    } catch { return false }
   }
 
   const totals: Totals = calcTotals(data)
