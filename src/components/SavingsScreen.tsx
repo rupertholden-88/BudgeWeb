@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Owner, AssetType, SavingsSnapshot, fmt } from '@/lib/models'
-import { Plus, Trash2 } from 'lucide-react'
+import { Owner, AssetType, fmt } from '@/lib/models'
+import { Plus, Trash2, Pencil, Check } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -33,10 +33,98 @@ function AmountInput({ value, onChange }: { value: number; onChange: (v: number)
   )
 }
 
-function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }: {
+function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
+  asset: { id: string; label: string; amount: number; type: AssetType; interestRate?: number; institution?: string }
   owner: Owner
-  name: string
-  budget: BudgetHook['data']
+  today: string
+  updateAsset: BudgetHook['updateAsset']
+  deleteAsset: BudgetHook['deleteAsset']
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [editingLabel, setEditingLabel] = useState(false)
+  const [labelDraft, setLabelDraft] = useState(asset.label)
+  const [editingType, setEditingType] = useState(false)
+
+  const commitLabel = () => {
+    if (labelDraft.trim()) {
+      updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution)
+    }
+    setEditingLabel(false)
+  }
+
+  return (
+    <div style={{ borderBottom: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0' }}>
+        {editingLabel ? (
+          <>
+            <input value={labelDraft} onChange={e => setLabelDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution); setEditingLabel(false) } }}
+              onBlur={() => { updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution); setEditingLabel(false) }}
+              style={{ flex: 1, fontSize: 13, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', outline: 'none' }}
+              autoFocus />
+            <button onClick={commitLabel} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', display: 'flex' }}>
+              <Check size={12} />
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{asset.label}</div>
+              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>
+                {ASSET_LABELS[asset.type] ?? asset.type}
+                {asset.interestRate ? ` · ${asset.interestRate}%` : ''}
+                {asset.institution ? ` · ${asset.institution}` : ''}
+              </div>
+            </div>
+            <button onClick={() => { setLabelDraft(asset.label); setEditingLabel(true) }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--border)', display: 'flex', padding: 2 }}>
+              <Pencil size={11} />
+            </button>
+          </>
+        )}
+        <AmountInput value={asset.amount || 0} onChange={v => updateAsset(owner, today, asset.id, v, asset.interestRate, asset.institution)} />
+        <button onClick={() => setExpanded(e => !e)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 10, padding: '2px 4px' }}>
+          {expanded ? '▲' : '▼'}
+        </button>
+        <button onClick={() => deleteAsset(owner, today, asset.id)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--border)', display: 'flex', padding: 2 }}>
+          <Trash2 size={12} />
+        </button>
+      </div>
+
+      {expanded && (
+        <div style={{ padding: '0 0 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Type</label>
+            <select value={asset.type}
+              onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution)}
+              style={{ fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', background: 'var(--card)' }}>
+              {Object.entries(ASSET_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rate %</label>
+            <input type="number" value={asset.interestRate || ''}
+              onChange={e => updateAsset(owner, today, asset.id, asset.amount, parseFloat(e.target.value) || undefined, asset.institution)}
+              placeholder="0"
+              style={{ width: 70, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', outline: 'none' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Institution</label>
+            <input value={asset.institution || ''}
+              onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, e.target.value)}
+              placeholder="e.g. Monzo"
+              style={{ width: 110, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', outline: 'none' }} />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }: {
+  owner: Owner; name: string; budget: BudgetHook['data']
   addAsset: BudgetHook['addAsset']
   updateAsset: BudgetHook['updateAsset']
   deleteAsset: BudgetHook['deleteAsset']
@@ -50,36 +138,19 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }:
   const [newType, setNewType] = useState<AssetType>('SAVINGS_ACCOUNT')
 
   const submit = () => {
-    if (newLabel.trim()) {
-      addAsset(owner, today, newType, newLabel.trim())
-      setNewLabel('')
-      setAdding(false)
-    }
+    if (newLabel.trim()) { addAsset(owner, today, newType, newLabel.trim()); setNewLabel(''); setAdding(false) }
   }
 
   return (
     <div className="card" style={{ marginBottom: 12, borderLeft: `3px solid ${OWNER_COLORS[owner]}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
         <span style={{ fontWeight: 600, fontSize: 14 }}>{name}</span>
-        <span style={{ fontWeight: 700, fontSize: 16, fontVariantNumeric: 'tabular-nums', color: total > 0 ? 'var(--positive)' : 'var(--muted)' }}>
-          {fmt(total)}
-        </span>
+        <span style={{ fontWeight: 700, fontSize: 16, fontVariantNumeric: 'tabular-nums', color: total > 0 ? 'var(--positive)' : 'var(--muted)' }}>{fmt(total)}</span>
       </div>
       <div style={{ padding: '4px 12px 8px' }}>
         {assets.map(asset => (
-          <div key={asset.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ flex: 1, fontSize: 13 }}>{asset.label}</span>
-            <span style={{ fontSize: 10, background: 'var(--surface)', padding: '2px 6px', borderRadius: 4, color: 'var(--muted)', flexShrink: 0 }}>
-              {ASSET_LABELS[asset.type] ?? asset.type}
-            </span>
-            <AmountInput value={asset.amount || 0} onChange={v => updateAsset(owner, today, asset.id, v)} />
-            <button onClick={() => deleteAsset(owner, today, asset.id)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--border)', display: 'flex', padding: 2, flexShrink: 0 }}>
-              <Trash2 size={12} />
-            </button>
-          </div>
+          <AssetRow key={asset.id} asset={asset as any} owner={owner} today={today} updateAsset={updateAsset} deleteAsset={deleteAsset} />
         ))}
-
         {adding ? (
           <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             <input value={newLabel} onChange={e => setNewLabel(e.target.value)}
@@ -94,8 +165,7 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }:
             <button onClick={() => setAdding(false)} style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
           </div>
         ) : (
-          <button onClick={() => setAdding(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }}>
+          <button onClick={() => setAdding(true)} style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }}>
             <Plus size={12} /> Add asset
           </button>
         )}
@@ -107,7 +177,6 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }:
 export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   const { data, addAsset, updateAsset, deleteAsset } = budget
   const today = new Date().toISOString().slice(0, 7)
-
   const totalAll = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
     const assets = Array.isArray(snap?.assets) ? snap!.assets : []
