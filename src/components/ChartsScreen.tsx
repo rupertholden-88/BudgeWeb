@@ -103,6 +103,30 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
     <div style={{ height: '100%', overflowY: 'auto', padding: 16 }}>
       <h2 style={{ fontSize: 20, marginBottom: 16, marginTop: 0 }}>Analysis</h2>
 
+      {/* Expense pie */}
+      {expenseData.length > 0 && (
+        <div className="card" style={{ padding: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Expenses by Category</div>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie data={expenseData} cx="50%" cy="50%" outerRadius={80} dataKey="value">
+                {expenseData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+              </Pie>
+              <Tooltip formatter={(v: number) => fmt(v)} />
+            </PieChart>
+          </ResponsiveContainer>
+          {expenseData.map((d, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: PIE_COLORS[i % PIE_COLORS.length], display: 'inline-block', flexShrink: 0 }} />
+                {d.name}
+              </span>
+              <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt(d.value)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Monthly stacked bar — expenses + savings */}
       <div className="card" style={{ padding: 16, marginBottom: 12 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Monthly Spend & Savings</div>
@@ -184,29 +208,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
         </div>
       )}
 
-      {/* Expense pie */}
-      {expenseData.length > 0 && (
-        <div className="card" style={{ padding: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Expenses by Category</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={expenseData} cx="50%" cy="50%" outerRadius={80} dataKey="value">
-                {expenseData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-              </Pie>
-              <Tooltip formatter={(v: number) => fmt(v)} />
-            </PieChart>
-          </ResponsiveContainer>
-          {expenseData.map((d, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: PIE_COLORS[i % PIE_COLORS.length], display: 'inline-block', flexShrink: 0 }} />
-                {d.name}
-              </span>
-              <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt(d.value)}</span>
-            </div>
-          ))}
-        </div>
-      )}
+
 
       {/* Top 5 expenses */}
       {top5.length > 0 && (
