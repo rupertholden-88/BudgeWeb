@@ -210,7 +210,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
 
       {/* Top 5 expenses */}
       {top5.length > 0 && (
-        <div className="card" style={{ padding: 16, marginBottom: 12 }}>
+        <div className="card" style={{ padding: 16, marginBottom: 12, marginTop: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Top 5 Expenses</div>
           {top5.map((item, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: i < top5.length - 1 ? '1px solid var(--border)' : 'none' }}>
