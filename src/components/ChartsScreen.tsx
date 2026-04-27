@@ -80,13 +80,6 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
       .sort((a, b) => b.value - a.value)
   , [data, expFilter])
 
-  const top5 = useMemo(() =>
-    data.categories
-      .filter(c => c.type === 'EXPENSE')
-      .flatMap(c => c.items.filter(i => i.amount > 0).map(i => ({ label: i.label, amount: i.amount, category: c.label })))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 5)
-  , [data])
 
   const overviewData = [
     { name: 'Expenses', value: totals.totalExp, fill: 'var(--expense-text)' },
