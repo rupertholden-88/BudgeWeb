@@ -97,28 +97,26 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
       <h2 style={{ fontSize: 20, marginBottom: 16, marginTop: 0 }}>Analysis</h2>
 
       {/* Monthly stacked bar — expenses + savings */}
-      {hasMultipleMonths && (
-        <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Monthly Spend & Savings</div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>Stacked — tap a bar for breakdown</div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={monthlyData} barSize={32} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis hide />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="Expenses" stackId="a" fill="var(--expense-text)" radius={[0,0,0,0]}>
-                <LabelList dataKey="Expenses" position="inside" style={{ fontSize: 10, fill: 'white', fontWeight: 600 }}
-                  formatter={(v: number) => v > 0 ? fmt(v) : ''} />
-              </Bar>
-              <Bar dataKey="Savings" stackId="a" fill="var(--savings-text)" radius={[4,4,0,0]}>
-                <LabelList dataKey="Savings" position="inside" style={{ fontSize: 10, fill: 'white', fontWeight: 600 }}
-                  formatter={(v: number) => v > 0 ? fmt(v) : ''} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+      <div className="card" style={{ padding: 16, marginBottom: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Monthly Spend & Savings</div>
+        <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>Stacked — tap a bar for breakdown</div>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={monthlyData} barSize={40} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
+            <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis hide />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+            <Bar dataKey="Expenses" stackId="stack" fill="var(--expense-text)" radius={[0,0,0,0]}>
+              <LabelList dataKey="Expenses" position="insideTop" style={{ fontSize: 10, fill: 'white', fontWeight: 600 }}
+                formatter={(v: number) => v && v > 0 ? fmt(v) : ''} />
+            </Bar>
+            <Bar dataKey="Savings" stackId="stack" fill="var(--savings-text)" radius={[4,4,0,0]}>
+              <LabelList dataKey="Savings" position="insideTop" style={{ fontSize: 10, fill: 'white', fontWeight: 600 }}
+                formatter={(v: number) => v && v > 0 ? fmt(v) : ''} />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
 
       {/* Assets over time */}
       {hasMultipleMonths && (
