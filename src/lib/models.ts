@@ -49,7 +49,7 @@ export function defaultBudgetData(): BudgetData {
       { key: 'sav_r', owner: 'RUPERT', type: 'SAVINGS', label: 'Monthly Savings Plan', items: [
         { id: 'sav_r_0', label: 'Personal Savings', amount: 0, priority: 'NONE' },
       ]},
-      { key: 'house_n', owner: 'JOINT', type: 'EXPENSE', label: 'House Costs', items: [
+      { key: 'house_n', owner: 'JOINT', type: 'EXPENSE', label: 'Accommodation', items: [
         { id: 'house_n_0', label: 'Mortgage / Rent', amount: 0, priority: 'NECESSITY' },
         { id: 'house_n_1', label: 'Council Tax', amount: 0, priority: 'NECESSITY' },
         { id: 'house_n_2', label: 'Water', amount: 0, priority: 'NECESSITY' },
@@ -57,7 +57,7 @@ export function defaultBudgetData(): BudgetData {
         { id: 'house_n_4', label: 'Insurance', amount: 0, priority: 'NECESSITY' },
         { id: 'house_n_5', label: 'Maintenance', amount: 0, priority: 'NECESSITY' },
       ]},
-      { key: 'house_r', owner: 'JOINT', type: 'EXPENSE', label: 'House Costs', items: [
+      { key: 'house_r', owner: 'JOINT', type: 'EXPENSE', label: 'Accommodation', items: [
         { id: 'house_r_0', label: 'Mortgage / Rent', amount: 0, priority: 'NECESSITY' },
         { id: 'house_r_1', label: 'Council Tax', amount: 0, priority: 'NECESSITY' },
         { id: 'house_r_2', label: 'Water', amount: 0, priority: 'NECESSITY' },
