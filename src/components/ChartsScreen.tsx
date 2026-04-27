@@ -140,7 +140,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
       )}
 
       {/* Monthly stacked bar — expenses + savings */}
-      <div className="card" style={{ padding: 16, marginBottom: 12 }}>
+      <div className="card" style={{ padding: 16, marginBottom: 12, marginTop: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Monthly Spend & Savings</div>
         <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>Stacked — tap a bar for breakdown</div>
         <ResponsiveContainer width="100%" height={220}>
