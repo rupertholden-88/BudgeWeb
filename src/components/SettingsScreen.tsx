@@ -50,7 +50,27 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
 
   const handleExport = () => {
     const json = getJsonString()
-    navigator.clipboard.writeText(json).then(() => setImportResult('JSON copied to clipboard!'))
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `budge-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setImportResult('Downloaded!')
+  }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string
+      const ok = importFromJson(text)
+      setImportResult(ok ? 'Imported successfully!' : 'Invalid file — check the format')
+    }
+    reader.readAsText(file)
+    e.target.value = ''
   }
 
   return (
@@ -72,16 +92,22 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
       <div className="card" style={{ padding: '4px 16px', marginBottom: 12 }}>
         <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', padding: '10px 0 4px' }}>Export / Import</div>
         <button onClick={handleExport} style={{ width: '100%', marginTop: 8, background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
-          Copy budget JSON to clipboard
+          Download backup (.json)
         </button>
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6 }}>Paste JSON to import:</div>
+        <div style={{ marginTop: 10 }}>
+          <label style={{ display: 'block', width: '100%', background: 'var(--rupert)', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 500, textAlign: 'center' }}>
+            Upload backup (.json)
+            <input type="file" accept=".json" onChange={handleFileUpload} style={{ display: 'none' }} />
+          </label>
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>Or paste JSON directly:</div>
           <textarea value={importText} onChange={e => setImportText(e.target.value)}
             placeholder="Paste exported JSON here..."
-            style={{ width: '100%', height: 100, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 8, padding: '8px', outline: 'none', resize: 'vertical', fontFamily: 'monospace' }} />
+            style={{ width: '100%', height: 80, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 8, padding: '8px', outline: 'none', resize: 'vertical', fontFamily: 'monospace' }} />
           <button onClick={handleImport} disabled={!importText.trim()}
             style={{ width: '100%', marginTop: 6, background: importText.trim() ? 'var(--rupert)' : 'var(--border)', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', cursor: importText.trim() ? 'pointer' : 'default', fontSize: 14, fontWeight: 500 }}>
-            Import
+            Import from text
           </button>
         </div>
         {importResult && (
