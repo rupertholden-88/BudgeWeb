@@ -168,7 +168,7 @@ function SummaryBar({ totals }: { totals: ReturnType<typeof calcTotals> }) {
     { label: 'Income', value: totals.totalInc, color: 'var(--income-text)' },
     { label: 'Expenses', value: totals.totalExp, color: 'var(--expense-text)' },
     { label: 'Savings', value: totals.totalSav, color: 'var(--savings-text)' },
-    { label: 'Net', value: totals.net, color: totals.net >= 0 ? 'var(--positive)' : 'var(--negative)' },
+    { label: 'Leftover', value: totals.net, color: totals.net >= 0 ? 'var(--positive)' : 'var(--negative)' },
   ]
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
@@ -201,7 +201,7 @@ function PersonSummary({ name, inc, exp, sav, debt, hjExp, hjSav, hjDebt, color 
         <Row label="Savings" value={sav} c="var(--savings-text)" />
         {debt > 0 && <Row label="Personal debts" value={debt} c="var(--expense-text)" />}
         <div style={{ borderTop: '1px solid var(--border)', marginTop: 4, paddingTop: 4 }}>
-          <Row label="Net" value={net} c={net >= 0 ? 'var(--positive)' : 'var(--negative)'} bold />
+          <Row label="Leftover" value={net} c={net >= 0 ? 'var(--positive)' : 'var(--negative)'} bold />
         </div>
       </div>
     </div>
