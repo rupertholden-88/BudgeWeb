@@ -186,7 +186,7 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }:
 }
 
 export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, addAsset, updateAsset, deleteAsset, addItem } = budget
+  const { data, addAsset, updateAsset, deleteAsset, addItemWithAmount } = budget
   const today = new Date().toISOString().slice(0, 7)
   const totalAll = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
@@ -250,7 +250,8 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
                 byOwner.forEach(({ owner, monthly, assets }) => {
                   const catKey = owner === 'NIAMH' ? 'inc_n' : owner === 'RUPERT' ? 'inc_r' : 'inc_joint'
                   assets.forEach((a: any) => {
-                    addItem(catKey, `Interest - ${a.label}`)
+                    const monthlyYield = Math.round((a.amount * (a.interestRate || 0)) / 100 / 12)
+                    addItemWithAmount(catKey, `Interest - ${a.label}`, monthlyYield)
                   })
                 })
               }}

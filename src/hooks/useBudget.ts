@@ -122,6 +122,11 @@ export function useBudget() {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: [...c.items, { id: uuid(), label: label.trim(), amount: 0, priority: 'DISCRETIONARY' as const }] }) }))
   }
 
+  const addItemWithAmount = (catKey: string, label: string, amount: number) => {
+    if (!label.trim()) return
+    mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: [...c.items, { id: uuid(), label: label.trim(), amount, priority: 'NONE' as const }] }) }))
+  }
+
   const removeItem = (catKey: string, itemId: string) => {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.filter(i => i.id !== itemId) }) }))
   }
@@ -185,7 +190,7 @@ export function useBudget() {
     data, user, savedAt, isRefreshing, totals,
     signIn, signOutUser, refreshFromCloud,
     updateOwnerName, addCategory, renameCategory, deleteCategory,
-    updateItemAmount, addItem, removeItem, renameItem,
+    updateItemAmount, addItem, addItemWithAmount, removeItem, renameItem,
     addAsset, updateAsset, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,
