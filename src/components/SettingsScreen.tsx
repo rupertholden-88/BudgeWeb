@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Owner } from '@/lib/models'
 import { Check, Pencil } from 'lucide-react'
 
@@ -41,6 +41,19 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
   const { data, updateOwnerName, getJsonString, importFromJson } = budget
   const [importText, setImportText] = useState('')
   const [importResult, setImportResult] = useState<string | null>(null)
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    const saved = localStorage.getItem('budge-dark-mode')
+    if (saved === 'true') { setDarkMode(true); document.documentElement.setAttribute('data-theme', 'dark') }
+  }, [])
+
+  const toggleDarkMode = () => {
+    const next = !darkMode
+    setDarkMode(next)
+    document.documentElement.setAttribute('data-theme', next ? 'dark' : '')
+    localStorage.setItem('budge-dark-mode', String(next))
+  }
 
   const handleImport = () => {
     const ok = importFromJson(importText)
@@ -86,6 +99,25 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
         <p style={{ fontSize: 12, color: 'var(--muted)', margin: '8px 0' }}>
           These names appear throughout the app. Changes sync to all devices.
         </p>
+      </div>
+
+      {/* Dark mode */}
+      <div className="card" style={{ padding: '4px 16px', marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', padding: '10px 0 4px' }}>Appearance</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
+          <span style={{ fontSize: 14 }}>Dark mode</span>
+          <button onClick={toggleDarkMode} style={{
+            width: 48, height: 26, borderRadius: 999, border: 'none', cursor: 'pointer',
+            background: darkMode ? 'var(--ink)' : 'var(--border)',
+            position: 'relative', transition: 'background 0.2s',
+          }}>
+            <div style={{
+              width: 20, height: 20, borderRadius: '50%', background: 'white',
+              position: 'absolute', top: 3, transition: 'left 0.2s',
+              left: darkMode ? 24 : 4,
+            }} />
+          </button>
+        </div>
       </div>
 
       {/* Export / Import */}

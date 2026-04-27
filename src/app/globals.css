@@ -27,6 +27,25 @@
 }
 
 * { box-sizing: border-box; }
+
+[data-theme="dark"] {
+  --surface: #111118;
+  --card: #1C1C26;
+  --border: #2E2E3E;
+  --ink: #F0F0F5;
+  --muted: #8888A0;
+  --income-bg: #1A2E22;
+  --income-text: #4CAF70;
+  --expense-bg: #2E1A1A;
+  --expense-text: #E57373;
+  --savings-bg: #1A1F35;
+  --savings-text: #6B9FE8;
+  --positive: #4CAF70;
+  --negative: #E57373;
+  --niamh-light: #2E1E1A;
+  --rupert-light: #1A2030;
+  --joint-light: #1A2E1A;
+}
 html, body { font-family: 'DM Sans', sans-serif; background: var(--surface); color: var(--ink); -webkit-font-smoothing: antialiased; }
 h1, h2, h3 { font-family: 'DM Serif Display', serif; }
 ::-webkit-scrollbar { width: 4px; height: 4px; }
