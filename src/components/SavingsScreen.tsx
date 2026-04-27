@@ -218,14 +218,14 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
 
         if (allAssets.length === 0) return null
 
-        const totalMonthly = allAssets.reduce((acc, a) => acc + (a.amount * a.interestRate) / 100 / 12, 0)
+        const totalMonthly = allAssets.reduce((acc, a) => acc + (a.amount * (a.interestRate || 0)) / 100 / 12, 0)
         const totalAnnual = totalMonthly * 12
 
         const byOwner = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(owner => {
           const ownerAssets = data.savingsHistory
             .find(s => s.owner === owner && s.date.slice(0, 7) === today)
           const assets = Array.isArray(ownerAssets?.assets) ? ownerAssets!.assets.filter((a: any) => a.interestRate && a.amount > 0) : []
-          const monthly = assets.reduce((acc: number, a: any) => acc + (a.amount * a.interestRate) / 100 / 12, 0)
+          const monthly = assets.reduce((acc: number, a: any) => acc + (a.amount * (a.interestRate || 0)) / 100 / 12, 0)
           return { owner, monthly, assets }
         }).filter(o => o.monthly > 0)
 
