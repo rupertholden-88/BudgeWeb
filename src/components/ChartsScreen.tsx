@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { fmt, calcTotals } from '@/lib/models'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -44,6 +44,7 @@ function CustomTooltip({ active, payload, label }: any) {
 
 export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
   const { data, totals } = budget
+  const [expFilter, setExpFilter] = useState<'ALL' | 'NIAMH' | 'RUPERT' | 'JOINT'>('ALL')
 
   // Monthly totals from savingsHistory snapshots
   const monthlyData = useMemo(() => {
@@ -73,11 +74,11 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
   // Current month expense breakdown
   const expenseData = useMemo(() =>
     data.categories
-      .filter(c => c.type === 'EXPENSE')
+      .filter(c => c.type === 'EXPENSE' && (expFilter === 'ALL' || c.owner === expFilter))
       .map(c => ({ name: c.label, value: c.items.reduce((a, i) => a + i.amount, 0) }))
       .filter(d => d.value > 0)
       .sort((a, b) => b.value - a.value)
-  , [data])
+  , [data, expFilter])
 
   const top5 = useMemo(() =>
     data.categories
@@ -106,7 +107,18 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
       {/* Expense pie */}
       {expenseData.length > 0 && (
         <div className="card" style={{ padding: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Expenses by Category</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Expenses by Category</div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+            {(['ALL', 'NIAMH', 'RUPERT', 'JOINT'] as const).map(f => {
+              const label = f === 'ALL' ? 'All' : f === 'NIAMH' ? (data.nameNiamh || 'Person 1') : f === 'RUPERT' ? (data.nameRupert || 'Person 2') : (data.nameJoint || 'Joint')
+              return (
+                <button key={f} onClick={() => setExpFilter(f)}
+                  className={expFilter === f ? `chip chip-${f.toLowerCase()}` : 'chip chip-inactive'}>
+                  {label}
+                </button>
+              )
+            })}
+          </div>
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie data={expenseData} cx="50%" cy="50%" outerRadius={80} dataKey="value">
