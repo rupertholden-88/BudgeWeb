@@ -6,6 +6,12 @@ import { Plus, Trash2, Pencil, Check } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
+function calcMonthlyYield(assets: any[]) {
+  return assets
+    .filter(a => a.interestRate && a.amount > 0)
+    .reduce((acc, a) => acc + (a.amount * a.interestRate) / 100 / 12, 0)
+}
+
 const ASSET_LABELS: Record<AssetType, string> = {
   CASH: 'Cash', CASH_ISA: 'Cash ISA', STOCKS_SHARES_ISA: 'S&S ISA',
   JUNIOR_ISA: 'Junior ISA', LIFETIME_ISA: 'LISA',
@@ -180,7 +186,7 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }:
 }
 
 export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, addAsset, updateAsset, deleteAsset } = budget
+  const { data, addAsset, updateAsset, deleteAsset, addItem } = budget
   const today = new Date().toISOString().slice(0, 7)
   const totalAll = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
@@ -202,6 +208,62 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
       <OwnerPanel owner="NIAMH"  name={data.nameNiamh  || 'Person 1'} budget={data} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
       <OwnerPanel owner="RUPERT" name={data.nameRupert || 'Person 2'} budget={data} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
       <OwnerPanel owner="JOINT"  name={data.nameJoint  || 'Joint'}    budget={data} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
+
+      {/* Interest yield summary */}
+      {(() => {
+        const allAssets = data.savingsHistory
+          .filter(s => s.date.slice(0, 7) === today)
+          .flatMap(s => Array.isArray(s.assets) ? s.assets : [])
+          .filter(a => a.interestRate && a.amount > 0)
+
+        if (allAssets.length === 0) return null
+
+        const totalMonthly = allAssets.reduce((acc, a) => acc + (a.amount * a.interestRate) / 100 / 12, 0)
+        const totalAnnual = totalMonthly * 12
+
+        const byOwner = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(owner => {
+          const ownerAssets = data.savingsHistory
+            .find(s => s.owner === owner && s.date.slice(0, 7) === today)
+          const assets = Array.isArray(ownerAssets?.assets) ? ownerAssets!.assets.filter((a: any) => a.interestRate && a.amount > 0) : []
+          const monthly = assets.reduce((acc: number, a: any) => acc + (a.amount * a.interestRate) / 100 / 12, 0)
+          return { owner, monthly, assets }
+        }).filter(o => o.monthly > 0)
+
+        return (
+          <div className="card" style={{ padding: 16, marginTop: 4 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Interest Income</div>
+            {byOwner.map(({ owner, monthly }) => (
+              <div key={owner} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--muted)' }}>{owner === 'NIAMH' ? data.nameNiamh : owner === 'RUPERT' ? data.nameRupert : data.nameJoint}</span>
+                <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: 'var(--positive)' }}>
+                  {fmt(monthly)}/mo · {fmt(monthly * 12)}/yr
+                </span>
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, padding: '8px 0 12px', color: 'var(--positive)' }}>
+              <span>Total</span>
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(totalMonthly)}/mo · {fmt(totalAnnual)}/yr</span>
+            </div>
+            <button
+              onClick={() => {
+                if (!confirm('This will replace any existing interest income items in your budget. Continue?')) return
+                byOwner.forEach(({ owner, monthly, assets }) => {
+                  const catKey = owner === 'NIAMH' ? 'inc_n' : owner === 'RUPERT' ? 'inc_r' : 'inc_joint'
+                  assets.forEach((a: any) => {
+                    addItem(catKey, `Interest - ${a.label}`)
+                  })
+                })
+              }}
+              style={{ width: '100%', background: 'var(--positive)', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+            >
+              Sync interest to budget income
+            </button>
+            <p style={{ fontSize: 11, color: 'var(--muted)', margin: '8px 0 0', textAlign: 'center' }}>
+              Remove manual interest entries from Budget first
+            </p>
+          </div>
+        )
+      })()}
     </div>
   )
 }
