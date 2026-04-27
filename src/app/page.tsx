@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useBudget } from '@/hooks/useBudget'
 import BudgetScreen from '@/components/BudgetScreen'
 import ChartsScreen from '@/components/ChartsScreen'
@@ -8,7 +8,7 @@ import SavingsScreen from '@/components/SavingsScreen'
 import DebtsScreen from '@/components/DebtsScreen'
 import SettingsScreen from '@/components/SettingsScreen'
 import { TabFilter } from '@/lib/models'
-import { LayoutDashboard, BarChart3, PiggyBank, CreditCard, User, RefreshCw, Settings } from 'lucide-react'
+import { LayoutDashboard, BarChart3, PiggyBank, CreditCard, User, RefreshCw, Settings, CheckCircle } from 'lucide-react'
 
 type Screen = 'budget' | 'charts' | 'savings' | 'debts' | 'settings'
 
@@ -27,52 +27,34 @@ function SetupScreen({ onDone, updateOwnerName, signIn }: {
 }) {
   const [name1, setName1] = useState('')
   const [name2, setName2] = useState('')
-
   const submit = () => {
-    if (name1.trim()) updateOwnerName('NIAMH', name1.trim())
-    if (name2.trim()) updateOwnerName('RUPERT', name2.trim())
-    if (!name1.trim()) updateOwnerName('NIAMH', 'Person 1')
-    if (!name2.trim()) updateOwnerName('RUPERT', 'Person 2')
+    updateOwnerName('NIAMH', name1.trim() || 'Person 1')
+    updateOwnerName('RUPERT', name2.trim() || 'Person 2')
     onDone()
   }
-
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, background: 'var(--surface)' }}>
       <h1 style={{ fontFamily: 'DM Serif Display, serif', fontSize: 36, margin: '0 0 8px', color: 'var(--ink)' }}>Budge</h1>
-      <p style={{ color: 'var(--muted)', fontSize: 15, marginBottom: 40, textAlign: 'center' }}>
-        A shared household budget for two.
-      </p>
-
+      <p style={{ color: 'var(--muted)', fontSize: 15, marginBottom: 40, textAlign: 'center' }}>A shared household budget for two.</p>
       <div className="card" style={{ width: '100%', maxWidth: 360, padding: 24 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16, color: 'var(--ink)' }}>Who's using Budge?</div>
-
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Who's using Budge?</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
           <div>
             <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Person 1</label>
-            <input
-              value={name1}
-              onChange={e => setName1(e.target.value)}
-              placeholder="e.g. Niamh"
-              style={{ width: '100%', fontSize: 15, border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px 12px', outline: 'none', background: 'var(--card)' }}
-            />
+            <input value={name1} onChange={e => setName1(e.target.value)} placeholder="e.g. Niamh"
+              style={{ width: '100%', fontSize: 15, border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px 12px', outline: 'none', background: 'var(--card)' }} />
           </div>
           <div>
             <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Person 2</label>
-            <input
-              value={name2}
-              onChange={e => setName2(e.target.value)}
-              placeholder="e.g. Rupert"
+            <input value={name2} onChange={e => setName2(e.target.value)} placeholder="e.g. Rupert"
               onKeyDown={e => { if (e.key === 'Enter') submit() }}
-              style={{ width: '100%', fontSize: 15, border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px 12px', outline: 'none', background: 'var(--card)' }}
-            />
+              style={{ width: '100%', fontSize: 15, border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px 12px', outline: 'none', background: 'var(--card)' }} />
           </div>
         </div>
-
         <button onClick={submit} style={{ width: '100%', background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 8, padding: '12px', cursor: 'pointer', fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
           Get started
         </button>
-
-        <button onClick={signIn} style={{ width: '100%', background: 'none', color: 'var(--muted)', border: '1.5px solid var(--border)', borderRadius: 8, padding: '12px', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <button onClick={() => { signIn(); onDone() }} style={{ width: '100%', background: 'none', color: 'var(--muted)', border: '1.5px solid var(--border)', borderRadius: 8, padding: '12px', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <User size={15} /> Sign in to restore existing budget
         </button>
       </div>
@@ -85,31 +67,51 @@ export default function HomePage() {
   const [screen, setScreen] = useState<Screen>('budget')
   const [tab, setTab] = useState<TabFilter>('ALL')
   const [setupDone, setSetupDone] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
   const { data, user, savedAt, isRefreshing, signIn, signOutUser, refreshFromCloud, updateOwnerName } = budget
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2500)
+  }
+
+  const handleRefresh = async () => {
+    await refreshFromCloud()
+    showToast('Synced!')
+  }
 
   const needsSetup = !setupDone && !user && !data.nameNiamh && !data.nameRupert
 
   if (needsSetup) {
-    return (
-      <SetupScreen
-        onDone={() => setSetupDone(true)}
-        updateOwnerName={updateOwnerName}
-        signIn={() => { signIn(); setSetupDone(true) }}
-      />
-    )
+    return <SetupScreen onDone={() => setSetupDone(true)} updateOwnerName={updateOwnerName} signIn={() => { signIn(); setSetupDone(true) }} />
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: 'var(--surface)' }}>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
+          background: 'var(--ink)', color: 'white', padding: '10px 20px',
+          borderRadius: 999, fontSize: 13, fontWeight: 500, zIndex: 100,
+          display: 'flex', alignItems: 'center', gap: 6,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+          animation: 'fadeUp 0.2s ease',
+        }}>
+          <CheckCircle size={14} /> {toast}
+        </div>
+      )}
+
       <header style={{ background: 'var(--card)', borderBottom: '1px solid var(--border)', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, zIndex: 10 }}>
         <h1 style={{ fontFamily: 'DM Serif Display, serif', fontSize: 24, margin: 0, flex: 1 }}>Budge</h1>
         {savedAt && <span style={{ fontSize: 11, color: 'var(--muted)' }}>Saved {new Date(savedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>}
         {user ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={refreshFromCloud} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 4, display: 'flex' }}>
+            <button onClick={handleRefresh} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 4, display: 'flex' }} title="Sync from cloud">
               <RefreshCw size={16} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
             </button>
-            <div onClick={signOutUser} title={`${user.email} — click to sign out`} style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--rupert)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            <div onClick={signOutUser} title={`${user.email} — tap to sign out`} style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--rupert)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
               {user.email?.[0].toUpperCase()}
             </div>
           </div>
