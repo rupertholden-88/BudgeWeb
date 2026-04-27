@@ -14,7 +14,7 @@ export interface Totals { incN: number; incR: number; expN: number; expR: number
 
 export function defaultBudgetData(): BudgetData {
   return {
-    nameNiamh: '', nameRupert: '', nameJoint: 'Joint',
+    nameNiamh: '', nameRupert: '', nameJoint: '',
     savedAt: '', savingsHistory: [], debts: [],
     categories: [
       { key: 'inc_n', owner: 'NIAMH', type: 'INCOME', label: 'Income', items: [
@@ -49,7 +49,7 @@ export function defaultBudgetData(): BudgetData {
       { key: 'sav_r', owner: 'RUPERT', type: 'SAVINGS', label: 'Monthly Savings Plan', items: [
         { id: 'sav_r_0', label: 'Personal Savings', amount: 0, priority: 'NONE' },
       ]},
-      { key: 'house_n', owner: 'JOINT', type: 'EXPENSE', label: 'Laurel Gardens', items: [
+      { key: 'house_n', owner: 'JOINT', type: 'EXPENSE', label: 'House Costs', items: [
         { id: 'house_n_0', label: 'Mortgage / Rent', amount: 0, priority: 'NECESSITY' },
         { id: 'house_n_1', label: 'Council Tax', amount: 0, priority: 'NECESSITY' },
         { id: 'house_n_2', label: 'Water', amount: 0, priority: 'NECESSITY' },
@@ -57,7 +57,7 @@ export function defaultBudgetData(): BudgetData {
         { id: 'house_n_4', label: 'Insurance', amount: 0, priority: 'NECESSITY' },
         { id: 'house_n_5', label: 'Maintenance', amount: 0, priority: 'NECESSITY' },
       ]},
-      { key: 'house_r', owner: 'JOINT', type: 'EXPENSE', label: 'Mulberry Cottage', items: [
+      { key: 'house_r', owner: 'JOINT', type: 'EXPENSE', label: 'House Costs', items: [
         { id: 'house_r_0', label: 'Mortgage / Rent', amount: 0, priority: 'NECESSITY' },
         { id: 'house_r_1', label: 'Council Tax', amount: 0, priority: 'NECESSITY' },
         { id: 'house_r_2', label: 'Water', amount: 0, priority: 'NECESSITY' },
@@ -65,7 +65,7 @@ export function defaultBudgetData(): BudgetData {
         { id: 'house_r_4', label: 'Insurance', amount: 0, priority: 'NECESSITY' },
         { id: 'house_r_5', label: 'Maintenance', amount: 0, priority: 'NECESSITY' },
       ]},
-      { key: 'energy', owner: 'JOINT', type: 'EXPENSE', label: 'Energy (Shared)', shared: true, note: 'One bill between both houses — split 50/50', items: [
+      { key: 'energy', owner: 'JOINT', type: 'EXPENSE', label: 'Energy (Shared)', shared: true, note: 'One bill — split 50/50', items: [
         { id: 'energy_0', label: 'Gas & Electricity', amount: 0, priority: 'NECESSITY' },
       ]},
       { key: 'food', owner: 'JOINT', type: 'EXPENSE', label: 'Food & Drink', items: [
