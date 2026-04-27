@@ -212,20 +212,6 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
 
 
       {/* Top 5 expenses */}
-      {top5.length > 0 && (
-        <div className="card" style={{ padding: 16, marginBottom: 12, marginTop: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Top 5 Expenses</div>
-          {top5.map((item, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: i < top5.length - 1 ? '1px solid var(--border)' : 'none' }}>
-              <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--expense-bg)', color: 'var(--expense-text)', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                {i + 1}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{item.category}</div>
-              </div>
-              <div style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, fontSize: 14, color: 'var(--expense-text)', flexShrink: 0 }}>
-                {fmt(item.amount)}
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0, minWidth: 36, textAlign: 'right' }}>
                 {totals.totalExp > 0 ? `${((item.amount / totals.totalExp) * 100).toFixed(0)}%` : ''}
