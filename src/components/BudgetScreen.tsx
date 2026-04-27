@@ -196,11 +196,10 @@ function PersonSummary({ name, inc, exp, sav, debt, hjExp, hjSav, hjDebt, color 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <Row label="Income" value={inc} c="var(--income-text)" />
         <Row label="Personal exp." value={exp} c="var(--expense-text)" />
-        <Row label="Half joint exp." value={hjExp} c="var(--expense-text)" />
+        <Row label="Monthly contribution" value={hjExp + hjDebt} c="var(--expense-text)" />
         <Row label="Half joint sav." value={hjSav} c="var(--savings-text)" />
         <Row label="Savings" value={sav} c="var(--savings-text)" />
         {debt > 0 && <Row label="Personal debts" value={debt} c="var(--expense-text)" />}
-        {hjDebt > 0 && <Row label="½ Joint debts" value={hjDebt} c="var(--expense-text)" />}
         <div style={{ borderTop: '1px solid var(--border)', marginTop: 4, paddingTop: 4 }}>
           <Row label="Net" value={net} c={net >= 0 ? 'var(--positive)' : 'var(--negative)'} bold />
         </div>
