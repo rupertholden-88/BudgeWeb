@@ -186,7 +186,7 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }:
 }
 
 export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, addAsset, updateAsset, deleteAsset, addItemWithAmount } = budget
+  const { data, addAsset, updateAsset, deleteAsset, addItemWithAmount, resyncInterest } = budget
   const today = new Date().toISOString().slice(0, 7)
   const totalAll = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
@@ -246,21 +246,14 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
             </div>
             <button
               onClick={() => {
-                if (!confirm('This will replace any existing interest income items in your budget. Continue?')) return
-                byOwner.forEach(({ owner, monthly, assets }) => {
-                  const catKey = owner === 'NIAMH' ? 'inc_n' : owner === 'RUPERT' ? 'inc_r' : 'inc_joint'
-                  assets.forEach((a: any) => {
-                    const monthlyYield = Math.round((a.amount * (a.interestRate || 0)) / 100 / 12)
-                    addItemWithAmount(catKey, `Interest - ${a.label}`, monthlyYield)
-                  })
-                })
+                resyncInterest(byOwner.map(({ owner, assets }) => ({ owner, assets })))
               }}
               style={{ width: '100%', background: 'var(--positive)', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
             >
               Sync interest to budget income
             </button>
             <p style={{ fontSize: 11, color: 'var(--muted)', margin: '8px 0 0', textAlign: 'center' }}>
-              Remove manual interest entries from Budget first
+              Automatically removes old interest items and recreates with current values
             </p>
           </div>
         )

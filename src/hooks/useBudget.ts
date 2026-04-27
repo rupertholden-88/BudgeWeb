@@ -127,6 +127,36 @@ export function useBudget() {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: [...c.items, { id: uuid(), label: label.trim(), amount, priority: 'NONE' as const }] }) }))
   }
 
+  const resyncInterest = (byOwner: { owner: Owner; assets: { label: string; amount: number; interestRate?: number }[] }[]) => {
+    mutate(b => {
+      // Remove all existing interest items
+      let updated = {
+        ...b,
+        categories: b.categories.map(c => ({
+          ...c,
+          items: c.items.filter(i => !i.label.startsWith('Interest -'))
+        }))
+      }
+      // Re-add with current amounts
+      byOwner.forEach(({ owner, assets }) => {
+        const catKey = owner === 'NIAMH' ? 'inc_n' : owner === 'RUPERT' ? 'inc_r' : 'inc_joint'
+        assets.forEach(a => {
+          const monthly = Math.round((a.amount * (a.interestRate || 0)) / 100 / 12)
+          if (monthly > 0) {
+            updated = {
+              ...updated,
+              categories: updated.categories.map(c => c.key !== catKey ? c : {
+                ...c,
+                items: [...c.items, { id: uuid(), label: `Interest - ${a.label}`, amount: monthly, priority: 'NONE' as const }]
+              })
+            }
+          }
+        })
+      })
+      return updated
+    })
+  }
+
   const removeItem = (catKey: string, itemId: string) => {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.filter(i => i.id !== itemId) }) }))
   }
@@ -190,7 +220,7 @@ export function useBudget() {
     data, user, savedAt, isRefreshing, totals,
     signIn, signOutUser, refreshFromCloud,
     updateOwnerName, addCategory, renameCategory, deleteCategory,
-    updateItemAmount, addItem, addItemWithAmount, removeItem, renameItem,
+    updateItemAmount, addItem, addItemWithAmount, resyncInterest, removeItem, renameItem,
     addAsset, updateAsset, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,
