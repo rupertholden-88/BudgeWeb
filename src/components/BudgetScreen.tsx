@@ -257,6 +257,41 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
           ))}
         </div>
       ))}
+      {/* Debt payments — read only summary linking to Debts tab */}
+      {totals.totalDebt > 0 && (tab === 'ALL' || tab === 'RUPERT' || tab === 'NIAMH' || tab === 'JOINT') && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: 6, marginTop: 4 }}>
+            Debt Payments
+          </div>
+          {data.debts
+            .filter(d => tab === 'ALL' || d.owner === tab)
+            .map(d => (
+              <div key={d.id} className="card fade-up" style={{ marginBottom: 8, borderLeft: '3px solid ' + (d.owner === 'NIAMH' ? 'var(--niamh)' : d.owner === 'RUPERT' ? 'var(--rupert)' : 'var(--joint)') }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{d.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                      {d.owner === 'NIAMH' ? data.nameNiamh : d.owner === 'RUPERT' ? data.nameRupert : data.nameJoint}
+                      {d.isZeroPercent ? ' · 0%' : d.interestRate > 0 ? ` · ${d.interestRate}%` : ''}
+                      {d.currentBalance > 0 ? ` · ${fmt(d.currentBalance)} remaining` : ''}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, fontSize: 14, color: 'var(--expense-text)' }}>{fmt(d.monthlyPayment)}/mo</div>
+                    {d.currentBalance > 0 && d.monthlyPayment > 0 && (
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>~{Math.ceil(d.currentBalance / d.monthlyPayment)} months left</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          }
+          <button onClick={onNavigateToDebts} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }}>
+            + Manage debts →
+          </button>
+        </div>
+      )}
+
       {addingCat ? (
         <div className="card" style={{ padding: 12, marginTop: 8 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
