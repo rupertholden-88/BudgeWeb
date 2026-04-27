@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Owner, DebtType, Debt, fmt } from '@/lib/models'
-import { Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronUp, Pencil, Check } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -11,13 +11,35 @@ const OWNER_COLORS: Record<Owner, string> = { NIAMH: 'var(--niamh)', RUPERT: 'va
 
 function DebtCard({ debt, ownerName, onUpdate, onDelete }: { debt: Debt; ownerName: string; onUpdate: (id: string, fields: Partial<Debt>) => void; onDelete: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false)
+  const [editingLabel, setEditingLabel] = useState(false)
+  const [labelDraft, setLabelDraft] = useState(debt.label)
+  const commitLabel = () => { if (labelDraft.trim()) onUpdate(debt.id, { label: labelDraft.trim() }); setEditingLabel(false) }
   const months = debt.monthlyPayment > 0 && debt.currentBalance > 0 ? Math.ceil(debt.currentBalance / debt.monthlyPayment) : null
 
   return (
     <div className="card" style={{ marginBottom: 8, borderLeft: `3px solid ${OWNER_COLORS[debt.owner]}`, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: 14 }}>{debt.label}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {editingLabel ? (
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <input value={labelDraft} onChange={e => setLabelDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') commitLabel() }}
+                onBlur={commitLabel}
+                style={{ flex: 1, fontSize: 14, fontWeight: 600, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', outline: 'none' }}
+                autoFocus />
+              <button onClick={commitLabel} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', display: 'flex' }}>
+                <Check size={12} />
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontWeight: 600, fontSize: 14 }}>{debt.label}</span>
+              <button onClick={() => { setLabelDraft(debt.label); setEditingLabel(true) }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--border)', display: 'flex', padding: 2 }}>
+                <Pencil size={11} />
+              </button>
+            </div>
+          )}
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
             {DEBT_LABELS[debt.type]} · {ownerName}{months ? ` · ~${months} months left` : ''}
           </div>
