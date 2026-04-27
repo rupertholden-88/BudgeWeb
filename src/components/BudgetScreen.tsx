@@ -123,6 +123,9 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
             <button onClick={() => { setNameDraft(cat.label); setEditingName(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 2 }}>
               <Pencil size={13} />
             </button>
+            <button onClick={() => { if (confirm('Delete this category?')) onDeleteCategory(cat.key) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FECACA', display: 'flex', padding: 2 }}>
+              <Trash2 size={13} />
+            </button>
           </>
         )}
         <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: bg, color: text, fontWeight: 600, flexShrink: 0 }}>

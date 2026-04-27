@@ -19,82 +19,41 @@ export function defaultBudgetData(): BudgetData {
     categories: [
       { key: 'inc_n', owner: 'NIAMH', type: 'INCOME', label: 'Income', items: [
         { id: 'inc_n_0', label: 'Salary / Wages', amount: 0, priority: 'NONE' },
-        { id: 'inc_n_1', label: 'Freelance', amount: 0, priority: 'NONE' },
-        { id: 'inc_n_2', label: 'Benefits', amount: 0, priority: 'NONE' },
-        { id: 'inc_n_3', label: 'Other', amount: 0, priority: 'NONE' },
       ]},
       { key: 'pers_n', owner: 'NIAMH', type: 'EXPENSE', label: 'Personal Spend', items: [
         { id: 'pers_n_0', label: 'Clothing', amount: 0, priority: 'DISCRETIONARY' },
         { id: 'pers_n_1', label: 'Personal Care', amount: 0, priority: 'DISCRETIONARY' },
-        { id: 'pers_n_2', label: 'Hobbies', amount: 0, priority: 'DISCRETIONARY' },
-        { id: 'pers_n_3', label: 'Eating Out (solo)', amount: 0, priority: 'DISCRETIONARY' },
-        { id: 'pers_n_4', label: 'Other', amount: 0, priority: 'DISCRETIONARY' },
-      ]},
-      { key: 'sav_n', owner: 'NIAMH', type: 'SAVINGS', label: 'Monthly Savings Plan', items: [
-        { id: 'sav_n_0', label: 'Personal Savings', amount: 0, priority: 'NONE' },
       ]},
       { key: 'inc_r', owner: 'RUPERT', type: 'INCOME', label: 'Income', items: [
         { id: 'inc_r_0', label: 'Salary / Wages', amount: 0, priority: 'NONE' },
-        { id: 'inc_r_1', label: 'Freelance', amount: 0, priority: 'NONE' },
-        { id: 'inc_r_2', label: 'Benefits', amount: 0, priority: 'NONE' },
-        { id: 'inc_r_3', label: 'Other', amount: 0, priority: 'NONE' },
       ]},
       { key: 'pers_r', owner: 'RUPERT', type: 'EXPENSE', label: 'Personal Spend', items: [
         { id: 'pers_r_0', label: 'Clothing', amount: 0, priority: 'DISCRETIONARY' },
         { id: 'pers_r_1', label: 'Personal Care', amount: 0, priority: 'DISCRETIONARY' },
-        { id: 'pers_r_2', label: 'Hobbies', amount: 0, priority: 'DISCRETIONARY' },
-        { id: 'pers_r_3', label: 'Eating Out (solo)', amount: 0, priority: 'DISCRETIONARY' },
-        { id: 'pers_r_4', label: 'Other', amount: 0, priority: 'DISCRETIONARY' },
       ]},
-      { key: 'sav_r', owner: 'RUPERT', type: 'SAVINGS', label: 'Monthly Savings Plan', items: [
-        { id: 'sav_r_0', label: 'Personal Savings', amount: 0, priority: 'NONE' },
+      { key: 'house', owner: 'JOINT', type: 'EXPENSE', label: 'Accommodation', items: [
+        { id: 'house_0', label: 'Mortgage / Rent', amount: 0, priority: 'NECESSITY' },
+        { id: 'house_1', label: 'Council Tax', amount: 0, priority: 'NECESSITY' },
+        { id: 'house_2', label: 'Water', amount: 0, priority: 'NECESSITY' },
+        { id: 'house_3', label: 'Broadband', amount: 0, priority: 'NECESSITY' },
+        { id: 'house_4', label: 'Insurance', amount: 0, priority: 'NECESSITY' },
       ]},
-      { key: 'house_n', owner: 'JOINT', type: 'EXPENSE', label: 'Accommodation', items: [
-        { id: 'house_n_0', label: 'Mortgage / Rent', amount: 0, priority: 'NECESSITY' },
-        { id: 'house_n_1', label: 'Council Tax', amount: 0, priority: 'NECESSITY' },
-        { id: 'house_n_2', label: 'Water', amount: 0, priority: 'NECESSITY' },
-        { id: 'house_n_3', label: 'Broadband', amount: 0, priority: 'NECESSITY' },
-        { id: 'house_n_4', label: 'Insurance', amount: 0, priority: 'NECESSITY' },
-        { id: 'house_n_5', label: 'Maintenance', amount: 0, priority: 'NECESSITY' },
-      ]},
-      { key: 'house_r', owner: 'JOINT', type: 'EXPENSE', label: 'Accommodation', items: [
-        { id: 'house_r_0', label: 'Mortgage / Rent', amount: 0, priority: 'NECESSITY' },
-        { id: 'house_r_1', label: 'Council Tax', amount: 0, priority: 'NECESSITY' },
-        { id: 'house_r_2', label: 'Water', amount: 0, priority: 'NECESSITY' },
-        { id: 'house_r_3', label: 'Broadband', amount: 0, priority: 'NECESSITY' },
-        { id: 'house_r_4', label: 'Insurance', amount: 0, priority: 'NECESSITY' },
-        { id: 'house_r_5', label: 'Maintenance', amount: 0, priority: 'NECESSITY' },
-      ]},
-      { key: 'energy', owner: 'JOINT', type: 'EXPENSE', label: 'Energy (Shared)', shared: true, note: 'One bill — split 50/50', items: [
+      { key: 'energy', owner: 'JOINT', type: 'EXPENSE', label: 'Energy', items: [
         { id: 'energy_0', label: 'Gas & Electricity', amount: 0, priority: 'NECESSITY' },
       ]},
       { key: 'food', owner: 'JOINT', type: 'EXPENSE', label: 'Food & Drink', items: [
         { id: 'food_0', label: 'Groceries', amount: 0, priority: 'NECESSITY' },
         { id: 'food_1', label: 'Eating Out', amount: 0, priority: 'DISCRETIONARY' },
-        { id: 'food_2', label: 'Coffee & Snacks', amount: 0, priority: 'DISCRETIONARY' },
-      ]},
-      { key: 'baby', owner: 'JOINT', type: 'EXPENSE', label: 'Baby & Family', items: [
-        { id: 'baby_0', label: 'Childcare / Nursery', amount: 0, priority: 'NECESSITY' },
-        { id: 'baby_1', label: 'Baby Supplies', amount: 0, priority: 'NECESSITY' },
-        { id: 'baby_2', label: 'Clothing', amount: 0, priority: 'DISCRETIONARY' },
-        { id: 'baby_3', label: 'Activities', amount: 0, priority: 'DISCRETIONARY' },
       ]},
       { key: 'trans', owner: 'JOINT', type: 'EXPENSE', label: 'Transport', items: [
-        { id: 'trans_0', label: 'Car Insurance', amount: 0, priority: 'NECESSITY' },
-        { id: 'trans_1', label: 'Fuel', amount: 0, priority: 'NECESSITY' },
-        { id: 'trans_2', label: 'Road Tax / MOT', amount: 0, priority: 'NECESSITY' },
-        { id: 'trans_3', label: 'Public Transport', amount: 0, priority: 'DISCRETIONARY' },
+        { id: 'trans_0', label: 'Fuel', amount: 0, priority: 'NECESSITY' },
+        { id: 'trans_1', label: 'Car Insurance', amount: 0, priority: 'NECESSITY' },
       ]},
-      { key: 'subs', owner: 'JOINT', type: 'EXPENSE', label: 'Subscriptions & Leisure', items: [
+      { key: 'subs', owner: 'JOINT', type: 'EXPENSE', label: 'Subscriptions', items: [
         { id: 'subs_0', label: 'Streaming', amount: 0, priority: 'DISCRETIONARY' },
-        { id: 'subs_1', label: 'Gym / Fitness', amount: 0, priority: 'DISCRETIONARY' },
-        { id: 'subs_2', label: 'Holidays (saving)', amount: 0, priority: 'DISCRETIONARY' },
-        { id: 'subs_3', label: 'Other', amount: 0, priority: 'DISCRETIONARY' },
       ]},
-      { key: 'sav', owner: 'JOINT', type: 'SAVINGS', label: 'Monthly Savings Plan', items: [
+      { key: 'sav', owner: 'JOINT', type: 'SAVINGS', label: 'Savings', items: [
         { id: 'sav_0', label: 'Emergency Fund', amount: 0, priority: 'NONE' },
-        { id: 'sav_1', label: 'Joint Savings', amount: 0, priority: 'NONE' },
-        { id: 'sav_2', label: 'Shared Loan / Repayment', amount: 0, priority: 'NONE' },
       ]},
     ]
   }
