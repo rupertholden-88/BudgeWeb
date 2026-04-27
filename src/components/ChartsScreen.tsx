@@ -80,9 +80,8 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
   , [data])
 
   const overviewData = [
-    { name: 'Income',   value: totals.totalInc, fill: 'var(--income-text)' },
-    { name: 'Expenses', value: totals.totalExp,  fill: 'var(--expense-text)' },
-    { name: 'Savings',  value: totals.totalSav,  fill: 'var(--savings-text)' },
+    { name: 'Expenses', value: totals.totalExp, fill: 'var(--expense-text)' },
+    { name: 'Savings',  value: totals.totalSav, fill: 'var(--savings-text)' },
   ]
 
   const personData = [
