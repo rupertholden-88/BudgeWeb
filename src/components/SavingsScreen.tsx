@@ -29,7 +29,7 @@ function AmountInput({ value, onChange }: { value: number; onChange: (v: number)
 
 function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }: { owner: Owner; name: string; budget: BudgetHook['data']; addAsset: BudgetHook['addAsset']; updateAsset: BudgetHook['updateAsset']; deleteAsset: BudgetHook['deleteAsset'] }) {
   const today = new Date().toISOString().slice(0, 7)
-  const snap = budget.savingsHistory.find(s => s.owner === owner && s.date === today)
+  const snap = budget.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
   const assets = snap?.assets ?? []
   const total = assets.reduce((a, i) => a + i.amount, 0)
   const [adding, setAdding] = useState(false)
@@ -78,7 +78,7 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   const { data, addAsset, updateAsset, deleteAsset } = budget
   const today = new Date().toISOString().slice(0, 7)
   const totalAll = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
-    const snap = data.savingsHistory.find(s => s.owner === owner && s.date === today)
+    const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
     return acc + (snap?.assets.reduce((a, i) => a + i.amount, 0) ?? 0)
   }, 0)
 
