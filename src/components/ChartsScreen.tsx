@@ -2,10 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { fmt, calcTotals } from '@/lib/models'
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  Legend, Cell, PieChart, Pie, LabelList
-} from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell, PieChart, Pie, LabelList } from 'recharts'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -46,32 +43,25 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
   const { data, totals } = budget
   const [expFilter, setExpFilter] = useState<'ALL' | 'NIAMH' | 'RUPERT' | 'JOINT'>('JOINT')
 
-  // Monthly totals from savingsHistory snapshots
   const monthlyData = useMemo(() => {
     const months = new Set<string>()
     data.savingsHistory.forEach(s => months.add(s.date.slice(0, 7)))
-
-    // Always include current month
     const today = new Date().toISOString().slice(0, 7)
     months.add(today)
-
     return Array.from(months).sort().map(month => {
       const totalAssets = data.savingsHistory
         .filter(s => s.date.slice(0, 7) === month)
         .reduce((acc, s) => acc + (Array.isArray(s.assets) ? s.assets.reduce((a, i) => a + (i.amount || 0), 0) : 0), 0)
-
-      // For current month use live budget figures, otherwise use asset snapshots as proxy
       const isCurrentMonth = month === today
       return {
         month: formatMonth(month),
-        Expenses: isCurrentMonth ? totals.totalExp : 0,
-        Savings: isCurrentMonth ? totals.totalSav : 0,
+        Expenses: isCurrentMonth ? totals.totalExp : null,
+        Savings: isCurrentMonth ? totals.totalSav : null,
         Assets: totalAssets,
       }
     })
   }, [data, totals])
 
-  // Current month expense breakdown
   const expenseData = useMemo(() =>
     data.categories
       .filter(c => c.type === 'EXPENSE' && (expFilter === 'ALL' || c.owner === expFilter))
@@ -79,7 +69,6 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
       .filter(d => d.value > 0)
       .sort((a, b) => b.value - a.value)
   , [data, expFilter])
-
 
   const overviewData = [
     { name: 'Expenses', value: totals.totalExp, fill: 'var(--expense-text)' },
@@ -97,16 +86,15 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
     <div style={{ height: '100%', overflowY: 'auto', padding: 16 }}>
       <h2 style={{ fontSize: 20, marginBottom: 16, marginTop: 0 }}>Analysis</h2>
 
-      {/* Expense pie */}
+      {/* Expenses by category */}
       {expenseData.length > 0 && (
-        <div className="card" style={{ padding: 16 }}>
+        <div className="card" style={{ padding: 16, marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Expenses by Category</div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
             {(['ALL', 'NIAMH', 'RUPERT', 'JOINT'] as const).map(f => {
               const label = f === 'ALL' ? 'All' : f === 'NIAMH' ? (data.nameNiamh || 'Person 1') : f === 'RUPERT' ? (data.nameRupert || 'Person 2') : (data.nameJoint || 'Joint')
               return (
-                <button key={f} onClick={() => setExpFilter(f)}
-                  className={expFilter === f ? `chip chip-${f.toLowerCase()}` : 'chip chip-inactive'}>
+                <button key={f} onClick={() => setExpFilter(f)} className={expFilter === f ? `chip chip-${f.toLowerCase()}` : 'chip chip-inactive'}>
                   {label}
                 </button>
               )
@@ -132,7 +120,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
         </div>
       )}
 
-      {/* Monthly stacked bar — expenses + savings */}
+      {/* Monthly stacked bar */}
       <div className="card" style={{ padding: 16, marginBottom: 12, marginTop: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Monthly Spend & Savings</div>
         <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>Stacked — tap a bar for breakdown</div>
@@ -172,7 +160,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
         </div>
       )}
 
-      {/* This month overview */}
+      {/* This month */}
       <div className="card" style={{ padding: 16, marginBottom: 12 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>This Month</div>
         <ResponsiveContainer width="100%" height={160}>
@@ -181,17 +169,14 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
             <YAxis hide />
             <Tooltip formatter={(v: number) => fmt(v)} />
             <Bar dataKey="value" radius={[4,4,0,0]}>
-              <LabelList dataKey="value" position="top" style={{ fontSize: 11, fill: 'var(--muted)', fontWeight: 600 }}
-                formatter={(v: number) => fmt(v)} />
+              <LabelList dataKey="value" position="top" style={{ fontSize: 11, fill: 'var(--muted)', fontWeight: 600 }} formatter={(v: number) => fmt(v)} />
               {overviewData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-
-
-      {/* Per person */}
+      {/* By person */}
       {(totals.incN > 0 || totals.incR > 0) && (
         <div className="card" style={{ padding: 16, marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>By Person</div>
@@ -206,18 +191,6 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
               <Bar dataKey="Savings"  fill="var(--savings-text)" radius={[4,4,0,0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
-      )}
-
-
-
-      {/* Top 5 expenses */}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0, minWidth: 36, textAlign: 'right' }}>
-                {totals.totalExp > 0 ? `${((item.amount / totals.totalExp) * 100).toFixed(0)}%` : ''}
-              </div>
-            </div>
-          ))}
         </div>
       )}
 
