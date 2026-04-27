@@ -196,11 +196,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
         </ResponsiveContainer>
       </div>
 
-      {/* Net */}
-      <div className="card" style={{ padding: 12, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 14, fontWeight: 600 }}>Monthly Net</span>
-        <span style={{ fontSize: 20, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: totals.net >= 0 ? 'var(--positive)' : 'var(--negative)' }}>{fmt(totals.net)}</span>
-      </div>
+
 
       {/* Per person */}
       {(totals.incN > 0 || totals.incR > 0) && (
