@@ -44,7 +44,7 @@ function CustomTooltip({ active, payload, label }: any) {
 
 export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
   const { data, totals } = budget
-  const [expFilter, setExpFilter] = useState<'ALL' | 'NIAMH' | 'RUPERT' | 'JOINT'>('ALL')
+  const [expFilter, setExpFilter] = useState<'ALL' | 'NIAMH' | 'RUPERT' | 'JOINT'>('JOINT')
 
   // Monthly totals from savingsHistory snapshots
   const monthlyData = useMemo(() => {
