@@ -72,8 +72,13 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
               <div style={{ fontSize: 13, fontWeight: 500 }}>{asset.label}</div>
               <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>
                 {ASSET_LABELS[asset.type] ?? asset.type}
-                {asset.interestRate ? ` · ${asset.interestRate}%` : ''}
                 {asset.institution ? ` · ${asset.institution}` : ''}
+                {asset.interestRate && asset.amount > 0 ? (
+                  <span style={{ color: 'var(--positive)', fontWeight: 600, marginLeft: 4 }}>
+                    {` · £${((asset.amount * asset.interestRate) / 100 / 12).toFixed(0)}/mo`}
+                    {` (${asset.interestRate}% = £${((asset.amount * asset.interestRate) / 100).toFixed(0)}/yr)`}
+                  </span>
+                ) : asset.interestRate ? <span style={{ color: 'var(--muted)' }}>{` · ${asset.interestRate}%`}</span> : null}
               </div>
             </div>
             <button onClick={() => { setLabelDraft(asset.label); setEditingLabel(true) }}
