@@ -133,26 +133,26 @@ export function useBudget() {
 
   const addAsset = (owner: Owner, date: string, type: AssetType, label: string) => {
     mutate(b => {
-      const snap = b.savingsHistory.find(s => s.owner === owner && s.date === date) ?? { date, owner, assets: [] }
+      const snap = b.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7)) ?? { date, owner, assets: [] }
       const updated = { ...snap, assets: [...snap.assets, { id: uuid(), type, label, amount: 0 }] }
-      return { ...b, savingsHistory: [...b.savingsHistory.filter(s => !(s.owner === owner && s.date === date)), updated].sort((a, z) => a.date.localeCompare(z.date)) }
+      return { ...b, savingsHistory: [...b.savingsHistory.filter(s => !(s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7))), updated].sort((a, z) => a.date.localeCompare(z.date)) }
     })
   }
 
   const updateAsset = (owner: Owner, date: string, assetId: string, amount: number, interestRate?: number, institution?: string) => {
     mutate(b => {
-      const snap = b.savingsHistory.find(s => s.owner === owner && s.date === date) ?? { date, owner, assets: [] }
+      const snap = b.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7)) ?? { date, owner, assets: [] }
       const updated = { ...snap, assets: snap.assets.map(a => a.id === assetId ? { ...a, amount, interestRate, institution } : a) }
-      return { ...b, savingsHistory: [...b.savingsHistory.filter(s => !(s.owner === owner && s.date === date)), updated].sort((a, z) => a.date.localeCompare(z.date)) }
+      return { ...b, savingsHistory: [...b.savingsHistory.filter(s => !(s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7))), updated].sort((a, z) => a.date.localeCompare(z.date)) }
     })
   }
 
   const deleteAsset = (owner: Owner, date: string, assetId: string) => {
     mutate(b => {
-      const snap = b.savingsHistory.find(s => s.owner === owner && s.date === date)
+      const snap = b.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7))
       if (!snap) return b
       const updated = { ...snap, assets: snap.assets.filter(a => a.id !== assetId) }
-      return { ...b, savingsHistory: [...b.savingsHistory.filter(s => !(s.owner === owner && s.date === date)), updated].sort((a, z) => a.date.localeCompare(z.date)) }
+      return { ...b, savingsHistory: [...b.savingsHistory.filter(s => !(s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7))), updated].sort((a, z) => a.date.localeCompare(z.date)) }
     })
   }
 
