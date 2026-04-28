@@ -105,7 +105,11 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
               <Pie data={expenseData} cx="50%" cy="50%" outerRadius={80} dataKey="value">
                 {expenseData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
               </Pie>
-              <Tooltip formatter={(v: number) => fmt(v)} />
+              <Tooltip
+                contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                itemStyle={{ color: 'var(--ink)' }}
+                formatter={(v: number) => fmt(v)}
+              />
             </PieChart>
           </ResponsiveContainer>
           {expenseData.map((d, i) => (
@@ -150,7 +154,11 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
             <BarChart data={monthlyData} barSize={32} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
               <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis hide />
-              <Tooltip formatter={(v: number) => fmt(v)} />
+              <Tooltip
+                contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                itemStyle={{ color: 'var(--ink)' }}
+                formatter={(v: number) => fmt(v)}
+              />
               <Bar dataKey="Assets" fill="var(--joint)" radius={[4,4,0,0]}>
                 <LabelList dataKey="Assets" position="top" style={{ fontSize: 10, fill: 'var(--muted)', fontWeight: 600 }}
                   formatter={(v: number) => v > 0 ? fmt(v) : ''} />
@@ -184,7 +192,11 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
             <BarChart data={personData} barGap={4} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
               <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis hide />
-              <Tooltip formatter={(v: number) => fmt(v)} />
+              <Tooltip
+                contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                itemStyle={{ color: 'var(--ink)' }}
+                formatter={(v: number) => fmt(v)}
+              />
               <Legend iconSize={8} wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="Income"   fill="var(--income-text)"  radius={[4,4,0,0]} />
               <Bar dataKey="Expenses" fill="var(--expense-text)" radius={[4,4,0,0]} />
