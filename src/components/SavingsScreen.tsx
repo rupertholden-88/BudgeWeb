@@ -54,12 +54,7 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
   const [expanded, setExpanded] = useState(false)
   const [editingLabel, setEditingLabel] = useState(false)
   const [labelDraft, setLabelDraft] = useState(asset.label)
-
-  const commitLabel = () => {
-    updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution)
-    setEditingLabel(false)
-  }
-
+  const commitLabel = () => { updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution); setEditingLabel(false) }
   return (
     <div style={{ borderBottom: '1px solid var(--border)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0' }}>
@@ -95,12 +90,10 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
           </>
         )}
         <AmountInput value={asset.amount || 0} onChange={v => updateAsset(owner, today, asset.id, v, asset.interestRate, asset.institution)} />
-        <button onClick={() => setExpanded(e => !e)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 10, padding: '2px 4px' }}>
+        <button onClick={() => setExpanded(e => !e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 10, padding: '2px 4px' }}>
           {expanded ? '▲' : '▼'}
         </button>
-        <button onClick={() => deleteAsset(owner, today, asset.id)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--border)', display: 'flex', padding: 2 }}>
+        <button onClick={() => deleteAsset(owner, today, asset.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--border)', display: 'flex', padding: 2 }}>
           <Trash2 size={12} />
         </button>
       </div>
@@ -108,24 +101,21 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
         <div style={{ padding: '0 0 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Type</label>
-            <select value={asset.type}
-              onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution)}
+            <select value={asset.type} onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution)}
               style={{ fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', background: 'var(--card)' }}>
               {Object.entries(ASSET_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rate %</label>
-            <input type="number" value={asset.interestRate || ''}
+            <input type="number" value={asset.interestRate || ''} placeholder="0"
               onChange={e => updateAsset(owner, today, asset.id, asset.amount, parseFloat(e.target.value) || undefined, asset.institution)}
-              placeholder="0"
               style={{ width: 70, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', outline: 'none' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Institution</label>
-            <input value={asset.institution || ''}
+            <input value={asset.institution || ''} placeholder="e.g. Monzo"
               onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, e.target.value)}
-              placeholder="e.g. Monzo"
               style={{ width: 110, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', outline: 'none' }} />
           </div>
         </div>
@@ -147,11 +137,7 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }:
   const [adding, setAdding] = useState(false)
   const [newLabel, setNewLabel] = useState('')
   const [newType, setNewType] = useState<AssetType>('SAVINGS_ACCOUNT')
-
-  const submit = () => {
-    if (newLabel.trim()) { addAsset(owner, today, newType, newLabel.trim()); setNewLabel(''); setAdding(false) }
-  }
-
+  const submit = () => { if (newLabel.trim()) { addAsset(owner, today, newType, newLabel.trim()); setNewLabel(''); setAdding(false) } }
   return (
     <div className="card" style={{ marginBottom: 12, borderLeft: `3px solid ${OWNER_COLORS[owner]}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
@@ -164,8 +150,7 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }:
         ))}
         {adding ? (
           <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-            <input value={newLabel} onChange={e => setNewLabel(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') submit() }}
+            <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submit() }}
               placeholder="Account name..." autoFocus
               style={{ flex: 1, minWidth: 120, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px', outline: 'none' }} />
             <select value={newType} onChange={e => setNewType(e.target.value as AssetType)}
@@ -185,12 +170,11 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }:
   )
 }
 
-// Custom bar label showing total above each stacked bar
 function TotalLabel(props: any) {
-  const { x, y, width, index, chartData, nameNiamh, nameRupert, nameJoint } = props
+  const { x, y, width, index, chartData, n1, n2, n3 } = props
   const row = chartData[index]
   if (!row) return null
-  const total = (row[nameNiamh] || 0) + (row[nameRupert] || 0) + (row[nameJoint] || 0)
+  const total = (row[n1] || 0) + (row[n2] || 0) + (row[n3] || 0)
   if (total === 0) return null
   return (
     <text x={x + width / 2} y={y - 8} textAnchor="middle" fontSize={11} fontWeight={700} fill="var(--ink)">
@@ -200,7 +184,7 @@ function TotalLabel(props: any) {
 }
 
 export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, addAsset, updateAsset, deleteAsset, addItemWithAmount, resyncInterest } = budget
+  const { data, addAsset, updateAsset, deleteAsset, resyncInterest } = budget
   const today = new Date().toISOString().slice(0, 7)
 
   const totalAll = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
@@ -217,11 +201,11 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   const n3 = data.nameJoint || 'Joint'
 
   const chartData = months.map(month => {
-    const niamh = data.savingsHistory.find(s => s.owner === 'NIAMH' && s.date.slice(0, 7) === month)
-    const rupert = data.savingsHistory.find(s => s.owner === 'RUPERT' && s.date.slice(0, 7) === month)
-    const joint = data.savingsHistory.find(s => s.owner === 'JOINT' && s.date.slice(0, 7) === month)
-    const sum = (s: typeof niamh) => Array.isArray(s?.assets) ? s!.assets.reduce((a, i) => a + (i.amount || 0), 0) : 0
-    return { month: formatMonth(month), [n1]: sum(niamh), [n2]: sum(rupert), [n3]: sum(joint) }
+    const get = (owner: Owner) => {
+      const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === month)
+      return Array.isArray(snap?.assets) ? snap!.assets.reduce((a, i) => a + (i.amount || 0), 0) : 0
+    }
+    return { month: formatMonth(month), [n1]: get('NIAMH'), [n2]: get('RUPERT'), [n3]: get('JOINT') }
   })
 
   const byOwner = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(owner => {
@@ -237,13 +221,13 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
     <div style={{ height: '100%', overflowY: 'auto', padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
         <h2 style={{ fontSize: 20, margin: 0 }}>Assets</h2>
+        <div style={{ fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: totalAll > 0 ? 'var(--positive)' : 'var(--muted)' }}>
           Total: {fmt(totalAll)}
+        </div>
       </div>
 
-      {/* Monthly asset chart */}
       <div className="card" style={{ padding: 16, marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Assets Over Time</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Assets Over Time</div>
         <ResponsiveContainer width="100%" height={180}>
           <BarChart data={chartData} barSize={40} margin={{ top: 30, right: 16, left: 8, bottom: 0 }}>
             <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -252,9 +236,7 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
             <Bar dataKey={n1} stackId="a" fill="var(--niamh)" radius={[0,0,0,0]} />
             <Bar dataKey={n2} stackId="a" fill="var(--rupert)" radius={[0,0,0,0]} />
             <Bar dataKey={n3} stackId="a" fill="var(--joint)" radius={[4,4,0,0]}
-              label={(props: any) => (
-                <TotalLabel {...props} chartData={chartData} nameNiamh={n1} nameRupert={n2} nameJoint={n3} />
-              )}
+              label={(props: any) => <TotalLabel {...props} chartData={chartData} n1={n1} n2={n2} n3={n3} />}
             />
           </BarChart>
         </ResponsiveContainer>
