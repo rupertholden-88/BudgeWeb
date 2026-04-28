@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Owner, AssetType, fmt } from '@/lib/models'
 import { Plus, Trash2, Pencil, Check } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -104,7 +104,6 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
           <Trash2 size={12} />
         </button>
       </div>
-
       {expanded && (
         <div style={{ padding: '0 0 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -186,6 +185,20 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }:
   )
 }
 
+// Custom bar label showing total above each stacked bar
+function TotalLabel(props: any) {
+  const { x, y, width, index, chartData, nameNiamh, nameRupert, nameJoint } = props
+  const row = chartData[index]
+  if (!row) return null
+  const total = (row[nameNiamh] || 0) + (row[nameRupert] || 0) + (row[nameJoint] || 0)
+  if (total === 0) return null
+  return (
+    <text x={x + width / 2} y={y - 8} textAnchor="middle" fontSize={11} fontWeight={700} fill="var(--ink)">
+      {fmt(total)}
+    </text>
+  )
+}
+
 export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   const { data, addAsset, updateAsset, deleteAsset, addItemWithAmount, resyncInterest } = budget
   const today = new Date().toISOString().slice(0, 7)
@@ -196,28 +209,20 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
     return acc + assets.reduce((a, i) => a + (i.amount || 0), 0)
   }, 0)
 
-  // Build monthly chart data — one bar per month, stacked by owner
   const months = Array.from(new Set(data.savingsHistory.map(s => s.date.slice(0, 7)))).sort()
   if (!months.includes(today)) months.push(today)
+
+  const n1 = data.nameNiamh || 'Person 1'
+  const n2 = data.nameRupert || 'Person 2'
+  const n3 = data.nameJoint || 'Joint'
 
   const chartData = months.map(month => {
     const niamh = data.savingsHistory.find(s => s.owner === 'NIAMH' && s.date.slice(0, 7) === month)
     const rupert = data.savingsHistory.find(s => s.owner === 'RUPERT' && s.date.slice(0, 7) === month)
     const joint = data.savingsHistory.find(s => s.owner === 'JOINT' && s.date.slice(0, 7) === month)
     const sum = (s: typeof niamh) => Array.isArray(s?.assets) ? s!.assets.reduce((a, i) => a + (i.amount || 0), 0) : 0
-    return {
-      month: formatMonth(month),
-      [data.nameNiamh || 'Person 1']: sum(niamh),
-      [data.nameRupert || 'Person 2']: sum(rupert),
-      [data.nameJoint || 'Joint']: sum(joint),
-    }
+    return { month: formatMonth(month), [n1]: sum(niamh), [n2]: sum(rupert), [n3]: sum(joint) }
   })
-
-  // Interest yield summary
-  const allAssets = data.savingsHistory
-    .filter(s => s.date.slice(0, 7) === today)
-    .flatMap(s => Array.isArray(s.assets) ? s.assets : [])
-    .filter((a: any) => a.interestRate && a.amount > 0)
 
   const byOwner = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(owner => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
@@ -227,7 +232,6 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   }).filter(o => o.monthly > 0)
 
   const totalMonthly = byOwner.reduce((a, o) => a + o.monthly, 0)
-  const totalAnnual = totalMonthly * 12
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: 16 }}>
@@ -239,69 +243,49 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
       </div>
 
       {/* Monthly asset chart */}
-      {months.length > 0 && (
-        <div className="card" style={{ padding: 16, marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Assets Over Time</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--positive)', fontVariantNumeric: 'tabular-nums' }}>{fmt(totalAll)}</div>
-          </div>
-          <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={chartData} barSize={32} margin={{ top: 28, right: 8, left: 8, bottom: 0 }}>
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis hide />
-              <Tooltip formatter={(v: number) => fmt(v)} />
-              <Bar dataKey={data.nameNiamh || 'Person 1'} stackId="a" fill="var(--niamh)" radius={[0,0,0,0]}>
-              </Bar>
-              <Bar dataKey={data.nameRupert || 'Person 2'} stackId="a" fill="var(--rupert)" radius={[0,0,0,0]}>
-              </Bar>
-              <Bar dataKey={data.nameJoint || 'Joint'} stackId="a" fill="var(--joint)" radius={[4,4,0,0]}>
-                <LabelList
-                  dataKey={data.nameJoint || 'Joint'}
-                  position="top"
-                  style={{ fontSize: 11, fill: 'var(--ink)', fontWeight: 700 }}
-                  formatter={(_: any, __: any, index: number) => {
-                    const row = chartData[index]
-                    if (!row) return ''
-                    const total = (row[data.nameNiamh || 'Person 1'] as number || 0) +
-                                  (row[data.nameRupert || 'Person 2'] as number || 0) +
-                                  (row[data.nameJoint || 'Joint'] as number || 0)
-                    return total > 0 ? fmt(total) : ''
-                  }}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-          {/* Legend */}
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8 }}>
-            {[
-              { label: data.nameNiamh || 'Person 1', color: 'var(--niamh)' },
-              { label: data.nameRupert || 'Person 2', color: 'var(--rupert)' },
-              { label: data.nameJoint || 'Joint', color: 'var(--joint)' },
-            ].map(({ label, color }) => (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
-                {label}
-              </div>
-            ))}
-          </div>
+      <div className="card" style={{ padding: 16, marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Assets Over Time</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--positive)', fontVariantNumeric: 'tabular-nums' }}>{fmt(totalAll)}</div>
         </div>
-      )}
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={chartData} barSize={40} margin={{ top: 30, right: 16, left: 8, bottom: 0 }}>
+            <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis hide />
+            <Tooltip formatter={(v: number) => fmt(v)} />
+            <Bar dataKey={n1} stackId="a" fill="var(--niamh)" radius={[0,0,0,0]} />
+            <Bar dataKey={n2} stackId="a" fill="var(--rupert)" radius={[0,0,0,0]} />
+            <Bar dataKey={n3} stackId="a" fill="var(--joint)" radius={[4,4,0,0]}
+              label={(props: any) => (
+                <TotalLabel {...props} chartData={chartData} nameNiamh={n1} nameRupert={n2} nameJoint={n3} />
+              )}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8 }}>
+          {[{ label: n1, color: 'var(--niamh)' }, { label: n2, color: 'var(--rupert)' }, { label: n3, color: 'var(--joint)' }].map(({ label, color }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
+              {label}
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
         {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
       </div>
 
-      <OwnerPanel owner="NIAMH"  name={data.nameNiamh  || 'Person 1'} budget={data} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
-      <OwnerPanel owner="RUPERT" name={data.nameRupert || 'Person 2'} budget={data} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
-      <OwnerPanel owner="JOINT"  name={data.nameJoint  || 'Joint'}    budget={data} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
+      <OwnerPanel owner="NIAMH"  name={n1} budget={data} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
+      <OwnerPanel owner="RUPERT" name={n2} budget={data} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
+      <OwnerPanel owner="JOINT"  name={n3} budget={data} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
 
-      {/* Interest yield summary */}
       {byOwner.length > 0 && (
         <div className="card" style={{ padding: 16, marginTop: 4 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Interest Income</div>
           {byOwner.map(({ owner, monthly }) => (
             <div key={owner} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ color: 'var(--muted)' }}>{owner === 'NIAMH' ? data.nameNiamh : owner === 'RUPERT' ? data.nameRupert : data.nameJoint}</span>
+              <span style={{ color: 'var(--muted)' }}>{owner === 'NIAMH' ? n1 : owner === 'RUPERT' ? n2 : n3}</span>
               <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: 'var(--positive)' }}>
                 {fmt(monthly)}/mo · {fmt(monthly * 12)}/yr
               </span>
@@ -309,10 +293,9 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
           ))}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, padding: '8px 0 12px', color: 'var(--positive)' }}>
             <span>Total</span>
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(totalMonthly)}/mo · {fmt(totalAnnual)}/yr</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(totalMonthly)}/mo · {fmt(totalMonthly * 12)}/yr</span>
           </div>
-          <button
-            onClick={() => resyncInterest(byOwner.map(({ owner, assets }) => ({ owner, assets })))}
+          <button onClick={() => resyncInterest(byOwner.map(({ owner, assets }) => ({ owner, assets })))}
             style={{ width: '100%', background: 'var(--positive)', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
             Re-sync interest to budget income
           </button>
