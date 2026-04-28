@@ -241,8 +241,11 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
       {/* Monthly asset chart */}
       {months.length > 0 && (
         <div className="card" style={{ padding: 16, marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Assets Over Time</div>
-          <ResponsiveContainer width="100%" height={200}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Assets Over Time</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--positive)', fontVariantNumeric: 'tabular-nums' }}>{fmt(totalAll)}</div>
+          </div>
+          <ResponsiveContainer width="100%" height={160}>
             <BarChart data={chartData} barSize={32} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
               <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis hide />
