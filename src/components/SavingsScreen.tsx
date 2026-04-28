@@ -247,14 +247,21 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
               <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis hide />
               <Tooltip formatter={(v: number) => fmt(v)} />
-              <Bar dataKey={data.nameNiamh || 'Person 1'} stackId="a" fill="var(--niamh)" radius={[0,0,0,0]} />
+              <Bar dataKey={data.nameNiamh || 'Person 1'} stackId="a" fill="var(--niamh)" radius={[0,0,0,0]}>
+                <LabelList dataKey={data.nameNiamh || 'Person 1'} position="inside" style={{ fontSize: 9, fill: 'white', fontWeight: 600 }}
+                  formatter={(v: number) => v > 2000 ? fmt(v) : ''} />
+              </Bar>
               <Bar dataKey={data.nameRupert || 'Person 2'} stackId="a" fill="var(--rupert)" radius={[0,0,0,0]}>
+                <LabelList dataKey={data.nameRupert || 'Person 2'} position="inside" style={{ fontSize: 9, fill: 'white', fontWeight: 600 }}
+                  formatter={(v: number) => v > 2000 ? fmt(v) : ''} />
               </Bar>
               <Bar dataKey={data.nameJoint || 'Joint'} stackId="a" fill="var(--joint)" radius={[4,4,0,0]}>
+                <LabelList dataKey={data.nameJoint || 'Joint'} position="inside" style={{ fontSize: 9, fill: 'white', fontWeight: 600 }}
+                  formatter={(v: number) => v > 2000 ? fmt(v) : ''} />
                 <LabelList
                   dataKey={data.nameJoint || 'Joint'}
                   position="top"
-                  style={{ fontSize: 10, fill: 'var(--muted)', fontWeight: 600 }}
+                  style={{ fontSize: 11, fill: 'var(--ink)', fontWeight: 700 }}
                   formatter={(_: any, __: any, index: number) => {
                     const row = chartData[index]
                     if (!row) return ''
