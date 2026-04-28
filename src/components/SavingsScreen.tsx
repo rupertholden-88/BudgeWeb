@@ -246,7 +246,7 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--positive)', fontVariantNumeric: 'tabular-nums' }}>{fmt(totalAll)}</div>
           </div>
           <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={chartData} barSize={32} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
+            <BarChart data={chartData} barSize={32} margin={{ top: 28, right: 8, left: 8, bottom: 0 }}>
               <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis hide />
               <Tooltip formatter={(v: number) => fmt(v)} />
