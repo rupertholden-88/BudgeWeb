@@ -263,13 +263,20 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
             ))}
           </BarChart>
         </ResponsiveContainer>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 8, flexWrap: 'wrap' }}>
-          {activeTypes.map(type => (
-            <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--muted)' }}>
-              <div style={{ width: 8, height: 8, borderRadius: 2, background: ASSET_COLORS[type] }} />
-              {ASSET_LABELS[type]}
-            </div>
-          ))}
+        <div style={{ marginTop: 12 }}>
+          {activeTypes.map(type => {
+            const value = chartData[chartData.length - 1]?.[ASSET_LABELS[type]] || 0
+            const pct = totalAll > 0 ? ((value / totalAll) * 100).toFixed(0) : '0'
+            if (value === 0) return null
+            return (
+              <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: ASSET_COLORS[type], flexShrink: 0 }} />
+                <span style={{ flex: 1, fontSize: 12 }}>{ASSET_LABELS[type]}</span>
+                <span style={{ fontSize: 12, color: 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
+                <span style={{ fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(value)}</span>
+              </div>
+            )
+          })}
         </div>
       </div>
 
