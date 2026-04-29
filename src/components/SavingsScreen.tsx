@@ -171,10 +171,17 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }:
 }
 
 function TotalLabel(props: any) {
-  const { x, y, width, index, chartData, n1, n2, n3 } = props
+  const { x, y, width, index, chartData, activeTypes } = props
   const row = chartData[index]
   if (!row) return null
-  const total = (row[n1] || 0) + (row[n2] || 0) + (row[n3] || 0)
+  const total = (activeTypes || []).reduce((sum: number, type: string) => {
+    const label = Object.entries({
+      CASH: 'Cash', CASH_ISA: 'Cash ISA', STOCKS_SHARES_ISA: 'S&S ISA',
+      JUNIOR_ISA: 'Junior ISA', LIFETIME_ISA: 'LISA', SAVINGS_ACCOUNT: 'Savings Account',
+      CRYPTO: 'Crypto', OTHER: 'Other'
+    }).find(([k]) => k === type)?.[1] || type
+    return sum + (row[label] || 0)
+  }, 0)
   if (total === 0) return null
   return (
     <text x={x + width / 2} y={y - 8} textAnchor="middle" fontSize={11} fontWeight={700} fill="var(--ink)">
@@ -200,13 +207,27 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   const n2 = data.nameRupert || 'Person 2'
   const n3 = data.nameJoint || 'Joint'
 
+  const ASSET_TYPES: AssetType[] = ['CASH', 'CASH_ISA', 'STOCKS_SHARES_ISA', 'JUNIOR_ISA', 'LIFETIME_ISA', 'SAVINGS_ACCOUNT', 'CRYPTO', 'OTHER']
+  const ASSET_COLORS: Record<AssetType, string> = {
+    CASH: '#6BAF92', CASH_ISA: '#5B9BD5', STOCKS_SHARES_ISA: '#4472C4',
+    JUNIOR_ISA: '#70AD47', LIFETIME_ISA: '#255E91', SAVINGS_ACCOUNT: '#8BAFD4',
+    CRYPTO: '#F4A460', OTHER: '#A9A9A9'
+  }
+
   const chartData = months.map(month => {
-    const get = (owner: Owner) => {
-      const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === month)
-      return Array.isArray(snap?.assets) ? snap!.assets.reduce((a, i) => a + (i.amount || 0), 0) : 0
-    }
-    return { month: formatMonth(month), [n1]: get('NIAMH'), [n2]: get('RUPERT'), [n3]: get('JOINT') }
+    const allAssets = data.savingsHistory
+      .filter(s => s.date.slice(0, 7) === month)
+      .flatMap(s => Array.isArray(s.assets) ? s.assets : [])
+    const row: any = { month: formatMonth(month) }
+    ASSET_TYPES.forEach(type => {
+      row[ASSET_LABELS[type]] = allAssets.filter((a: any) => a.type === type).reduce((sum: number, a: any) => sum + (a.amount || 0), 0)
+    })
+    return row
   })
+
+  const activeTypes = ASSET_TYPES.filter(type =>
+    chartData.some(row => (row[ASSET_LABELS[type]] || 0) > 0)
+  )
 
   const byOwner = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(owner => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
@@ -233,18 +254,20 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
             <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
             <YAxis hide />
             <Tooltip formatter={(v: number) => fmt(v)} />
-            <Bar dataKey={n1} stackId="a" fill="var(--niamh)" radius={[0,0,0,0]} />
-            <Bar dataKey={n2} stackId="a" fill="var(--rupert)" radius={[0,0,0,0]} />
-            <Bar dataKey={n3} stackId="a" fill="var(--joint)" radius={[4,4,0,0]}
-              label={(props: any) => <TotalLabel {...props} chartData={chartData} n1={n1} n2={n2} n3={n3} />}
-            />
+            {activeTypes.map((type, i) => (
+              <Bar key={type} dataKey={ASSET_LABELS[type]} stackId="a"
+                fill={ASSET_COLORS[type]}
+                radius={i === activeTypes.length - 1 ? [4,4,0,0] : [0,0,0,0]}
+                label={i === activeTypes.length - 1 ? (props: any) => <TotalLabel {...props} chartData={chartData} n1={n1} n2={n2} n3={n3} activeTypes={activeTypes} /> : undefined}
+              />
+            ))}
           </BarChart>
         </ResponsiveContainer>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8 }}>
-          {[{ label: n1, color: 'var(--niamh)' }, { label: n2, color: 'var(--rupert)' }, { label: n3, color: 'var(--joint)' }].map(({ label, color }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
-              <div style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
-              {label}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+          {activeTypes.map(type => (
+            <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--muted)' }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: ASSET_COLORS[type] }} />
+              {ASSET_LABELS[type]}
             </div>
           ))}
         </div>
