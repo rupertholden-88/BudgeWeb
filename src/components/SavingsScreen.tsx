@@ -199,6 +199,21 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
     return acc + assets.reduce((a, i) => a + (i.amount || 0), 0)
   }, 0)
 
+  const lastMonth = (() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - 1)
+    return d.toISOString().slice(0, 7)
+  })()
+
+  const totalLastMonth = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
+    const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === lastMonth)
+    const assets = Array.isArray(snap?.assets) ? snap!.assets : []
+    return acc + assets.reduce((a, i) => a + (i.amount || 0), 0)
+  }, 0)
+
+  const monthDiff = totalLastMonth > 0 ? totalAll - totalLastMonth : null
+  const monthDiffPct = totalLastMonth > 0 ? ((totalAll - totalLastMonth) / totalLastMonth * 100) : null
+
   const currentMonthHasData = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).some(owner => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
     return Array.isArray(snap?.assets) && snap!.assets.length > 0
@@ -245,8 +260,15 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
     <div style={{ height: '100%', overflowY: 'auto', padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
         <h2 style={{ fontSize: 20, margin: 0 }}>Assets</h2>
-        <div style={{ fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: totalAll > 0 ? 'var(--positive)' : 'var(--muted)' }}>
-          Total: {fmt(totalAll)}
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: totalAll > 0 ? 'var(--positive)' : 'var(--muted)' }}>
+            {fmt(totalAll)}
+          </div>
+          {monthDiff !== null && (
+            <div style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', color: monthDiff >= 0 ? 'var(--positive)' : 'var(--negative)', marginTop: 1 }}>
+              {monthDiff >= 0 ? '▲' : '▼'} {fmt(Math.abs(monthDiff))} ({monthDiffPct!.toFixed(1)}%) vs last month
+            </div>
+          )}
         </div>
       </div>
 
