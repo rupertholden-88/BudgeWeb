@@ -169,7 +169,6 @@ export function useBudget() {
   const getOrCopySnapshot = (b: BudgetData, owner: Owner, date: string) => {
     const existing = b.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7))
     if (existing) return existing
-    // Copy forward from most recent previous month
     const prev = b.savingsHistory
       .filter(s => s.owner === owner && s.date.slice(0, 7) < date.slice(0, 7))
       .sort((a, z) => z.date.localeCompare(a.date))[0]
@@ -177,6 +176,31 @@ export function useBudget() {
       return { date, owner, assets: prev.assets.map(a => ({ ...a, id: uuid() })) }
     }
     return { date, owner, assets: [] }
+  }
+
+  const copyForwardAssets = () => {
+    const today = new Date().toISOString().slice(0, 7)
+    mutate(b => {
+      let updated = { ...b, savingsHistory: [...b.savingsHistory] }
+      const owners: Owner[] = ['NIAMH', 'RUPERT', 'JOINT']
+      owners.forEach(owner => {
+        const existing = updated.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
+        if (!existing || !Array.isArray(existing.assets) || existing.assets.length === 0) {
+          const prev = updated.savingsHistory
+            .filter(s => s.owner === owner && s.date.slice(0, 7) < today)
+            .sort((a, z) => z.date.localeCompare(a.date))[0]
+          if (prev && Array.isArray(prev.assets) && prev.assets.length > 0) {
+            const newSnap = { date: today, owner, assets: prev.assets.map((a: any) => ({ ...a, id: uuid() })) }
+            updated = {
+              ...updated,
+              savingsHistory: [...updated.savingsHistory.filter(s => !(s.owner === owner && s.date.slice(0, 7) === today)), newSnap]
+                .sort((a, z) => a.date.localeCompare(z.date))
+            }
+          }
+        }
+      })
+      return updated
+    })
   }
 
   const addAsset = (owner: Owner, date: string, type: AssetType, label: string) => {
@@ -233,7 +257,7 @@ export function useBudget() {
     data, user, savedAt, isRefreshing, totals,
     signIn, signOutUser, refreshFromCloud,
     updateOwnerName, addCategory, renameCategory, deleteCategory,
-    updateItemAmount, addItem, addItemWithAmount, resyncInterest, removeItem, renameItem,
+    updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, removeItem, renameItem,
     addAsset, updateAsset, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,

@@ -191,7 +191,15 @@ function TotalLabel(props: any) {
 }
 
 export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, addAsset, updateAsset, deleteAsset, resyncInterest } = budget
+  const { data, addAsset, updateAsset, deleteAsset, resyncInterest, copyForwardAssets } = budget
+
+  // Auto copy forward on first load if current month is empty
+  const currentMonthHasData = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).some(owner => {
+    const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
+    return Array.isArray(snap?.assets) && snap!.assets.length > 0
+  })
+
+  const hasPreviousData = data.savingsHistory.some(s => s.date.slice(0, 7) < today)
   const today = new Date().toISOString().slice(0, 7)
 
   const totalAll = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
@@ -280,8 +288,22 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
         </div>
       </div>
 
-      <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
-        {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+          {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+        </div>
+        {!currentMonthHasData && hasPreviousData && (
+          <button onClick={copyForwardAssets}
+            style={{ fontSize: 12, background: 'var(--rupert)', color: 'white', border: 'none', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontWeight: 500 }}>
+            Copy from last month
+          </button>
+        )}
+        {currentMonthHasData && hasPreviousData && (
+          <button onClick={copyForwardAssets}
+            style={{ fontSize: 12, background: 'none', color: 'var(--muted)', border: '1.5px solid var(--border)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer' }}>
+            Reset to last month
+          </button>
+        )}
       </div>
 
       <OwnerPanel owner="NIAMH"  name={n1} budget={data} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
