@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Owner, AssetType, fmt } from '@/lib/models'
 import { Plus, Trash2, Pencil, Check } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { useDarkMode } from '@/hooks/useDarkMode'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -17,10 +18,12 @@ const ASSET_COLORS: Record<AssetType, string> = {
   JUNIOR_ISA: '#70AD47', LIFETIME_ISA: '#255E91', SAVINGS_ACCOUNT: '#8BAFD4',
   CRYPTO: '#F4A460', OTHER: '#A9A9A9'
 }
-const ASSET_TYPES: AssetType[] = ['CASH', 'CASH_ISA', 'STOCKS_SHARES_ISA', 'JUNIOR_ISA', 'LIFETIME_ISA', 'SAVINGS_ACCOUNT', 'CRYPTO', 'OTHER']
-const OWNER_COLORS: Record<Owner, string> = {
-  NIAMH: 'var(--niamh)', RUPERT: 'var(--rupert)', JOINT: 'var(--joint)'
+const ASSET_COLORS_DARK: Record<AssetType, string> = {
+  CASH: '#7EC8A4', CASH_ISA: '#7BB8E8', STOCKS_SHARES_ISA: '#6B9FE8',
+  JUNIOR_ISA: '#8CC957', LIFETIME_ISA: '#4B96D6', SAVINGS_ACCOUNT: '#A8C8E8',
+  CRYPTO: '#F4B46A', OTHER: '#B0B0B0'
 }
+const ASSET_TYPES: AssetType[] = ['CASH', 'CASH_ISA', 'STOCKS_SHARES_ISA', 'JUNIOR_ISA', 'LIFETIME_ISA', 'SAVINGS_ACCOUNT', 'CRYPTO', 'OTHER']
 const MONTH_LABELS: Record<string, string> = {
   '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr',
   '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug',
@@ -35,15 +38,16 @@ function formatMonth(dateStr: string) {
 function AmountInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [editing, setEditing] = useState(false)
   const [raw, setRaw] = useState('')
+  const start = () => { setRaw(value === 0 ? '' : String(value)); setEditing(true) }
   if (editing) return (
     <input value={raw} onChange={e => setRaw(e.target.value)}
       onBlur={() => { onChange(parseFloat(raw.replace(/[£,]/g, '')) || 0); setEditing(false) }}
       onKeyDown={e => { if (e.key === 'Enter') { onChange(parseFloat(raw.replace(/[£,]/g, '')) || 0); setEditing(false) } }}
-      style={{ width: 90, textAlign: 'right', fontSize: 14, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', outline: 'none', background: 'var(--rupert-light)' }}
+      style={{ width: 90, textAlign: 'right', fontSize: 14, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', background: 'var(--rupert-light)' }}
       inputMode="decimal" autoFocus />
   )
   return (
-    <span onClick={() => { setRaw(value === 0 ? '' : String(value)); setEditing(true) }}
+    <span onClick={start} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') start() }}
       style={{ cursor: 'text', fontVariantNumeric: 'tabular-nums', fontSize: 14, color: value > 0 ? 'var(--ink)' : 'var(--muted)', minWidth: 80, textAlign: 'right', display: 'inline-block', padding: '2px 4px', borderRadius: 4 }}>
       {value > 0 ? fmt(value) : '—'}
     </span>
@@ -69,9 +73,10 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
             <input value={labelDraft} onChange={e => setLabelDraft(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') commitLabel() }}
               onBlur={commitLabel}
-              style={{ flex: 1, fontSize: 13, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', outline: 'none' }}
+              style={{ flex: 1, fontSize: 13, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px' }}
               autoFocus />
-            <button onClick={commitLabel} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', display: 'flex' }}>
+            <button onClick={commitLabel} aria-label="Save asset name"
+              style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', display: 'flex' }}>
               <Check size={12} />
             </button>
           </>
@@ -90,16 +95,22 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
               </div>
             </div>
             <button onClick={() => { setLabelDraft(asset.label); setEditingLabel(true) }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--border)', display: 'flex', padding: 2 }}>
+              aria-label={`Rename ${asset.label}`}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center', opacity: 0.7 }}>
               <Pencil size={11} />
             </button>
           </>
         )}
         <AmountInput value={asset.amount || 0} onChange={v => updateAsset(owner, today, asset.id, v, asset.interestRate, asset.institution)} />
-        <button onClick={() => setExpanded(e => !e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 10, padding: '2px 4px' }}>
+        <button onClick={() => setExpanded(e => !e)}
+          aria-expanded={expanded}
+          aria-label={expanded ? 'Collapse asset details' : 'Expand asset details'}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 10, padding: '6px 8px', minWidth: 32, minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {expanded ? '▲' : '▼'}
         </button>
-        <button onClick={() => deleteAsset(owner, today, asset.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--border)', display: 'flex', padding: 2 }}>
+        <button onClick={() => deleteAsset(owner, today, asset.id)}
+          aria-label={`Delete ${asset.label}`}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
           <Trash2 size={12} />
         </button>
       </div>
@@ -116,13 +127,13 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
             <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rate %</label>
             <input type="number" value={asset.interestRate || ''} placeholder="0"
               onChange={e => updateAsset(owner, today, asset.id, asset.amount, parseFloat(e.target.value) || undefined, asset.institution)}
-              style={{ width: 70, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', outline: 'none' }} />
+              style={{ width: 70, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Institution</label>
             <input value={asset.institution || ''} placeholder="e.g. Monzo"
               onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, e.target.value)}
-              style={{ width: 110, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', outline: 'none' }} />
+              style={{ width: 110, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px' }} />
           </div>
         </div>
       )}
@@ -145,7 +156,7 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset, t
   const submit = () => { if (newLabel.trim()) { addAsset(owner, today, newType, newLabel.trim()); setNewLabel(''); setAdding(false) } }
 
   return (
-    <div className="card" style={{ marginBottom: 12, borderLeft: `3px solid ${OWNER_COLORS[owner]}` }}>
+    <div className="card" style={{ marginBottom: 12, background: `var(--${owner.toLowerCase()}-light)` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
         <span style={{ fontWeight: 600, fontSize: 14 }}>{name}</span>
         <span style={{ fontWeight: 700, fontSize: 16, fontVariantNumeric: 'tabular-nums', color: total > 0 ? 'var(--positive)' : 'var(--muted)' }}>{fmt(total)}</span>
@@ -158,7 +169,7 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset, t
           <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submit() }}
               placeholder="Account name..." autoFocus
-              style={{ flex: 1, minWidth: 120, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px', outline: 'none' }} />
+              style={{ flex: 1, minWidth: 120, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px' }} />
             <select value={newType} onChange={e => setNewType(e.target.value as AssetType)}
               style={{ fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px', background: 'var(--card)', cursor: 'pointer' }}>
               {Object.entries(ASSET_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -192,6 +203,8 @@ function TotalLabel(props: any) {
 export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   const { data, addAsset, updateAsset, deleteAsset, resyncInterest, copyForwardAssets } = budget
   const today = new Date().toISOString().slice(0, 7)
+  const isDark = useDarkMode()
+  const chartColors = isDark ? ASSET_COLORS_DARK : ASSET_COLORS
 
   const totalAll = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
@@ -221,12 +234,14 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
 
   const hasPreviousData = data.savingsHistory.some(s => s.date.slice(0, 7) < today)
 
-  // Auto copy forward on first load if current month is empty
+  const didAutoSync = useRef(false)
   useEffect(() => {
-    if (!currentMonthHasData && hasPreviousData) {
+    if (!didAutoSync.current && !currentMonthHasData && hasPreviousData) {
+      didAutoSync.current = true
       copyForwardAssets()
     }
-  }, []) // eslint-disable-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMonthHasData, hasPreviousData])
 
   const months = Array.from(new Set(data.savingsHistory.map(s => s.date.slice(0, 7)))).sort()
   if (!months.includes(today)) months.push(today)
@@ -281,7 +296,7 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
             <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} formatter={(v: number) => fmt(v)} />
             {activeTypes.map((type, i) => (
               <Bar key={type} dataKey={ASSET_LABELS[type]} stackId="a"
-                fill={ASSET_COLORS[type]}
+                fill={chartColors[type]}
                 radius={i === activeTypes.length - 1 ? [4,4,0,0] : [0,0,0,0]}
                 label={i === activeTypes.length - 1 ? (props: any) => <TotalLabel {...props} chartData={chartData} activeTypes={activeTypes} /> : undefined}
               />
@@ -295,7 +310,7 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
             if (value === 0) return null
             return (
               <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: ASSET_COLORS[type], flexShrink: 0 }} />
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: chartColors[type], flexShrink: 0 }} />
                 <span style={{ flex: 1, fontSize: 12 }}>{ASSET_LABELS[type]}</span>
                 <span style={{ fontSize: 12, color: 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
                 <span style={{ fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(value)}</span>

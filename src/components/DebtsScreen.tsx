@@ -7,17 +7,23 @@ import { Plus, Trash2, ChevronDown, ChevronUp, Pencil, Check } from 'lucide-reac
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
 const DEBT_LABELS: Record<DebtType, string> = { CREDIT_CARD: 'Credit Card', PERSONAL_LOAN: 'Personal Loan', CAR_FINANCE: 'Car Finance', MORTGAGE: 'Mortgage', STUDENT_LOAN: 'Student Loan', OTHER: 'Other' }
-const OWNER_COLORS: Record<Owner, string> = { NIAMH: 'var(--niamh)', RUPERT: 'var(--rupert)', JOINT: 'var(--joint)' }
+
+function ownerLightColor(owner: Owner) {
+  if (owner === 'NIAMH') return 'var(--niamh-light)'
+  if (owner === 'RUPERT') return 'var(--rupert-light)'
+  return 'var(--joint-light)'
+}
 
 function DebtCard({ debt, ownerName, onUpdate, onDelete }: { debt: Debt; ownerName: string; onUpdate: (id: string, fields: Partial<Debt>) => void; onDelete: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false)
   const [editingLabel, setEditingLabel] = useState(false)
   const [labelDraft, setLabelDraft] = useState(debt.label)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const commitLabel = () => { if (labelDraft.trim()) onUpdate(debt.id, { label: labelDraft.trim() }); setEditingLabel(false) }
   const months = debt.monthlyPayment > 0 && debt.currentBalance > 0 ? Math.ceil(debt.currentBalance / debt.monthlyPayment) : null
 
   return (
-    <div className="card" style={{ marginBottom: 8, borderLeft: `3px solid ${OWNER_COLORS[debt.owner]}`, overflow: 'hidden' }}>
+    <div className="card" style={{ marginBottom: 8, background: ownerLightColor(debt.owner), overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           {editingLabel ? (
@@ -25,9 +31,10 @@ function DebtCard({ debt, ownerName, onUpdate, onDelete }: { debt: Debt; ownerNa
               <input value={labelDraft} onChange={e => setLabelDraft(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') commitLabel() }}
                 onBlur={commitLabel}
-                style={{ flex: 1, fontSize: 14, fontWeight: 600, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', outline: 'none' }}
+                style={{ flex: 1, fontSize: 14, fontWeight: 600, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px' }}
                 autoFocus />
-              <button onClick={commitLabel} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', display: 'flex' }}>
+              <button onClick={commitLabel} aria-label="Save debt name"
+                style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', display: 'flex' }}>
                 <Check size={12} />
               </button>
             </div>
@@ -35,7 +42,8 @@ function DebtCard({ debt, ownerName, onUpdate, onDelete }: { debt: Debt; ownerNa
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{ fontWeight: 600, fontSize: 14 }}>{debt.label}</span>
               <button onClick={() => { setLabelDraft(debt.label); setEditingLabel(true) }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--border)', display: 'flex', padding: 2 }}>
+                aria-label={`Rename ${debt.label}`}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center', opacity: 0.7 }}>
                 <Pencil size={11} />
               </button>
             </div>
@@ -48,7 +56,10 @@ function DebtCard({ debt, ownerName, onUpdate, onDelete }: { debt: Debt; ownerNa
           <div style={{ fontWeight: 700, fontSize: 15, fontVariantNumeric: 'tabular-nums', color: 'var(--negative)' }}>{fmt(debt.currentBalance)}</div>
           {debt.monthlyPayment > 0 && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{fmt(debt.monthlyPayment)}/mo</div>}
         </div>
-        <button onClick={() => setExpanded(e => !e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 2 }}>
+        <button onClick={() => setExpanded(e => !e)}
+          aria-expanded={expanded}
+          aria-label={expanded ? 'Collapse debt details' : 'Expand debt details'}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center' }}>
           {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
       </div>
@@ -65,7 +76,7 @@ function DebtCard({ debt, ownerName, onUpdate, onDelete }: { debt: Debt; ownerNa
                 <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
                 <input type="number" value={value || ''} onChange={e => onUpdate(debt.id, { [key]: parseFloat(e.target.value) || 0 })}
                   placeholder="0"
-                  style={{ width: 100, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px', outline: 'none', background: 'var(--card)' }} />
+                  style={{ width: 100, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px', background: 'var(--card)' }} />
               </div>
             ))}
           </div>
@@ -76,15 +87,26 @@ function DebtCard({ debt, ownerName, onUpdate, onDelete }: { debt: Debt; ownerNa
             </label>
             {debt.isZeroPercent && (
               <input type="month" value={debt.zeroPercentExpiryDate ?? ''} onChange={e => onUpdate(debt.id, { zeroPercentExpiryDate: e.target.value })}
-                style={{ fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '3px 6px', outline: 'none' }} />
+                style={{ fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '3px 6px' }} />
             )}
           </div>
           <input value={debt.institution ?? ''} onChange={e => onUpdate(debt.id, { institution: e.target.value })}
             placeholder="Institution (optional)"
-            style={{ marginTop: 8, width: '100%', fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '5px 8px', outline: 'none' }} />
-          <button onClick={() => onDelete(debt.id)} style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: '1.5px solid #FECACA', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: 'var(--negative)', fontSize: 12 }}>
-            <Trash2 size={12} /> Delete
-          </button>
+            style={{ marginTop: 8, width: '100%', fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '5px 8px' }} />
+          {confirmingDelete ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+              <span style={{ fontSize: 13, color: 'var(--muted)' }}>Delete this debt?</span>
+              <button onClick={() => onDelete(debt.id)}
+                style={{ fontSize: 13, fontWeight: 600, color: 'var(--expense-text)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>Yes, delete</button>
+              <button onClick={() => setConfirmingDelete(false)}
+                style={{ fontSize: 13, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>Cancel</button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmingDelete(true)}
+              style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: '1.5px solid var(--expense-text)', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: 'var(--expense-text)', fontSize: 12, opacity: 0.7 }}>
+              <Trash2 size={12} /> Delete
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -112,11 +134,11 @@ export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
       {data.debts.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
           {[
-            { label: data.nameNiamh,  total: totals.debtN,     color: 'var(--niamh)' },
-            { label: data.nameRupert, total: totals.debtR,     color: 'var(--rupert)' },
-            { label: data.nameJoint,  total: totals.debtJoint, color: 'var(--joint)' },
-          ].map(({ label, total, color }) => (
-            <div key={label} className="card" style={{ padding: '8px 10px', borderLeft: `3px solid ${color}`, textAlign: 'center' }}>
+            { label: data.nameNiamh,  total: totals.debtN,     lightColor: 'var(--niamh-light)' },
+            { label: data.nameRupert, total: totals.debtR,     lightColor: 'var(--rupert-light)' },
+            { label: data.nameJoint,  total: totals.debtJoint, lightColor: 'var(--joint-light)' },
+          ].map(({ label, total, lightColor }) => (
+            <div key={label} className="card" style={{ padding: '8px 10px', background: lightColor, textAlign: 'center' }}>
               <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 2 }}>{label}</div>
               <div style={{ fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: total > 0 ? 'var(--negative)' : 'var(--muted)' }}>{total > 0 ? `${fmt(total)}/mo` : '—'}</div>
             </div>
@@ -135,7 +157,7 @@ export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
             <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submit() }}
               placeholder="Debt name…" autoFocus
-              style={{ flex: 1, minWidth: 140, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '6px 10px', outline: 'none' }} />
+              style={{ flex: 1, minWidth: 140, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '6px 10px' }} />
             <select value={newOwner} onChange={e => setNewOwner(e.target.value as Owner)} style={{ fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '6px 8px', background: 'var(--card)', cursor: 'pointer' }}>
               <option value="NIAMH">{data.nameNiamh}</option>
               <option value="RUPERT">{data.nameRupert}</option>

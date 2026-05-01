@@ -1,14 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useBudget } from '@/hooks/useBudget'
 import BudgetScreen from '@/components/BudgetScreen'
-import ChartsScreen from '@/components/ChartsScreen'
 import SavingsScreen from '@/components/SavingsScreen'
 import DebtsScreen from '@/components/DebtsScreen'
 import SettingsScreen from '@/components/SettingsScreen'
 import { TabFilter } from '@/lib/models'
 import { LayoutDashboard, BarChart3, PiggyBank, CreditCard, User, RefreshCw, Settings, CheckCircle } from 'lucide-react'
+
+const ChartsScreen = dynamic(() => import('@/components/ChartsScreen'))
 
 type Screen = 'budget' | 'charts' | 'savings' | 'debts' | 'settings'
 
@@ -40,15 +42,15 @@ function SetupScreen({ onDone, updateOwnerName, signIn }: {
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Who's using Budge?</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
           <div>
-            <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Person 1</label>
-            <input value={name1} onChange={e => setName1(e.target.value)} placeholder="e.g. Niamh"
-              style={{ width: '100%', fontSize: 15, border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px 12px', outline: 'none', background: 'var(--card)' }} />
+            <label htmlFor="setup-name1" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Person 1</label>
+            <input id="setup-name1" value={name1} onChange={e => setName1(e.target.value)} placeholder="e.g. Niamh"
+              style={{ width: '100%', fontSize: 15, border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px 12px', background: 'var(--card)' }} />
           </div>
           <div>
-            <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Person 2</label>
-            <input value={name2} onChange={e => setName2(e.target.value)} placeholder="e.g. Rupert"
+            <label htmlFor="setup-name2" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Person 2</label>
+            <input id="setup-name2" value={name2} onChange={e => setName2(e.target.value)} placeholder="e.g. Rupert"
               onKeyDown={e => { if (e.key === 'Enter') submit() }}
-              style={{ width: '100%', fontSize: 15, border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px 12px', outline: 'none', background: 'var(--card)' }} />
+              style={{ width: '100%', fontSize: 15, border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px 12px', background: 'var(--card)' }} />
           </div>
         </div>
         <button onClick={submit} style={{ width: '100%', background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 8, padding: '12px', cursor: 'pointer', fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
@@ -89,9 +91,8 @@ export default function HomePage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: 'var(--surface)' }}>
 
-      {/* Toast */}
       {toast && (
-        <div style={{
+        <div role="status" aria-live="polite" style={{
           position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
           background: 'var(--ink)', color: 'white', padding: '10px 20px',
           borderRadius: 999, fontSize: 13, fontWeight: 500, zIndex: 100,
@@ -108,12 +109,17 @@ export default function HomePage() {
         {savedAt && <span style={{ fontSize: 11, color: 'var(--muted)' }}>Saved {new Date(savedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>}
         {user ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={handleRefresh} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 4, display: 'flex' }} title="Sync from cloud">
+            <button onClick={handleRefresh}
+              aria-label="Sync from cloud"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 8, display: 'flex', minWidth: 36, minHeight: 36, alignItems: 'center', justifyContent: 'center' }}>
               <RefreshCw size={16} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
             </button>
-            <div onClick={signOutUser} title={`${user.email} — tap to sign out`} style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--rupert)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={signOutUser}
+              title={`${user.email} — tap to sign out`}
+              aria-label={`Signed in as ${user.email}. Tap to sign out.`}
+              style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--rupert)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', padding: 0 }}>
               {user.email?.[0].toUpperCase()}
-            </div>
+            </button>
           </div>
         ) : (
           <button onClick={signIn} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--card)', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
@@ -143,9 +149,11 @@ export default function HomePage() {
         {screen === 'settings' && <SettingsScreen budget={budget} />}
       </main>
 
-      <nav style={{ background: 'var(--card)', borderTop: '1px solid var(--border)', display: 'flex', flexShrink: 0 }}>
+      <nav aria-label="Main navigation" style={{ background: 'var(--card)', borderTop: '1px solid var(--border)', display: 'flex', flexShrink: 0 }}>
         {NAV.map(({ id, label, Icon }) => (
-          <button key={id} onClick={() => setScreen(id)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', color: screen === id ? 'var(--ink)' : 'var(--muted)', fontSize: 10, fontWeight: screen === id ? 600 : 400 }}>
+          <button key={id} onClick={() => setScreen(id)}
+            aria-current={screen === id ? 'page' : undefined}
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', color: screen === id ? 'var(--ink)' : 'var(--muted)', fontSize: 10, fontWeight: screen === id ? 600 : 400 }}>
             <Icon size={20} strokeWidth={screen === id ? 2.5 : 1.8} />
             {label}
           </button>

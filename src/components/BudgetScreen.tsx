@@ -6,10 +6,10 @@ import { Plus, ChevronDown, ChevronUp, Trash2, Pencil, Check } from 'lucide-reac
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
-function ownerColor(owner: Owner) {
-  if (owner === 'NIAMH') return 'var(--niamh)'
-  if (owner === 'RUPERT') return 'var(--rupert)'
-  return 'var(--joint)'
+function ownerLightColor(owner: Owner) {
+  if (owner === 'NIAMH') return 'var(--niamh-light)'
+  if (owner === 'RUPERT') return 'var(--rupert-light)'
+  return 'var(--joint-light)'
 }
 
 function typeColor(type: EntryType) {
@@ -27,11 +27,12 @@ function AmountCell({ value, onChange }: { value: number; onChange: (v: number) 
   if (editing) return (
     <input ref={inputRef} value={raw} onChange={e => setRaw(e.target.value)}
       onBlur={commit} onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Tab') commit() }}
-      style={{ width: 80, textAlign: 'right', fontSize: 14, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', outline: 'none', background: 'var(--rupert-light)' }}
+      style={{ width: 80, textAlign: 'right', fontSize: 14, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', background: 'var(--rupert-light)' }}
       inputMode="decimal" autoFocus />
   )
   return (
-    <span onClick={start} style={{ cursor: 'text', fontVariantNumeric: 'tabular-nums', fontSize: 14, color: value > 0 ? 'var(--ink)' : 'var(--muted)', padding: '2px 4px', borderRadius: 4, minWidth: 60, display: 'inline-block', textAlign: 'right' }}>
+    <span onClick={start} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') start() }}
+      style={{ cursor: 'text', fontVariantNumeric: 'tabular-nums', fontSize: 14, color: value > 0 ? 'var(--ink)' : 'var(--muted)', padding: '2px 4px', borderRadius: 4, minWidth: 60, display: 'inline-block', textAlign: 'right' }}>
       {value > 0 ? fmt(value) : '—'}
     </span>
   )
@@ -54,22 +55,27 @@ function ItemRow({ catKey, item, onUpdateAmount, onRemoveItem, onRenameItem }: {
           <input value={labelDraft} onChange={e => setLabelDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') commitLabel() }}
             onBlur={commitLabel}
-            style={{ flex: 1, fontSize: 13, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', outline: 'none' }}
+            style={{ flex: 1, fontSize: 13, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px' }}
             autoFocus />
-          <button onClick={commitLabel} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', display: 'flex' }}>
+          <button onClick={commitLabel} aria-label="Save item name"
+            style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', display: 'flex' }}>
             <Check size={12} />
           </button>
         </>
       ) : (
         <>
           <span style={{ flex: 1, fontSize: 13, color: 'var(--muted)' }}>{item.label}</span>
-          <button onClick={() => { setLabelDraft(item.label); setEditingLabel(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--border)', display: 'flex', padding: 2 }}>
+          <button onClick={() => { setLabelDraft(item.label); setEditingLabel(true) }}
+            aria-label={`Rename ${item.label}`}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center', opacity: 0.7 }}>
             <Pencil size={11} />
           </button>
         </>
       )}
       <AmountCell value={item.amount} onChange={v => onUpdateAmount(catKey, item.id, v)} />
-      <button onClick={() => onRemoveItem(catKey, item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--border)', display: 'flex', padding: 2 }}>
+      <button onClick={() => onRemoveItem(catKey, item.id)}
+        aria-label={`Remove ${item.label}`}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
         <Trash2 size={12} />
       </button>
     </div>
@@ -91,9 +97,9 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
   const [newItemLabel, setNewItemLabel] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState(cat.label)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const total = cat.items.reduce((a, i) => a + i.amount, 0)
   const { bg, text } = typeColor(cat.type)
-  const color = ownerColor(cat.owner)
   const submitItem = () => {
     if (newItemLabel.trim()) { onAddItem(cat.key, newItemLabel.trim()); setNewItemLabel(''); setAddingItem(false) }
   }
@@ -101,13 +107,14 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
 
   return (
     <div className="card fade-up" style={{ marginBottom: 8, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderLeft: '3px solid ' + color, background: open ? 'var(--card)' : 'var(--surface)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', background: ownerLightColor(cat.owner) }}>
         {editingName ? (
           <>
             <input value={nameDraft} onChange={e => setNameDraft(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') commitName() }}
-              style={{ flex: 1, fontSize: 14, fontWeight: 600, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '4px 8px', outline: 'none' }} autoFocus />
-            <button onClick={commitName} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex' }}>
+              style={{ flex: 1, fontSize: 14, fontWeight: 600, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '4px 8px' }} autoFocus />
+            <button onClick={commitName} aria-label="Save category name"
+              style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex' }}>
               <Check size={14} />
             </button>
           </>
@@ -118,14 +125,27 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
                 {cat.label}
                 {cat.note && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>{'— ' + cat.note}</span>}
               </div>
-              <div style={{ fontSize: 11, color: color, fontWeight: 500, marginTop: 1 }}>{ownerName}</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500, marginTop: 1 }}>{ownerName}</div>
             </div>
-            <button onClick={() => { setNameDraft(cat.label); setEditingName(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 2 }}>
+            <button onClick={() => { setNameDraft(cat.label); setEditingName(true) }}
+              aria-label={`Rename ${cat.label}`}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center', opacity: 0.7 }}>
               <Pencil size={13} />
             </button>
-            <button onClick={() => { if (confirm('Delete this category?')) onDeleteCategory(cat.key) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FECACA', display: 'flex', padding: 2 }}>
-              <Trash2 size={13} />
-            </button>
+            {confirmingDelete ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--muted)' }}>Delete?</span>
+                <button onClick={() => onDeleteCategory(cat.key)} aria-label="Confirm delete category"
+                  style={{ fontSize: 11, fontWeight: 600, color: 'var(--expense-text)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px' }}>Yes</button>
+                <button onClick={() => setConfirmingDelete(false)} aria-label="Cancel delete"
+                  style={{ fontSize: 11, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px' }}>No</button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmingDelete(true)} aria-label={`Delete ${cat.label}`}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--expense-text)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
+                <Trash2 size={13} />
+              </button>
+            )}
           </>
         )}
         <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: bg, color: text, fontWeight: 600, flexShrink: 0 }}>
@@ -134,7 +154,10 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
         <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 14, minWidth: 56, textAlign: 'right', flexShrink: 0 }}>
           {total > 0 ? fmt(total) : '—'}
         </span>
-        <button onClick={() => setOpen(o => !o)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 2 }}>
+        <button onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+          aria-label={open ? 'Collapse category' : 'Expand category'}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center' }}>
           {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
       </div>
@@ -148,7 +171,7 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
               <input value={newItemLabel} onChange={e => setNewItemLabel(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') submitItem(); if (e.key === 'Escape') setAddingItem(false) }}
                 placeholder="Item name..." autoFocus
-                style={{ flex: 1, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px', outline: 'none' }} />
+                style={{ flex: 1, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px' }} />
               <button onClick={submitItem} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}>Add</button>
               <button onClick={() => setAddingItem(false)} style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}>Cancel</button>
             </div>
@@ -165,13 +188,13 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
 
 function SummaryBar({ totals }: { totals: ReturnType<typeof calcTotals> }) {
   const items = [
-    { label: 'Income', value: totals.totalInc, color: 'var(--income-text)' },
+    { label: 'Income',   value: totals.totalInc, color: 'var(--income-text)' },
     { label: 'Expenses', value: totals.totalExp, color: 'var(--expense-text)' },
-    { label: 'Savings', value: totals.totalSav, color: 'var(--savings-text)' },
-    { label: 'Leftover', value: totals.net, color: totals.net >= 0 ? 'var(--positive)' : 'var(--negative)' },
+    { label: 'Savings',  value: totals.totalSav, color: 'var(--savings-text)' },
+    { label: 'Leftover', value: totals.net,      color: totals.net >= 0 ? 'var(--positive)' : 'var(--negative)' },
   ]
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
+    <div className="summary-grid">
       {items.map(({ label, value, color }) => (
         <div key={label} className="card" style={{ padding: '10px 12px', textAlign: 'center' }}>
           <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>{label}</div>
@@ -182,7 +205,10 @@ function SummaryBar({ totals }: { totals: ReturnType<typeof calcTotals> }) {
   )
 }
 
-function PersonSummary({ name, inc, exp, sav, debt, hjExp, hjSav, hjDebt, color }: { name: string; inc: number; exp: number; sav: number; debt: number; hjExp: number; hjSav: number; hjDebt: number; color: string }) {
+function PersonSummary({ name, inc, exp, sav, debt, hjExp, hjSav, hjDebt, lightColor }: {
+  name: string; inc: number; exp: number; sav: number; debt: number
+  hjExp: number; hjSav: number; hjDebt: number; lightColor: string
+}) {
   const net = inc - exp - sav - debt - hjExp - hjSav - hjDebt
   const Row = ({ label, value, c, bold }: { label: string; value: number; c: string; bold?: boolean }) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
@@ -191,8 +217,8 @@ function PersonSummary({ name, inc, exp, sav, debt, hjExp, hjSav, hjDebt, color 
     </div>
   )
   return (
-    <div className="card" style={{ padding: '12px 14px', borderLeft: '3px solid ' + color }}>
-      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, color }}>{name}</div>
+    <div className="card" style={{ padding: '12px 14px', background: lightColor }}>
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, color: 'var(--ink)' }}>{name}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <Row label="Income" value={inc} c="var(--income-text)" />
         <Row label="Personal exp." value={exp} c="var(--expense-text)" />
@@ -243,8 +269,8 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
       <SummaryBar totals={totals} />
       {tab === 'ALL' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-          <PersonSummary name={data.nameNiamh} color="var(--niamh)" inc={totals.incN} exp={totals.expN} sav={totals.savN} debt={totals.debtN} hjExp={totals.halfJointExp} hjSav={totals.halfJointSav} hjDebt={totals.halfJointDebt} />
-          <PersonSummary name={data.nameRupert} color="var(--rupert)" inc={totals.incR} exp={totals.expR} sav={totals.savR} debt={totals.debtR} hjExp={totals.halfJointExp} hjSav={totals.halfJointSav} hjDebt={totals.halfJointDebt} />
+          <PersonSummary name={data.nameNiamh} lightColor="var(--niamh-light)" inc={totals.incN} exp={totals.expN} sav={totals.savN} debt={totals.debtN} hjExp={totals.halfJointExp} hjSav={totals.halfJointSav} hjDebt={totals.halfJointDebt} />
+          <PersonSummary name={data.nameRupert} lightColor="var(--rupert-light)" inc={totals.incR} exp={totals.expR} sav={totals.savR} debt={totals.debtR} hjExp={totals.halfJointExp} hjSav={totals.halfJointSav} hjDebt={totals.halfJointDebt} />
         </div>
       )}
       {(['INCOME', 'EXPENSE', 'SAVINGS'] as EntryType[]).map(type => grouped[type].length > 0 && (
@@ -257,7 +283,6 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
           ))}
         </div>
       ))}
-      {/* Debt payments — read only summary linking to Debts tab */}
       {totals.totalDebt > 0 && (tab === 'ALL' || tab === 'RUPERT' || tab === 'NIAMH' || tab === 'JOINT') && (
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: 6, marginTop: 4 }}>
@@ -266,7 +291,7 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
           {data.debts
             .filter(d => tab === 'ALL' || d.owner === tab)
             .map(d => (
-              <div key={d.id} className="card fade-up" style={{ marginBottom: 8, borderLeft: '3px solid ' + (d.owner === 'NIAMH' ? 'var(--niamh)' : d.owner === 'RUPERT' ? 'var(--rupert)' : 'var(--joint)') }}>
+              <div key={d.id} className="card fade-up" style={{ marginBottom: 8, background: ownerLightColor(d.owner) }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 600 }}>{d.label}</div>
@@ -297,7 +322,7 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
             <input value={newCatLabel} onChange={e => setNewCatLabel(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submitCat() }}
               placeholder="Category name..." autoFocus
-              style={{ flex: 1, minWidth: 160, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '6px 10px', outline: 'none' }} />
+              style={{ flex: 1, minWidth: 160, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '6px 10px' }} />
             <select value={newCatOwner} onChange={e => setNewCatOwner(e.target.value as Owner)} style={{ fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '6px 8px', background: 'var(--card)', cursor: 'pointer' }}>
               <option value="NIAMH">{data.nameNiamh}</option>
               <option value="RUPERT">{data.nameRupert}</option>
