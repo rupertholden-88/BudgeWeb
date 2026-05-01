@@ -166,9 +166,22 @@ export function useBudget() {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.map(i => i.id === itemId ? { ...i, label: newLabel.trim() } : i) }) }))
   }
 
+  const getOrCopySnapshot = (b: BudgetData, owner: Owner, date: string) => {
+    const existing = b.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7))
+    if (existing) return existing
+    // Copy forward from most recent previous month
+    const prev = b.savingsHistory
+      .filter(s => s.owner === owner && s.date.slice(0, 7) < date.slice(0, 7))
+      .sort((a, z) => z.date.localeCompare(a.date))[0]
+    if (prev && Array.isArray(prev.assets)) {
+      return { date, owner, assets: prev.assets.map(a => ({ ...a, id: uuid() })) }
+    }
+    return { date, owner, assets: [] }
+  }
+
   const addAsset = (owner: Owner, date: string, type: AssetType, label: string) => {
     mutate(b => {
-      const snap = b.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7)) ?? { date, owner, assets: [] }
+      const snap = getOrCopySnapshot(b, owner, date)
       const updated = { ...snap, assets: [...snap.assets, { id: uuid(), type, label, amount: 0 }] }
       return { ...b, savingsHistory: [...b.savingsHistory.filter(s => !(s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7))), updated].sort((a, z) => a.date.localeCompare(z.date)) }
     })
@@ -176,7 +189,7 @@ export function useBudget() {
 
   const updateAsset = (owner: Owner, date: string, assetId: string, amount: number, interestRate?: number, institution?: string) => {
     mutate(b => {
-      const snap = b.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7)) ?? { date, owner, assets: [] }
+      const snap = getOrCopySnapshot(b, owner, date)
       const updated = { ...snap, assets: snap.assets.map(a => a.id === assetId ? { ...a, amount, interestRate, institution } : a) }
       return { ...b, savingsHistory: [...b.savingsHistory.filter(s => !(s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7))), updated].sort((a, z) => a.date.localeCompare(z.date)) }
     })
