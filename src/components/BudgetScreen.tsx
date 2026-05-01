@@ -123,7 +123,6 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 600 }}>
                 {cat.label}
-                {cat.note && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>{'— ' + cat.note}</span>}
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500, marginTop: 1 }}>{ownerName}</div>
             </div>
