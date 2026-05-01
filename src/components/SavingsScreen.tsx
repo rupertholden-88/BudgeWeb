@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Owner, AssetType, fmt } from '@/lib/models'
 import { Plus, Trash2, Pencil, Check } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
@@ -12,6 +12,12 @@ const ASSET_LABELS: Record<AssetType, string> = {
   JUNIOR_ISA: 'Junior ISA', LIFETIME_ISA: 'LISA',
   SAVINGS_ACCOUNT: 'Savings Account', CRYPTO: 'Crypto', OTHER: 'Other'
 }
+const ASSET_COLORS: Record<AssetType, string> = {
+  CASH: '#6BAF92', CASH_ISA: '#5B9BD5', STOCKS_SHARES_ISA: '#4472C4',
+  JUNIOR_ISA: '#70AD47', LIFETIME_ISA: '#255E91', SAVINGS_ACCOUNT: '#8BAFD4',
+  CRYPTO: '#F4A460', OTHER: '#A9A9A9'
+}
+const ASSET_TYPES: AssetType[] = ['CASH', 'CASH_ISA', 'STOCKS_SHARES_ISA', 'JUNIOR_ISA', 'LIFETIME_ISA', 'SAVINGS_ACCOUNT', 'CRYPTO', 'OTHER']
 const OWNER_COLORS: Record<Owner, string> = {
   NIAMH: 'var(--niamh)', RUPERT: 'var(--rupert)', JOINT: 'var(--joint)'
 }
@@ -46,8 +52,7 @@ function AmountInput({ value, onChange }: { value: number; onChange: (v: number)
 
 function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
   asset: { id: string; label: string; amount: number; type: AssetType; interestRate?: number; institution?: string }
-  owner: Owner
-  today: string
+  owner: Owner; today: string
   updateAsset: BudgetHook['updateAsset']
   deleteAsset: BudgetHook['deleteAsset']
 }) {
@@ -55,6 +60,7 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
   const [editingLabel, setEditingLabel] = useState(false)
   const [labelDraft, setLabelDraft] = useState(asset.label)
   const commitLabel = () => { updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution); setEditingLabel(false) }
+
   return (
     <div style={{ borderBottom: '1px solid var(--border)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0' }}>
@@ -124,13 +130,12 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
   )
 }
 
-function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }: {
-  owner: Owner; name: string; budget: BudgetHook['data']
+function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset, today }: {
+  owner: Owner; name: string; budget: BudgetHook['data']; today: string
   addAsset: BudgetHook['addAsset']
   updateAsset: BudgetHook['updateAsset']
   deleteAsset: BudgetHook['deleteAsset']
 }) {
-  const today = new Date().toISOString().slice(0, 7)
   const snap = budget.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
   const assets = Array.isArray(snap?.assets) ? snap!.assets : []
   const total = assets.reduce((a, i) => a + (i.amount || 0), 0)
@@ -138,6 +143,7 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset }:
   const [newLabel, setNewLabel] = useState('')
   const [newType, setNewType] = useState<AssetType>('SAVINGS_ACCOUNT')
   const submit = () => { if (newLabel.trim()) { addAsset(owner, today, newType, newLabel.trim()); setNewLabel(''); setAdding(false) } }
+
   return (
     <div className="card" style={{ marginBottom: 12, borderLeft: `3px solid ${OWNER_COLORS[owner]}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
@@ -174,14 +180,7 @@ function TotalLabel(props: any) {
   const { x, y, width, index, chartData, activeTypes } = props
   const row = chartData[index]
   if (!row) return null
-  const total = (activeTypes || []).reduce((sum: number, type: string) => {
-    const label = Object.entries({
-      CASH: 'Cash', CASH_ISA: 'Cash ISA', STOCKS_SHARES_ISA: 'S&S ISA',
-      JUNIOR_ISA: 'Junior ISA', LIFETIME_ISA: 'LISA', SAVINGS_ACCOUNT: 'Savings Account',
-      CRYPTO: 'Crypto', OTHER: 'Other'
-    }).find(([k]) => k === type)?.[1] || type
-    return sum + (row[label] || 0)
-  }, 0)
+  const total = activeTypes.reduce((sum: number, type: AssetType) => sum + (row[ASSET_LABELS[type]] || 0), 0)
   if (total === 0) return null
   return (
     <text x={x + width / 2} y={y - 8} textAnchor="middle" fontSize={11} fontWeight={700} fill="var(--ink)">
@@ -192,14 +191,6 @@ function TotalLabel(props: any) {
 
 export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   const { data, addAsset, updateAsset, deleteAsset, resyncInterest, copyForwardAssets } = budget
-
-  // Auto copy forward on first load if current month is empty
-  const currentMonthHasData = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).some(owner => {
-    const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
-    return Array.isArray(snap?.assets) && snap!.assets.length > 0
-  })
-
-  const hasPreviousData = data.savingsHistory.some(s => s.date.slice(0, 7) < today)
   const today = new Date().toISOString().slice(0, 7)
 
   const totalAll = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
@@ -208,19 +199,22 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
     return acc + assets.reduce((a, i) => a + (i.amount || 0), 0)
   }, 0)
 
+  const currentMonthHasData = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).some(owner => {
+    const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
+    return Array.isArray(snap?.assets) && snap!.assets.length > 0
+  })
+
+  const hasPreviousData = data.savingsHistory.some(s => s.date.slice(0, 7) < today)
+
+  // Auto copy forward on first load if current month is empty
+  useEffect(() => {
+    if (!currentMonthHasData && hasPreviousData) {
+      copyForwardAssets()
+    }
+  }, []) // eslint-disable-line
+
   const months = Array.from(new Set(data.savingsHistory.map(s => s.date.slice(0, 7)))).sort()
   if (!months.includes(today)) months.push(today)
-
-  const n1 = data.nameNiamh || 'Person 1'
-  const n2 = data.nameRupert || 'Person 2'
-  const n3 = data.nameJoint || 'Joint'
-
-  const ASSET_TYPES: AssetType[] = ['CASH', 'CASH_ISA', 'STOCKS_SHARES_ISA', 'JUNIOR_ISA', 'LIFETIME_ISA', 'SAVINGS_ACCOUNT', 'CRYPTO', 'OTHER']
-  const ASSET_COLORS: Record<AssetType, string> = {
-    CASH: '#6BAF92', CASH_ISA: '#5B9BD5', STOCKS_SHARES_ISA: '#4472C4',
-    JUNIOR_ISA: '#70AD47', LIFETIME_ISA: '#255E91', SAVINGS_ACCOUNT: '#8BAFD4',
-    CRYPTO: '#F4A460', OTHER: '#A9A9A9'
-  }
 
   const chartData = months.map(month => {
     const allAssets = data.savingsHistory
@@ -233,9 +227,7 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
     return row
   })
 
-  const activeTypes = ASSET_TYPES.filter(type =>
-    chartData.some(row => (row[ASSET_LABELS[type]] || 0) > 0)
-  )
+  const activeTypes = ASSET_TYPES.filter(type => chartData.some(row => (row[ASSET_LABELS[type]] || 0) > 0))
 
   const byOwner = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(owner => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
@@ -245,6 +237,9 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   }).filter(o => o.monthly > 0)
 
   const totalMonthly = byOwner.reduce((a, o) => a + o.monthly, 0)
+  const n1 = data.nameNiamh || 'Person 1'
+  const n2 = data.nameRupert || 'Person 2'
+  const n3 = data.nameJoint || 'Joint'
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: 16 }}>
@@ -261,12 +256,12 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
           <BarChart data={chartData} barSize={40} margin={{ top: 30, right: 16, left: 8, bottom: 0 }}>
             <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
             <YAxis hide />
-            <Tooltip formatter={(v: number) => fmt(v)} />
+            <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} formatter={(v: number) => fmt(v)} />
             {activeTypes.map((type, i) => (
               <Bar key={type} dataKey={ASSET_LABELS[type]} stackId="a"
                 fill={ASSET_COLORS[type]}
                 radius={i === activeTypes.length - 1 ? [4,4,0,0] : [0,0,0,0]}
-                label={i === activeTypes.length - 1 ? (props: any) => <TotalLabel {...props} chartData={chartData} n1={n1} n2={n2} n3={n3} activeTypes={activeTypes} /> : undefined}
+                label={i === activeTypes.length - 1 ? (props: any) => <TotalLabel {...props} chartData={chartData} activeTypes={activeTypes} /> : undefined}
               />
             ))}
           </BarChart>
@@ -292,23 +287,17 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
         <div style={{ fontSize: 11, color: 'var(--muted)' }}>
           {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
         </div>
-        {!currentMonthHasData && hasPreviousData && (
+        {hasPreviousData && (
           <button onClick={copyForwardAssets}
-            style={{ fontSize: 12, background: 'var(--rupert)', color: 'white', border: 'none', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontWeight: 500 }}>
-            Copy from last month
-          </button>
-        )}
-        {currentMonthHasData && hasPreviousData && (
-          <button onClick={copyForwardAssets}
-            style={{ fontSize: 12, background: 'none', color: 'var(--muted)', border: '1.5px solid var(--border)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer' }}>
+            style={{ fontSize: 12, background: 'none', color: 'var(--muted)', border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
             Reset to last month
           </button>
         )}
       </div>
 
-      <OwnerPanel owner="NIAMH"  name={n1} budget={data} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
-      <OwnerPanel owner="RUPERT" name={n2} budget={data} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
-      <OwnerPanel owner="JOINT"  name={n3} budget={data} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
+      <OwnerPanel owner="NIAMH"  name={n1} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
+      <OwnerPanel owner="RUPERT" name={n2} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
+      <OwnerPanel owner="JOINT"  name={n3} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
 
       {byOwner.length > 0 && (
         <div className="card" style={{ padding: 16, marginTop: 4 }}>
