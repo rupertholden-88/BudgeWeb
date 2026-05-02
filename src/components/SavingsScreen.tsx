@@ -125,7 +125,7 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <TapToEdit value={asset.label}
-              onSave={_v => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution)}
+              onSave={v => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution, v)}
               style={{ fontSize: 13, fontWeight: 500, display: 'block' }} />
             <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>
               {ASSET_LABELS[asset.type] ?? asset.type}
@@ -146,7 +146,7 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
           <div style={{ padding: '0 0 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Type</label>
-              <select value={asset.type} onChange={_e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution)}
+              <select value={asset.type} onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution, undefined, e.target.value as AssetType)}
                 style={{ fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', background: 'var(--card)' }}>
                 {Object.entries(ASSET_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
