@@ -1,8 +1,6 @@
-'use client'
-
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Owner, DebtType, Debt, fmt } from '@/lib/models'
-import { Plus, Trash2, ChevronDown, ChevronUp, Pencil, Check } from 'lucide-react'
+import { Plus, ChevronDown, ChevronUp } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -14,44 +12,75 @@ function ownerLightColor(owner: Owner) {
   return 'var(--joint-light)'
 }
 
+function DeleteModal({ label, onConfirm, onCancel }: { label: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+      onClick={onCancel}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card)', borderRadius: '16px 16px 0 0', padding: '20px 20px 32px', width: '100%', maxWidth: 480 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Delete "{label}"?</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>This can't be undone.</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button onClick={onConfirm} style={{ background: 'var(--expense-text)', color: 'white', border: 'none', borderRadius: 10, padding: 14, cursor: 'pointer', fontSize: 15, fontWeight: 600 }}>Delete</button>
+          <button onClick={onCancel} style={{ background: 'var(--surface)', color: 'var(--ink)', border: 'none', borderRadius: 10, padding: 14, cursor: 'pointer', fontSize: 15 }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function DebtCard({ debt, ownerName, onUpdate, onDelete }: { debt: Debt; ownerName: string; onUpdate: (id: string, fields: Partial<Debt>) => void; onDelete: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false)
   const [editingLabel, setEditingLabel] = useState(false)
   const [labelDraft, setLabelDraft] = useState(debt.label)
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState(false)
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const commitLabel = () => { if (labelDraft.trim()) onUpdate(debt.id, { label: labelDraft.trim() }); setEditingLabel(false) }
   const months = debt.monthlyPayment > 0 && debt.currentBalance > 0 ? Math.ceil(debt.currentBalance / debt.monthlyPayment) : null
 
-  return (
-    <div className="card" style={{ marginBottom: 8, background: ownerLightColor(debt.owner), overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {editingLabel ? (
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+  const startPress = () => {
+    if (editingLabel) return
+    pressTimer.current = setTimeout(() => {
+      navigator.vibrate?.(60)
+      setPendingDelete(true)
+    }, 600)
+  }
+  const cancelPress = () => {
+    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null }
+  }
+
+  return (<div style={{display: 'contents'}}>
+      {pendingDelete && (
+        <DeleteModal
+          label={debt.label}
+          onConfirm={() => { onDelete(debt.id); setPendingDelete(false) }}
+          onCancel={() => setPendingDelete(false)}
+        />
+      )}
+      <div className="card" style={{ marginBottom: 8, background: ownerLightColor(debt.owner), overflow: 'hidden' }}
+        onTouchStart={startPress} onTouchEnd={cancelPress} onTouchMove={cancelPress} onTouchCancel={cancelPress}
+        onMouseDown={startPress} onMouseUp={cancelPress} onMouseLeave={cancelPress}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {editingLabel ? (
               <input value={labelDraft} onChange={e => setLabelDraft(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') commitLabel() }}
                 onBlur={commitLabel}
-                style={{ flex: 1, fontSize: 14, fontWeight: 600, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px' }}
+                onTouchStart={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
+                style={{ width: '100%', fontSize: 14, fontWeight: 600, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px' }}
                 autoFocus />
-              <button onClick={commitLabel} aria-label="Save debt name"
-                style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', display: 'flex' }}>
-                <Check size={12} />
-              </button>
+            ) : (
+              <span onClick={() => { setLabelDraft(debt.label); setEditingLabel(true) }}
+                onTouchStart={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
+                role="button" tabIndex={0}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { setLabelDraft(debt.label); setEditingLabel(true) } }}
+                style={{ fontWeight: 600, fontSize: 14, cursor: 'text', padding: '2px 4px', borderRadius: 4 }}>
+                {debt.label}
+              </span>
+            )}
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+              {DEBT_LABELS[debt.type]} · {ownerName}{months ? ` · ~${months} months left` : ''}
             </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ fontWeight: 600, fontSize: 14 }}>{debt.label}</span>
-              <button onClick={() => { setLabelDraft(debt.label); setEditingLabel(true) }}
-                aria-label={`Rename ${debt.label}`}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center', opacity: 0.7 }}>
-                <Pencil size={11} />
-              </button>
-            </div>
-          )}
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-            {DEBT_LABELS[debt.type]} · {ownerName}{months ? ` · ~${months} months left` : ''}
           </div>
-        </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontWeight: 700, fontSize: 15, fontVariantNumeric: 'tabular-nums', color: 'var(--negative)' }}>{fmt(debt.currentBalance)}</div>
           {debt.monthlyPayment > 0 && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{fmt(debt.monthlyPayment)}/mo</div>}
@@ -93,25 +122,12 @@ function DebtCard({ debt, ownerName, onUpdate, onDelete }: { debt: Debt; ownerNa
           <input value={debt.institution ?? ''} onChange={e => onUpdate(debt.id, { institution: e.target.value })}
             placeholder="Institution (optional)"
             style={{ marginTop: 8, width: '100%', fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '5px 8px' }} />
-          {confirmingDelete ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-              <span style={{ fontSize: 13, color: 'var(--muted)' }}>Delete this debt?</span>
-              <button onClick={() => onDelete(debt.id)}
-                style={{ fontSize: 13, fontWeight: 600, color: 'var(--expense-text)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>Yes, delete</button>
-              <button onClick={() => setConfirmingDelete(false)}
-                style={{ fontSize: 13, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>Cancel</button>
-            </div>
-          ) : (
-            <button onClick={() => setConfirmingDelete(true)}
-              style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: '1.5px solid var(--expense-text)', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: 'var(--expense-text)', fontSize: 12, opacity: 0.7 }}>
-              <Trash2 size={12} /> Delete
-            </button>
-          )}
         </div>
       )}
     </div>
-  )
-}
+  </div>
+)
+
 
 export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
   const { data, addDebt, updateDebt, deleteDebt, totals } = budget

@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { Category, TabFilter, Owner, EntryType, fmt, calcTotals } from '@/lib/models'
-import { Plus, ChevronDown, ChevronUp, Trash2, Pencil, Check } from 'lucide-react'
+import { Plus, ChevronDown, ChevronUp } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -18,6 +18,22 @@ function typeColor(type: EntryType) {
   return { bg: 'var(--savings-bg)', text: 'var(--savings-text)' }
 }
 
+function DeleteModal({ label, onConfirm, onCancel }: { label: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+      onClick={onCancel}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card)', borderRadius: '16px 16px 0 0', padding: '20px 20px 32px', width: '100%', maxWidth: 480 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Delete "{label}"?</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>This can't be undone.</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button onClick={onConfirm} style={{ background: 'var(--expense-text)', color: 'white', border: 'none', borderRadius: 10, padding: 14, cursor: 'pointer', fontSize: 15, fontWeight: 600 }}>Delete</button>
+          <button onClick={onCancel} style={{ background: 'var(--surface)', color: 'var(--ink)', border: 'none', borderRadius: 10, padding: 14, cursor: 'pointer', fontSize: 15 }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AmountCell({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [editing, setEditing] = useState(false)
   const [raw, setRaw] = useState('')
@@ -31,7 +47,9 @@ function AmountCell({ value, onChange }: { value: number; onChange: (v: number) 
       inputMode="decimal" autoFocus />
   )
   return (
-    <span onClick={start} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') start() }}
+    <span onClick={start} role="button" tabIndex={0}
+      onTouchStart={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') start() }}
       style={{ cursor: 'text', fontVariantNumeric: 'tabular-nums', fontSize: 14, color: value > 0 ? 'var(--ink)' : 'var(--muted)', padding: '2px 4px', borderRadius: 4, minWidth: 60, display: 'inline-block', textAlign: 'right' }}>
       {value > 0 ? fmt(value) : '—'}
     </span>
@@ -47,57 +65,62 @@ function ItemRow({ catKey, item, onUpdateAmount, onRemoveItem, onRenameItem }: {
 }) {
   const [editingLabel, setEditingLabel] = useState(false)
   const [labelDraft, setLabelDraft] = useState(item.label)
+  const [pendingDelete, setPendingDelete] = useState(false)
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const commitLabel = () => { onRenameItem(catKey, item.id, labelDraft); setEditingLabel(false) }
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-      {editingLabel ? (
-        <>
+
+  const startPress = () => {
+    if (editingLabel) return
+    pressTimer.current = setTimeout(() => {
+      navigator.vibrate?.(60)
+      setPendingDelete(true)
+    }, 600)
+  }
+  const cancelPress = () => {
+    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null }
+  }
+  return (<div style={{display: 'contents'}}>
+      {pendingDelete && (
+        <DeleteModal
+          label={item.label}
+          onConfirm={() => { onRemoveItem(catKey, item.id); setPendingDelete(false) }}
+          onCancel={() => setPendingDelete(false)}
+        />
+      )}
+      <div
+        onTouchStart={startPress} onTouchEnd={cancelPress} onTouchMove={cancelPress} onTouchCancel={cancelPress}
+        onMouseDown={startPress} onMouseUp={cancelPress} onMouseLeave={cancelPress}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0', borderBottom: '1px solid var(--border)', userSelect: 'none' }}>
+        {editingLabel ? (
           <input value={labelDraft} onChange={e => setLabelDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') commitLabel() }}
             onBlur={commitLabel}
+            onTouchStart={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
             style={{ flex: 1, fontSize: 13, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px' }}
             autoFocus />
-          <button onClick={commitLabel} aria-label="Save item name"
-            style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', display: 'flex' }}>
-            <Check size={12} />
-          </button>
-        </>
-      ) : (
-        <>
-          <span style={{ flex: 1, fontSize: 13, color: 'var(--muted)' }}>{item.label}</span>
-          <button onClick={() => { setLabelDraft(item.label); setEditingLabel(true) }}
-            aria-label={`Rename ${item.label}`}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center', opacity: 0.7 }}>
-            <Pencil size={11} />
-          </button>
-        </>
-      )}
-      <AmountCell value={item.amount} onChange={v => onUpdateAmount(catKey, item.id, v)} />
-      <button onClick={() => onRemoveItem(catKey, item.id)}
-        aria-label={`Remove ${item.label}`}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
-        <Trash2 size={12} />
-      </button>
+        ) : (
+          <span onClick={() => { setLabelDraft(item.label); setEditingLabel(true) }}
+            onTouchStart={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
+            role="button" tabIndex={0}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { setLabelDraft(item.label); setEditingLabel(true) } }}
+            style={{ flex: 1, fontSize: 13, color: 'var(--muted)', cursor: 'text', padding: '2px 4px', borderRadius: 4 }}>
+            {item.label}
+          </span>
+        )}
+        <AmountCell value={item.amount} onChange={v => onUpdateAmount(catKey, item.id, v)} />
+      </div>
     </div>
   )
-}
 
-function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem, onRenameItem, onRenameCategory, onDeleteCategory }: {
-  cat: Category
-  ownerName: string
-  onUpdateAmount: (catKey: string, itemId: string, v: number) => void
-  onAddItem: (catKey: string, label: string) => void
-  onRemoveItem: (catKey: string, itemId: string) => void
-  onRenameItem: (catKey: string, itemId: string, label: string) => void
-  onRenameCategory: (catKey: string, label: string) => void
-  onDeleteCategory: (catKey: string) => void
-}) {
+function CategoryCard(props) {
+  const { cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem, onRenameItem, onRenameCategory, onDeleteCategory } = props
   const [open, setOpen] = useState(true)
   const [addingItem, setAddingItem] = useState(false)
   const [newItemLabel, setNewItemLabel] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState(cat.label)
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState(false)
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const total = cat.items.reduce((a, i) => a + i.amount, 0)
   const { bg, text } = typeColor(cat.type)
   const submitItem = () => {
@@ -105,46 +128,53 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
   }
   const commitName = () => { onRenameCategory(cat.key, nameDraft); setEditingName(false) }
 
-  return (
-    <div className="card fade-up" style={{ marginBottom: 8, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', background: ownerLightColor(cat.owner) }}>
-        {editingName ? (
-          <>
+  const startPress = () => {
+    if (editingName) return
+    pressTimer.current = setTimeout(() => {
+      navigator.vibrate?.(60)
+      setPendingDelete(true)
+    }, 600)
+  }
+  const cancelPress = () => {
+    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null }
+  }
+  return (<div>
+      {pendingDelete && (
+        <DeleteModal
+          label={cat.label}
+          onConfirm={() => { onDeleteCategory(cat.key); setPendingDelete(false) }}
+          onCancel={() => setPendingDelete(false)}
+        />
+      )}
+      <div className="card fade-up" style={{ marginBottom: 8, overflow: 'hidden' }}
+        onTouchStart={startPress} onTouchEnd={cancelPress} onTouchMove={cancelPress} onTouchCancel={cancelPress}
+        onMouseDown={startPress} onMouseUp={cancelPress} onMouseLeave={cancelPress}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', background: ownerLightColor(cat.owner) }}>
+          {editingName ? (
             <input value={nameDraft} onChange={e => setNameDraft(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') commitName() }}
+              onBlur={commitName}
+              onTouchStart={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
               style={{ flex: 1, fontSize: 14, fontWeight: 600, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '4px 8px' }} autoFocus />
-            <button onClick={commitName} aria-label="Save category name"
-              style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex' }}>
-              <Check size={14} />
-            </button>
-          </>
-        ) : (
-          <>
+          ) : (
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>
+              <div onClick={() => { setNameDraft(cat.label); setEditingName(true) }}
+                onTouchStart={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
+                role="button" tabIndex={0}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { setNameDraft(cat.label); setEditingName(true) } }}
+                style={{ fontSize: 14, fontWeight: 600, cursor: 'text', padding: '2px 4px', borderRadius: 4 }}>
                 {cat.label}
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500, marginTop: 1 }}>{ownerName}</div>
             </div>
-            <button onClick={() => { setNameDraft(cat.label); setEditingName(true) }}
-              aria-label={`Rename ${cat.label}`}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center', opacity: 0.7 }}>
-              <Pencil size={13} />
-            </button>
-            {confirmingDelete ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: 11, color: 'var(--muted)' }}>Delete?</span>
-                <button onClick={() => onDeleteCategory(cat.key)} aria-label="Confirm delete category"
-                  style={{ fontSize: 11, fontWeight: 600, color: 'var(--expense-text)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px' }}>Yes</button>
-                <button onClick={() => setConfirmingDelete(false)} aria-label="Cancel delete"
-                  style={{ fontSize: 11, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px' }}>No</button>
-              </div>
-            ) : (
-              <button onClick={() => setConfirmingDelete(true)} aria-label={`Delete ${cat.label}`}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--expense-text)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
-                <Trash2 size={13} />
-              </button>
-            )}
+          )}
+          <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: text }}>{fmt(total)}</div>
+          <button onClick={() => setOpen(o => !o)} aria-expanded={open} aria-label={open ? 'Collapse category' : 'Expand category'}
+            onTouchStart={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center' }}>
+            {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+        </div>
           </>
         )}
         <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: bg, color: text, fontWeight: 600, flexShrink: 0 }}>
@@ -182,10 +212,8 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
         </div>
       )}
     </div>
+  </div>
   )
-}
-
-function SummaryBar({ totals }: { totals: ReturnType<typeof calcTotals> }) {
   const items = [
     { label: 'Income',   value: totals.totalInc, color: 'var(--income-text)' },
     { label: 'Expenses', value: totals.totalExp, color: 'var(--expense-text)' },

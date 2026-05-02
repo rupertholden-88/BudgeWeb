@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Owner } from '@/lib/models'
-import { Check, Pencil } from 'lucide-react'
+import { Check } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -26,12 +26,10 @@ function NameRow({ label, value, onSave, color }: { label: string; value: string
           </button>
         </>
       ) : (
-        <>
-          <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{value}</span>
-          <button onClick={() => { setDraft(value); setEditing(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 4 }}>
-            <Pencil size={14} />
-          </button>
-        </>
+        <span onClick={() => { setDraft(value); setEditing(true) }}
+          style={{ flex: 1, fontSize: 14, fontWeight: 600, cursor: 'text' }}>
+          {value}
+        </span>
       )}
     </div>
   )
