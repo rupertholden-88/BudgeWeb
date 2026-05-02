@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Owner, AssetType, fmt } from '@/lib/models'
-import { Plus, Trash2, Pencil, Check } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { useDarkMode } from '@/hooks/useDarkMode'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -18,12 +17,10 @@ const ASSET_COLORS: Record<AssetType, string> = {
   JUNIOR_ISA: '#70AD47', LIFETIME_ISA: '#255E91', SAVINGS_ACCOUNT: '#8BAFD4',
   CRYPTO: '#F4A460', OTHER: '#A9A9A9'
 }
-const ASSET_COLORS_DARK: Record<AssetType, string> = {
-  CASH: '#7EC8A4', CASH_ISA: '#7BB8E8', STOCKS_SHARES_ISA: '#6B9FE8',
-  JUNIOR_ISA: '#8CC957', LIFETIME_ISA: '#4B96D6', SAVINGS_ACCOUNT: '#A8C8E8',
-  CRYPTO: '#F4B46A', OTHER: '#B0B0B0'
-}
 const ASSET_TYPES: AssetType[] = ['CASH', 'CASH_ISA', 'STOCKS_SHARES_ISA', 'JUNIOR_ISA', 'LIFETIME_ISA', 'SAVINGS_ACCOUNT', 'CRYPTO', 'OTHER']
+const OWNER_COLORS: Record<Owner, string> = {
+  NIAMH: 'var(--niamh)', RUPERT: 'var(--rupert)', JOINT: 'var(--joint)'
+}
 const MONTH_LABELS: Record<string, string> = {
   '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr',
   '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug',
@@ -35,22 +32,61 @@ function formatMonth(dateStr: string) {
   return `${MONTH_LABELS[parts[1]] ?? parts[1]} ${parts[0].slice(2)}`
 }
 
-function AmountInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+function TapToEdit({ value, onSave, style }: { value: string; onSave: (v: string) => void; style?: React.CSSProperties }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const commit = () => { onSave(draft); setEditing(false) }
+  if (editing) return (
+    <input value={draft} onChange={e => setDraft(e.target.value)}
+      onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit() }}
+      style={{ fontSize: 'inherit', fontWeight: 'inherit', border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', outline: 'none', background: 'var(--rupert-light)', ...style }}
+      autoFocus />
+  )
+  return (
+    <span onClick={() => { setDraft(value); setEditing(true) }} style={{ cursor: 'text', ...style }}>
+      {value}
+    </span>
+  )
+}
+
+function TapToEditAmount({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [editing, setEditing] = useState(false)
   const [raw, setRaw] = useState('')
-  const start = () => { setRaw(value === 0 ? '' : String(value)); setEditing(true) }
+  const commit = () => { onChange(parseFloat(raw.replace(/[£,]/g, '')) || 0); setEditing(false) }
   if (editing) return (
     <input value={raw} onChange={e => setRaw(e.target.value)}
-      onBlur={() => { onChange(parseFloat(raw.replace(/[£,]/g, '')) || 0); setEditing(false) }}
-      onKeyDown={e => { if (e.key === 'Enter') { onChange(parseFloat(raw.replace(/[£,]/g, '')) || 0); setEditing(false) } }}
-      style={{ width: 90, textAlign: 'right', fontSize: 14, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', background: 'var(--rupert-light)' }}
+      onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit() }}
+      style={{ width: 90, textAlign: 'right', fontSize: 14, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', outline: 'none', background: 'var(--rupert-light)' }}
       inputMode="decimal" autoFocus />
   )
   return (
-    <span onClick={start} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') start() }}
+    <span onClick={() => { setRaw(value === 0 ? '' : String(value)); setEditing(true) }}
       style={{ cursor: 'text', fontVariantNumeric: 'tabular-nums', fontSize: 14, color: value > 0 ? 'var(--ink)' : 'var(--muted)', minWidth: 80, textAlign: 'right', display: 'inline-block', padding: '2px 4px', borderRadius: 4 }}>
       {value > 0 ? fmt(value) : '—'}
     </span>
+  )
+}
+
+function DeleteModal({ label, onConfirm, onCancel }: { label: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div className="card" style={{ width: '100%', maxWidth: 320, padding: 24 }}>
+        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Delete asset?</div>
+        <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 24 }}>
+          Remove <strong>{label}</strong> from this month's snapshot?
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onCancel}
+            style={{ flex: 1, background: 'none', border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14 }}>
+            Cancel
+          </button>
+          <button onClick={onConfirm}
+            style={{ flex: 1, background: 'var(--negative)', color: 'white', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -61,83 +97,79 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
   deleteAsset: BudgetHook['deleteAsset']
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [editingLabel, setEditingLabel] = useState(false)
-  const [labelDraft, setLabelDraft] = useState(asset.label)
-  const commitLabel = () => { updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution); setEditingLabel(false) }
+  const [deleteModal, setDeleteModal] = useState(false)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const startLongPress = () => {
+    longPressTimer.current = setTimeout(() => {
+      if (navigator.vibrate) navigator.vibrate(50)
+      setDeleteModal(true)
+    }, 600)
+  }
+  const cancelLongPress = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current)
+  }
 
   return (
-    <div style={{ borderBottom: '1px solid var(--border)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0' }}>
-        {editingLabel ? (
-          <>
-            <input value={labelDraft} onChange={e => setLabelDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') commitLabel() }}
-              onBlur={commitLabel}
-              style={{ flex: 1, fontSize: 13, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px' }}
-              autoFocus />
-            <button onClick={commitLabel} aria-label="Save asset name"
-              style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', display: 'flex' }}>
-              <Check size={12} />
-            </button>
-          </>
-        ) : (
-          <>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 500 }}>{asset.label}</div>
-              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>
-                {ASSET_LABELS[asset.type] ?? asset.type}
-                {asset.institution ? ` · ${asset.institution}` : ''}
-                {asset.interestRate && asset.amount > 0 ? (
-                  <span style={{ color: 'var(--positive)', fontWeight: 600, marginLeft: 4 }}>
-                    {` · £${((asset.amount * asset.interestRate) / 100 / 12).toFixed(0)}/mo (${asset.interestRate}% = £${((asset.amount * asset.interestRate) / 100).toFixed(0)}/yr)`}
-                  </span>
-                ) : asset.interestRate ? <span style={{ color: 'var(--muted)' }}>{` · ${asset.interestRate}%`}</span> : null}
-              </div>
-            </div>
-            <button onClick={() => { setLabelDraft(asset.label); setEditingLabel(true) }}
-              aria-label={`Rename ${asset.label}`}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center', opacity: 0.7 }}>
-              <Pencil size={11} />
-            </button>
-          </>
-        )}
-        <AmountInput value={asset.amount || 0} onChange={v => updateAsset(owner, today, asset.id, v, asset.interestRate, asset.institution)} />
-        <button onClick={() => setExpanded(e => !e)}
-          aria-expanded={expanded}
-          aria-label={expanded ? 'Collapse asset details' : 'Expand asset details'}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 10, padding: '6px 8px', minWidth: 32, minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {expanded ? '▲' : '▼'}
-        </button>
-        <button onClick={() => deleteAsset(owner, today, asset.id)}
-          aria-label={`Delete ${asset.label}`}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
-          <Trash2 size={12} />
-        </button>
-      </div>
-      {expanded && (
-        <div style={{ padding: '0 0 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Type</label>
-            <select value={asset.type} onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution)}
-              style={{ fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', background: 'var(--card)' }}>
-              {Object.entries(ASSET_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rate %</label>
-            <input type="number" value={asset.interestRate || ''} placeholder="0"
-              onChange={e => updateAsset(owner, today, asset.id, asset.amount, parseFloat(e.target.value) || undefined, asset.institution)}
-              style={{ width: 70, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px' }} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Institution</label>
-            <input value={asset.institution || ''} placeholder="e.g. Monzo"
-              onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, e.target.value)}
-              style={{ width: 110, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px' }} />
-          </div>
-        </div>
+    <>
+      {deleteModal && (
+        <DeleteModal
+          label={asset.label}
+          onConfirm={() => { deleteAsset(owner, today, asset.id); setDeleteModal(false) }}
+          onCancel={() => setDeleteModal(false)}
+        />
       )}
-    </div>
+      <div style={{ borderBottom: '1px solid var(--border)' }}
+        onMouseDown={startLongPress} onMouseUp={cancelLongPress} onMouseLeave={cancelLongPress}
+        onTouchStart={startLongPress} onTouchEnd={cancelLongPress} onTouchCancel={cancelLongPress}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <TapToEdit value={asset.label}
+              onSave={_v => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution)}
+              style={{ fontSize: 13, fontWeight: 500, display: 'block' }} />
+            <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>
+              {ASSET_LABELS[asset.type] ?? asset.type}
+              {asset.institution ? ` · ${asset.institution}` : ''}
+              {asset.interestRate && asset.amount > 0 ? (
+                <span style={{ color: 'var(--positive)', fontWeight: 600, marginLeft: 4 }}>
+                  {` · £${((asset.amount * asset.interestRate) / 100 / 12).toFixed(0)}/mo (${asset.interestRate}% = £${((asset.amount * asset.interestRate) / 100).toFixed(0)}/yr)`}
+                </span>
+              ) : asset.interestRate ? <span>{` · ${asset.interestRate}%`}</span> : null}
+            </div>
+          </div>
+          <TapToEditAmount value={asset.amount || 0} onChange={v => updateAsset(owner, today, asset.id, v, asset.interestRate, asset.institution)} />
+          <button onClick={() => setExpanded(e => !e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 10, padding: '2px 4px' }}>
+            {expanded ? '▲' : '▼'}
+          </button>
+        </div>
+        {expanded && (
+          <div style={{ padding: '0 0 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Type</label>
+              <select value={asset.type} onChange={_e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution)}
+                style={{ fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', background: 'var(--card)' }}>
+                {Object.entries(ASSET_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rate %</label>
+              <input type="number" value={asset.interestRate || ''} placeholder="0"
+                onChange={e => updateAsset(owner, today, asset.id, asset.amount, parseFloat(e.target.value) || undefined, asset.institution)}
+                style={{ width: 70, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', outline: 'none' }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Institution</label>
+              <input value={asset.institution || ''} placeholder="e.g. Monzo"
+                onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, e.target.value)}
+                style={{ width: 110, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', outline: 'none' }} />
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--muted)', width: '100%', marginTop: 4 }}>
+              💡 Long press the row to delete
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 
@@ -156,7 +188,7 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset, t
   const submit = () => { if (newLabel.trim()) { addAsset(owner, today, newType, newLabel.trim()); setNewLabel(''); setAdding(false) } }
 
   return (
-    <div className="card" style={{ marginBottom: 12, background: `var(--${owner.toLowerCase()}-light)` }}>
+    <div className="card" style={{ marginBottom: 12, borderLeft: `3px solid ${OWNER_COLORS[owner]}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
         <span style={{ fontWeight: 600, fontSize: 14 }}>{name}</span>
         <span style={{ fontWeight: 700, fontSize: 16, fontVariantNumeric: 'tabular-nums', color: total > 0 ? 'var(--positive)' : 'var(--muted)' }}>{fmt(total)}</span>
@@ -169,7 +201,7 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset, t
           <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submit() }}
               placeholder="Account name..." autoFocus
-              style={{ flex: 1, minWidth: 120, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px' }} />
+              style={{ flex: 1, minWidth: 120, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px', outline: 'none' }} />
             <select value={newType} onChange={e => setNewType(e.target.value as AssetType)}
               style={{ fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px', background: 'var(--card)', cursor: 'pointer' }}>
               {Object.entries(ASSET_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -203,8 +235,6 @@ function TotalLabel(props: any) {
 export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   const { data, addAsset, updateAsset, deleteAsset, resyncInterest, copyForwardAssets } = budget
   const today = new Date().toISOString().slice(0, 7)
-  const isDark = useDarkMode()
-  const chartColors = isDark ? ASSET_COLORS_DARK : ASSET_COLORS
 
   const totalAll = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
@@ -212,18 +242,12 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
     return acc + assets.reduce((a, i) => a + (i.amount || 0), 0)
   }, 0)
 
-  const lastMonth = (() => {
-    const d = new Date()
-    d.setMonth(d.getMonth() - 1)
-    return d.toISOString().slice(0, 7)
-  })()
-
+  const lastMonth = (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7) })()
   const totalLastMonth = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === lastMonth)
     const assets = Array.isArray(snap?.assets) ? snap!.assets : []
     return acc + assets.reduce((a, i) => a + (i.amount || 0), 0)
   }, 0)
-
   const monthDiff = totalLastMonth > 0 ? totalAll - totalLastMonth : null
   const monthDiffPct = totalLastMonth > 0 ? ((totalAll - totalLastMonth) / totalLastMonth * 100) : null
 
@@ -231,29 +255,19 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
     return Array.isArray(snap?.assets) && snap!.assets.length > 0
   })
-
   const hasPreviousData = data.savingsHistory.some(s => s.date.slice(0, 7) < today)
 
-  const didAutoSync = useRef(false)
   useEffect(() => {
-    if (!didAutoSync.current && !currentMonthHasData && hasPreviousData) {
-      didAutoSync.current = true
-      copyForwardAssets()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMonthHasData, hasPreviousData])
+    if (!currentMonthHasData && hasPreviousData) copyForwardAssets()
+  }, []) // eslint-disable-line
 
   const months = Array.from(new Set(data.savingsHistory.map(s => s.date.slice(0, 7)))).sort()
   if (!months.includes(today)) months.push(today)
 
   const chartData = months.map(month => {
-    const allAssets = data.savingsHistory
-      .filter(s => s.date.slice(0, 7) === month)
-      .flatMap(s => Array.isArray(s.assets) ? s.assets : [])
+    const allAssets = data.savingsHistory.filter(s => s.date.slice(0, 7) === month).flatMap(s => Array.isArray(s.assets) ? s.assets : [])
     const row: any = { month: formatMonth(month) }
-    ASSET_TYPES.forEach(type => {
-      row[ASSET_LABELS[type]] = allAssets.filter((a: any) => a.type === type).reduce((sum: number, a: any) => sum + (a.amount || 0), 0)
-    })
+    ASSET_TYPES.forEach(type => { row[ASSET_LABELS[type]] = allAssets.filter((a: any) => a.type === type).reduce((sum: number, a: any) => sum + (a.amount || 0), 0) })
     return row
   })
 
@@ -296,7 +310,7 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
             <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} formatter={(v: number) => fmt(v)} />
             {activeTypes.map((type, i) => (
               <Bar key={type} dataKey={ASSET_LABELS[type]} stackId="a"
-                fill={chartColors[type]}
+                fill={ASSET_COLORS[type]}
                 radius={i === activeTypes.length - 1 ? [4,4,0,0] : [0,0,0,0]}
                 label={i === activeTypes.length - 1 ? (props: any) => <TotalLabel {...props} chartData={chartData} activeTypes={activeTypes} /> : undefined}
               />
@@ -310,7 +324,7 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
             if (value === 0) return null
             return (
               <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: chartColors[type], flexShrink: 0 }} />
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: ASSET_COLORS[type], flexShrink: 0 }} />
                 <span style={{ flex: 1, fontSize: 12 }}>{ASSET_LABELS[type]}</span>
                 <span style={{ fontSize: 12, color: 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
                 <span style={{ fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(value)}</span>
@@ -322,11 +336,11 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-          {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+          {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })} · tap to edit · long press to delete
         </div>
         {hasPreviousData && (
           <button onClick={copyForwardAssets}
-            style={{ fontSize: 12, background: 'none', color: 'var(--muted)', border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
+            style={{ fontSize: 11, background: 'none', color: 'var(--muted)', border: '1.5px solid var(--border)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>
             Reset to last month
           </button>
         )}
