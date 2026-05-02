@@ -127,6 +127,7 @@ function DebtCard({ debt, ownerName, onUpdate, onDelete }: { debt: Debt; ownerNa
     </div>
   </div>
 )
+}
 
 
 export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
