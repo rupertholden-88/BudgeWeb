@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Category, TabFilter, Owner, EntryType, fmt, calcTotals } from '@/lib/models'
+import { TabFilter, Owner, EntryType, fmt } from '@/lib/models'
 import { Plus, ChevronDown, ChevronUp } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
@@ -79,7 +79,9 @@ function ItemRow({ catKey, item, onUpdateAmount, onRemoveItem, onRenameItem }: {
   const cancelPress = () => {
     if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null }
   }
-  return (<div style={{display: 'contents'}}>
+
+  return (
+    <div style={{ display: 'contents' }}>
       {pendingDelete && (
         <DeleteModal
           label={item.label}
@@ -111,8 +113,9 @@ function ItemRow({ catKey, item, onUpdateAmount, onRemoveItem, onRenameItem }: {
       </div>
     </div>
   )
+}
 
-function CategoryCard(props) {
+function CategoryCard(props: any) {
   const { cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem, onRenameItem, onRenameCategory, onDeleteCategory } = props
   const [open, setOpen] = useState(true)
   const [addingItem, setAddingItem] = useState(false)
@@ -121,8 +124,9 @@ function CategoryCard(props) {
   const [nameDraft, setNameDraft] = useState(cat.label)
   const [pendingDelete, setPendingDelete] = useState(false)
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const total = cat.items.reduce((a, i) => a + i.amount, 0)
-  const { bg, text } = typeColor(cat.type)
+  const total = cat.items.reduce((a: number, i: any) => a + i.amount, 0)
+  const { text } = typeColor(cat.type)
+
   const submitItem = () => {
     if (newItemLabel.trim()) { onAddItem(cat.key, newItemLabel.trim()); setNewItemLabel(''); setAddingItem(false) }
   }
@@ -138,7 +142,9 @@ function CategoryCard(props) {
   const cancelPress = () => {
     if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null }
   }
-  return (<div>
+
+  return (
+    <div>
       {pendingDelete && (
         <DeleteModal
           label={cat.label}
@@ -175,45 +181,33 @@ function CategoryCard(props) {
             {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
         </div>
-          </>
+        {open && (
+          <div style={{ padding: '0 12px 8px' }}>
+            {cat.items.map((item: any) => (
+              <ItemRow key={item.id} catKey={cat.key} item={item} onUpdateAmount={onUpdateAmount} onRemoveItem={onRemoveItem} onRenameItem={onRenameItem} />
+            ))}
+            {addingItem ? (
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                <input value={newItemLabel} onChange={e => setNewItemLabel(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') submitItem(); if (e.key === 'Escape') setAddingItem(false) }}
+                  placeholder="Item name..." autoFocus
+                  style={{ flex: 1, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px' }} />
+                <button onClick={submitItem} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}>Add</button>
+                <button onClick={() => setAddingItem(false)} style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}>Cancel</button>
+              </div>
+            ) : (
+              <button onClick={() => setAddingItem(true)} style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }}>
+                <Plus size={12} /> Add item
+              </button>
+            )}
+          </div>
         )}
-        <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: bg, color: text, fontWeight: 600, flexShrink: 0 }}>
-          {cat.type === 'INCOME' ? 'Income' : cat.type === 'EXPENSE' ? 'Expense' : 'Savings'}
-        </span>
-        <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 14, minWidth: 56, textAlign: 'right', flexShrink: 0 }}>
-          {total > 0 ? fmt(total) : '—'}
-        </span>
-        <button onClick={() => setOpen(o => !o)}
-          aria-expanded={open}
-          aria-label={open ? 'Collapse category' : 'Expand category'}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 6, minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center' }}>
-          {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </button>
       </div>
-      {open && (
-        <div style={{ padding: '0 12px 8px' }}>
-          {cat.items.map(item => (
-            <ItemRow key={item.id} catKey={cat.key} item={item} onUpdateAmount={onUpdateAmount} onRemoveItem={onRemoveItem} onRenameItem={onRenameItem} />
-          ))}
-          {addingItem ? (
-            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              <input value={newItemLabel} onChange={e => setNewItemLabel(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') submitItem(); if (e.key === 'Escape') setAddingItem(false) }}
-                placeholder="Item name..." autoFocus
-                style={{ flex: 1, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px' }} />
-              <button onClick={submitItem} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}>Add</button>
-              <button onClick={() => setAddingItem(false)} style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}>Cancel</button>
-            </div>
-          ) : (
-            <button onClick={() => setAddingItem(true)} style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }}>
-              <Plus size={12} /> Add item
-            </button>
-          )}
-        </div>
-      )}
     </div>
-  </div>
   )
+}
+
+function SummaryBar({ totals }: { totals: any }) {
   const items = [
     { label: 'Income',   value: totals.totalInc, color: 'var(--income-text)' },
     { label: 'Expenses', value: totals.totalExp, color: 'var(--expense-text)' },
