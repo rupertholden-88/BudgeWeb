@@ -162,7 +162,7 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
           <div style={{ padding: '0 12px 8px' }}>
             <div style={{ fontSize: 10, color: 'var(--muted)', padding: '4px 0 2px' }}>Tap label to rename · Long press to delete</div>
             {cat.items.map(item => (
-              <ItemRow key={item.id} catKey={cat.key} item={item} onUpdateAmount={onUpdateAmount} onAddItem={onAddItem} onRemoveItem={onRemoveItem} onRenameItem={onRenameItem} />
+              <ItemRow key={item.id} catKey={cat.key} item={item} onUpdateAmount={onUpdateAmount} onRemoveItem={onRemoveItem} onRenameItem={onRenameItem} />
             ))}
             {addingItem ? (
               <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
