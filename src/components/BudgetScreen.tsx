@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { TabFilter, Owner, EntryType, fmt } from '@/lib/models'
 import { Plus, ChevronDown, ChevronUp } from 'lucide-react'
 
