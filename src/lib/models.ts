@@ -9,13 +9,14 @@ export interface Category { key: string; owner: Owner; type: EntryType; label: s
 export interface Asset { id: string; type: AssetType; label: string; amount: number; interestRate?: number; institution?: string }
 export interface SavingsSnapshot { date: string; owner: Owner; assets: Asset[] }
 export interface Debt { id: string; owner: Owner; type: DebtType; label: string; currentBalance: number; monthlyPayment: number; interestRate: number; isZeroPercent: boolean; zeroPercentExpiryDate?: string; institution?: string }
-export interface BudgetData { categories: Category[]; savingsHistory: SavingsSnapshot[]; debts: Debt[]; savedAt: string; nameNiamh: string; nameRupert: string; nameJoint: string }
+export interface SpendSnapshot { date: string; totalInc: number; totalExp: number; totalSav: number }
+export interface BudgetData { categories: Category[]; savingsHistory: SavingsSnapshot[]; spendHistory: SpendSnapshot[]; debts: Debt[]; savedAt: string; nameNiamh: string; nameRupert: string; nameJoint: string }
 export interface Totals { incN: number; incR: number; expN: number; expR: number; savN: number; savR: number; debtN: number; debtR: number; expJoint: number; savJoint: number; debtJoint: number; halfJointExp: number; halfJointSav: number; halfJointDebt: number; netN: number; netR: number; totalInc: number; totalExp: number; totalSav: number; totalDebt: number; net: number }
 
 export function defaultBudgetData(): BudgetData {
   return {
     nameNiamh: '', nameRupert: '', nameJoint: '',
-    savedAt: '', savingsHistory: [], debts: [],
+    savedAt: '', savingsHistory: [], spendHistory: [], debts: [],
     categories: [
       { key: 'inc_n', owner: 'NIAMH', type: 'INCOME', label: 'Income', items: [
         { id: 'inc_n_0', label: 'Salary / Wages', amount: 0, priority: 'NONE' },

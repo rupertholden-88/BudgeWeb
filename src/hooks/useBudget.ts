@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore'
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth'
 import { db, auth, provider } from '@/lib/firebase'
-import { BudgetData, Debt, Owner, EntryType, AssetType, DebtType, defaultBudgetData, calcTotals, Totals } from '@/lib/models'
+import { BudgetData, Debt, Owner, EntryType, AssetType, DebtType, defaultBudgetData, calcTotals, Totals, SpendSnapshot } from '@/lib/models'
 
 function uuid() { return crypto.randomUUID() }
 
@@ -252,6 +252,18 @@ export function useBudget() {
   }
 
   const totals: Totals = calcTotals(data)
+
+  // Auto-snapshot current month's spend whenever budget changes
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 7)
+    if (totals.totalInc === 0 && totals.totalExp === 0 && totals.totalSav === 0) return
+    const existing = (data.spendHistory || []).find((s: SpendSnapshot) => s.date === today)
+    if (existing && existing.totalInc === totals.totalInc && existing.totalExp === totals.totalExp && existing.totalSav === totals.totalSav) return
+    mutate(b => {
+      const snap: SpendSnapshot = { date: today, totalInc: totals.totalInc, totalExp: totals.totalExp, totalSav: totals.totalSav }
+      return { ...b, spendHistory: [...(b.spendHistory || []).filter((s: SpendSnapshot) => s.date !== today), snap].sort((a, z) => a.date.localeCompare(z.date)) }
+    })
+  }, [data.categories, data.debts]) // eslint-disable-line
 
   return {
     data, user, savedAt, isRefreshing, totals,

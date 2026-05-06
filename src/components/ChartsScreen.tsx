@@ -45,22 +45,19 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
 
   const monthlyData = useMemo(() => {
     const months = new Set<string>()
-    data.savingsHistory.forEach(s => months.add(s.date.slice(0, 7)))
     const today = new Date().toISOString().slice(0, 7)
+    ;(data.spendHistory || []).forEach((s: any) => months.add(s.date))
     months.add(today)
     return Array.from(months).sort().map(month => {
-      const totalAssets = data.savingsHistory
-        .filter(s => s.date.slice(0, 7) === month)
-        .reduce((acc, s) => acc + (Array.isArray(s.assets) ? s.assets.reduce((a, i) => a + (i.amount || 0), 0) : 0), 0)
+      const snap = (data.spendHistory || []).find((s: any) => s.date === month)
       const isCurrentMonth = month === today
       return {
         month: formatMonth(month),
-        Expenses: isCurrentMonth ? totals.totalExp : null,
-        Savings: isCurrentMonth ? totals.totalSav : null,
-        Assets: totalAssets,
+        Expenses: isCurrentMonth ? totals.totalExp : (snap?.totalExp ?? null),
+        Savings: isCurrentMonth ? totals.totalSav : (snap?.totalSav ?? null),
       }
     })
-  }, [data, totals])
+  }, [data.spendHistory, totals])
 
   const expenseData = useMemo(() =>
     data.categories
@@ -79,8 +76,6 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
     { name: data.nameNiamh || 'Person 1', Income: totals.incN, Expenses: totals.expN + totals.halfJointExp + totals.halfJointDebt, Savings: totals.savN + totals.halfJointSav },
     { name: data.nameRupert || 'Person 2', Income: totals.incR, Expenses: totals.expR + totals.halfJointExp + totals.halfJointDebt, Savings: totals.savR + totals.halfJointSav },
   ]
-
-  const hasMultipleMonths = monthlyData.length > 1
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: 16 }}>
@@ -145,28 +140,6 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
-
-      {/* Assets over time */}
-      {hasMultipleMonths && (
-        <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Total Assets Over Time</div>
-          <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={monthlyData} barSize={32} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis hide />
-              <Tooltip
-                contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-                itemStyle={{ color: 'var(--ink)' }}
-                formatter={(v: number) => fmt(v)}
-              />
-              <Bar dataKey="Assets" fill="var(--joint)" radius={[4,4,0,0]}>
-                <LabelList dataKey="Assets" position="top" style={{ fontSize: 10, fill: 'var(--muted)', fontWeight: 600 }}
-                  formatter={(v: number) => v > 0 ? fmt(v) : ''} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
 
       {/* This month */}
       <div className="card" style={{ padding: 16, marginBottom: 12 }}>
