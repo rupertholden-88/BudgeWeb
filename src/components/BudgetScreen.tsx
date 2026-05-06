@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { Category, TabFilter, Owner, EntryType, fmt, calcTotals } from '@/lib/models'
-import { Plus, ChevronDown, ChevronUp, Pencil, Check } from 'lucide-react'
+import { Plus, ChevronDown, ChevronUp, Check } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -113,40 +113,43 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState(cat.label)
   const [deleteModal, setDeleteModal] = useState(false)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const total = cat.items.reduce((a, i) => a + i.amount, 0)
   const { bg, text } = typeColor(cat.type)
   const color = ownerColor(cat.owner)
   const submitItem = () => { if (newItemLabel.trim()) { onAddItem(cat.key, newItemLabel.trim()); setNewItemLabel(''); setAddingItem(false) } }
   const commitName = () => { onRenameCategory(cat.key, nameDraft); setEditingName(false) }
+  const startLongPress = () => {
+    if (editingName) return
+    longPressTimer.current = setTimeout(() => {
+      if (navigator.vibrate) navigator.vibrate(50)
+      setDeleteModal(true)
+    }, 600)
+  }
+  const cancelLongPress = () => { if (longPressTimer.current) clearTimeout(longPressTimer.current) }
   return (
     <>
       {deleteModal && <DeleteModal label={cat.label} onConfirm={() => { onDeleteCategory(cat.key); setDeleteModal(false) }} onCancel={() => setDeleteModal(false)} />}
       <div className="card fade-up" style={{ marginBottom: 8, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderLeft: '3px solid ' + color, background: open ? 'var(--card)' : 'var(--surface)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderLeft: '3px solid ' + color, background: open ? 'var(--card)' : 'var(--surface)' }}
+          onMouseDown={startLongPress} onMouseUp={cancelLongPress} onMouseLeave={cancelLongPress}
+          onTouchStart={startLongPress} onTouchEnd={cancelLongPress} onTouchCancel={cancelLongPress}>
           {editingName ? (
             <>
               <input value={nameDraft} onChange={e => setNameDraft(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') commitName() }}
+                onKeyDown={e => { if (e.key === 'Enter') commitName() }} onBlur={commitName}
                 style={{ flex: 1, fontSize: 14, fontWeight: 600, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '4px 8px', outline: 'none' }} autoFocus />
-              <button onClick={commitName} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex' }}>
+              <button onClick={commitName} onMouseDown={e => e.stopPropagation()} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex' }}>
                 <Check size={14} />
               </button>
             </>
           ) : (
-            <>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{cat.label}
-                  {cat.note && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>{'— ' + cat.note}</span>}
-                </div>
-                <div style={{ fontSize: 11, color: color, fontWeight: 500, marginTop: 1 }}>{ownerName}</div>
+            <div style={{ flex: 1, minWidth: 0 }} onClick={() => { setNameDraft(cat.label); setEditingName(true) }} onMouseDown={e => e.stopPropagation()}>
+              <div style={{ fontSize: 14, fontWeight: 600, cursor: 'text' }}>{cat.label}
+                {cat.note && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>{'— ' + cat.note}</span>}
               </div>
-              <button onClick={() => { setNameDraft(cat.label); setEditingName(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 2 }}>
-                <Pencil size={13} />
-              </button>
-              <button onClick={() => setDeleteModal(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FECACA', display: 'flex', padding: 2 }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-              </button>
-            </>
+              <div style={{ fontSize: 11, color: color, fontWeight: 500, marginTop: 1 }}>{ownerName}</div>
+            </div>
           )}
           <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: bg, color: text, fontWeight: 600, flexShrink: 0 }}>
             {cat.type === 'INCOME' ? 'Income' : cat.type === 'EXPENSE' ? 'Expense' : 'Savings'}
