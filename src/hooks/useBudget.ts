@@ -215,6 +215,18 @@ export function useBudget() {
     })
   }
 
+  const moveAssetsToLastMonth = () => {
+    const todayStr = new Date().toISOString().slice(0, 7)
+    const prev = new Date(); prev.setMonth(prev.getMonth() - 1)
+    const prevStr = prev.toISOString().slice(0, 7)
+    mutate(b => {
+      const currentSnaps = b.savingsHistory.filter(s => s.date.slice(0, 7) === todayStr)
+      const prevSnaps = currentSnaps.map(s => ({ ...s, date: prevStr }))
+      const filtered = b.savingsHistory.filter(s => s.date.slice(0, 7) !== todayStr && s.date.slice(0, 7) !== prevStr)
+      return { ...b, savingsHistory: [...filtered, ...prevSnaps].sort((a, z) => a.date.localeCompare(z.date)) }
+    })
+  }
+
   const addAsset = (owner: Owner, date: string, type: AssetType, label: string) => {
     mutate(b => {
       const snap = getOrCopySnapshot(b, owner, date)
@@ -281,7 +293,7 @@ export function useBudget() {
     data, user, savedAt, isRefreshing, totals,
     signIn, signOutUser, refreshFromCloud,
     updateOwnerName, addCategory, renameCategory, deleteCategory,
-    updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, removeItem, renameItem,
+    updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem,
     addAsset, updateAsset, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,

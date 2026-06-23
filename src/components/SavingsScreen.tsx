@@ -347,7 +347,7 @@ function PensionOwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteA
 }
 
 export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, addAsset, updateAsset, deleteAsset, resyncInterest, copyForwardAssets } = budget
+  const { data, addAsset, updateAsset, deleteAsset, resyncInterest, copyForwardAssets, moveAssetsToLastMonth } = budget
   const today = new Date().toISOString().slice(0, 7)
 
   const n1 = data.nameNiamh || 'Person 1'
@@ -539,18 +539,30 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
       )}
 
       {/* Edit controls */}
-      <div className="flex justify-between items-center mb-3">
+      <div className="flex justify-between items-center mb-3 gap-2 flex-wrap">
         <div className="text-[11px] text-muted">
           {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })} · tap to edit · long press to delete
         </div>
-        {hasPreviousData && (
+        <div className="flex gap-1.5">
           <button
-            onClick={copyForwardAssets}
-            className="text-[11px] bg-transparent text-muted border-[1.5px] border-border rounded-md px-2 py-[3px] cursor-pointer"
+            onClick={() => {
+              const prev = new Date(); prev.setMonth(prev.getMonth() - 1)
+              const label = prev.toLocaleDateString('en-GB', { month: 'long' })
+              if (confirm(`Save current figures as ${label} and clear this month?`)) moveAssetsToLastMonth()
+            }}
+            className="text-[11px] bg-transparent text-negative border-[1.5px] border-negative/40 rounded-md px-2 py-[3px] cursor-pointer"
           >
-            Reset to last month
+            These are last month's figures
           </button>
-        )}
+          {hasPreviousData && (
+            <button
+              onClick={copyForwardAssets}
+              className="text-[11px] bg-transparent text-muted border-[1.5px] border-border rounded-md px-2 py-[3px] cursor-pointer"
+            >
+              Reset to last month
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Owner panels */}
