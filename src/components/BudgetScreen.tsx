@@ -8,29 +8,35 @@ type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
 function DeleteModal({ label, onConfirm, onCancel }: { label: string; onConfirm: () => void; onCancel: () => void }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div className="card" style={{ width: '100%', maxWidth: 320, padding: 24 }}>
-        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Delete?</div>
-        <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 24 }}>Remove <strong>{label}</strong>?</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={onCancel} style={{ flex: 1, background: 'none', border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14 }}>Cancel</button>
-          <button onClick={onConfirm} style={{ flex: 1, background: 'var(--negative)', color: 'white', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>Delete</button>
+    <div className="fixed inset-0 bg-black/40 z-[1000] flex items-center justify-center p-6">
+      <div className="card w-full max-w-[320px] p-6">
+        <div className="text-base font-semibold mb-2">Delete?</div>
+        <div className="text-sm text-muted mb-6">Remove <strong>{label}</strong>?</div>
+        <div className="flex gap-2">
+          <button onClick={onCancel} className="flex-1 bg-transparent border-[1.5px] border-border rounded-lg py-2.5 cursor-pointer text-sm">Cancel</button>
+          <button onClick={onConfirm} className="flex-1 bg-negative text-white border-0 rounded-lg py-2.5 cursor-pointer text-sm font-semibold">Delete</button>
         </div>
       </div>
     </div>
   )
 }
 
-function ownerColor(owner: Owner) {
-  if (owner === 'NIAMH') return 'var(--niamh)'
-  if (owner === 'RUPERT') return 'var(--rupert)'
-  return 'var(--joint)'
+function ownerBorderClass(owner: Owner) {
+  if (owner === 'NIAMH') return 'border-l-[3px] border-l-niamh'
+  if (owner === 'RUPERT') return 'border-l-[3px] border-l-rupert'
+  return 'border-l-[3px] border-l-joint'
 }
 
-function typeColor(type: EntryType) {
-  if (type === 'INCOME') return { bg: 'var(--income-bg)', text: 'var(--income-text)' }
-  if (type === 'EXPENSE') return { bg: 'var(--expense-bg)', text: 'var(--expense-text)' }
-  return { bg: 'var(--savings-bg)', text: 'var(--savings-text)' }
+function ownerTextClass(owner: Owner) {
+  if (owner === 'NIAMH') return 'text-niamh'
+  if (owner === 'RUPERT') return 'text-rupert'
+  return 'text-joint'
+}
+
+function typeBadgeClass(type: EntryType) {
+  if (type === 'INCOME') return 'bg-income-bg text-income-text'
+  if (type === 'EXPENSE') return 'bg-expense-bg text-expense-text'
+  return 'bg-savings-bg text-savings-text'
 }
 
 function AmountCell({ value, onChange }: { value: number; onChange: (v: number) => void }) {
@@ -40,13 +46,22 @@ function AmountCell({ value, onChange }: { value: number; onChange: (v: number) 
   const start = () => { setRaw(value === 0 ? '' : String(value)); setEditing(true); setTimeout(() => inputRef.current?.select(), 0) }
   const commit = () => { const n = parseFloat(raw.replace(/[£,]/g, '')); onChange(isNaN(n) ? 0 : n); setEditing(false) }
   if (editing) return (
-    <input ref={inputRef} value={raw} onChange={e => setRaw(e.target.value)}
-      onBlur={commit} onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Tab') commit() }}
-      style={{ width: 80, textAlign: 'right', fontSize: 14, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', outline: 'none', background: 'var(--rupert-light)' }}
-      inputMode="decimal" autoFocus />
+    <input
+      ref={inputRef}
+      value={raw}
+      onChange={e => setRaw(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Tab') commit() }}
+      className="w-20 text-right text-sm border-[1.5px] border-rupert rounded-md px-1.5 py-0.5 outline-none bg-rupert-light"
+      inputMode="decimal"
+      autoFocus
+    />
   )
   return (
-    <span onClick={start} style={{ cursor: 'text', fontVariantNumeric: 'tabular-nums', fontSize: 14, color: value > 0 ? 'var(--ink)' : 'var(--muted)', padding: '2px 4px', borderRadius: 4, minWidth: 60, display: 'inline-block', textAlign: 'right' }}>
+    <span
+      onClick={start}
+      className={`cursor-text tabular-nums text-sm px-1 py-0.5 rounded min-w-[60px] inline-block text-right ${value > 0 ? 'text-ink' : 'text-muted'}`}
+    >
       {value > 0 ? fmt(value) : '—'}
     </span>
   )
@@ -74,21 +89,30 @@ function ItemRow({ catKey, item, onUpdateAmount, onRemoveItem, onRenameItem }: {
   return (
     <>
       {deleteModal && <DeleteModal label={item.label} onConfirm={() => { onRemoveItem(catKey, item.id); setDeleteModal(false) }} onCancel={() => setDeleteModal(false)} />}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', borderBottom: '1px solid var(--border)' }}
+      <div
+        className="flex items-center gap-1.5 py-2 border-b border-border"
         onMouseDown={startLongPress} onMouseUp={cancelLongPress} onMouseLeave={cancelLongPress}
-        onTouchStart={startLongPress} onTouchEnd={cancelLongPress} onTouchCancel={cancelLongPress}>
+        onTouchStart={startLongPress} onTouchEnd={cancelLongPress} onTouchCancel={cancelLongPress}
+      >
         {editingLabel ? (
           <>
-            <input value={labelDraft} onChange={e => setLabelDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') commitLabel() }} onBlur={commitLabel}
-              style={{ flex: 1, fontSize: 13, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', outline: 'none' }} autoFocus />
-            <button onClick={commitLabel} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', display: 'flex' }}>
+            <input
+              value={labelDraft}
+              onChange={e => setLabelDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') commitLabel() }}
+              onBlur={commitLabel}
+              className="flex-1 text-[13px] border-[1.5px] border-rupert rounded-md px-1.5 py-0.5 outline-none"
+              autoFocus
+            />
+            <button onClick={commitLabel} className="bg-ink text-white border-0 rounded-md px-1.5 py-[3px] cursor-pointer flex">
               <Check size={12} />
             </button>
           </>
         ) : (
-          <span onClick={() => { setLabelDraft(item.label); setEditingLabel(true) }}
-            style={{ flex: 1, fontSize: 13, color: 'var(--muted)', cursor: 'text' }}>
+          <span
+            onClick={() => { setLabelDraft(item.label); setEditingLabel(true) }}
+            className="flex-1 text-[13px] text-muted cursor-text"
+          >
             {item.label}
           </span>
         )}
@@ -115,8 +139,6 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
   const [deleteModal, setDeleteModal] = useState(false)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const total = cat.items.reduce((a, i) => a + i.amount, 0)
-  const { bg, text } = typeColor(cat.type)
-  const color = ownerColor(cat.owner)
   const submitItem = () => { if (newItemLabel.trim()) { onAddItem(cat.key, newItemLabel.trim()); setNewItemLabel(''); setAddingItem(false) } }
   const commitName = () => { onRenameCategory(cat.key, nameDraft); setEditingName(false) }
   const startLongPress = () => {
@@ -130,54 +152,77 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
   return (
     <>
       {deleteModal && <DeleteModal label={cat.label} onConfirm={() => { onDeleteCategory(cat.key); setDeleteModal(false) }} onCancel={() => setDeleteModal(false)} />}
-      <div className="card fade-up" style={{ marginBottom: 8, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderLeft: '3px solid ' + color, background: open ? 'var(--card)' : 'var(--surface)' }}
+      <div className="card fade-up mb-2 overflow-hidden">
+        <div
+          className={`flex items-center gap-1.5 px-3 py-2.5 ${ownerBorderClass(cat.owner)} ${open ? 'bg-card' : 'bg-surface'}`}
           onMouseDown={startLongPress} onMouseUp={cancelLongPress} onMouseLeave={cancelLongPress}
-          onTouchStart={startLongPress} onTouchEnd={cancelLongPress} onTouchCancel={cancelLongPress}>
+          onTouchStart={startLongPress} onTouchEnd={cancelLongPress} onTouchCancel={cancelLongPress}
+        >
           {editingName ? (
             <>
-              <input value={nameDraft} onChange={e => setNameDraft(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') commitName() }} onBlur={commitName}
-                style={{ flex: 1, fontSize: 14, fontWeight: 600, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '4px 8px', outline: 'none' }} autoFocus />
-              <button onClick={commitName} onMouseDown={e => e.stopPropagation()} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex' }}>
+              <input
+                value={nameDraft}
+                onChange={e => setNameDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') commitName() }}
+                onBlur={commitName}
+                className="flex-1 text-sm font-semibold border-[1.5px] border-rupert rounded-md px-2 py-1 outline-none"
+                autoFocus
+              />
+              <button
+                onClick={commitName}
+                onMouseDown={e => e.stopPropagation()}
+                className="bg-ink text-white border-0 rounded-md px-2 py-1 cursor-pointer flex"
+              >
                 <Check size={14} />
               </button>
             </>
           ) : (
-            <div style={{ flex: 1, minWidth: 0 }} onClick={() => { setNameDraft(cat.label); setEditingName(true) }} onMouseDown={e => e.stopPropagation()}>
-              <div style={{ fontSize: 14, fontWeight: 600, cursor: 'text' }}>{cat.label}
-                {cat.note && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>{'— ' + cat.note}</span>}
+            <div
+              className="flex-1 min-w-0"
+              onClick={() => { setNameDraft(cat.label); setEditingName(true) }}
+              onMouseDown={e => e.stopPropagation()}
+            >
+              <div className="text-sm font-semibold cursor-text">
+                {cat.label}
+                {cat.note && <span className="ml-1.5 text-[10px] text-muted font-normal">{'— ' + cat.note}</span>}
               </div>
-              <div style={{ fontSize: 11, color: color, fontWeight: 500, marginTop: 1 }}>{ownerName}</div>
+              <div className={`text-[11px] font-medium mt-px ${ownerTextClass(cat.owner)}`}>{ownerName}</div>
             </div>
           )}
-          <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: bg, color: text, fontWeight: 600, flexShrink: 0 }}>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold shrink-0 ${typeBadgeClass(cat.type)}`}>
             {cat.type === 'INCOME' ? 'Income' : cat.type === 'EXPENSE' ? 'Expense' : 'Savings'}
           </span>
-          <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 14, minWidth: 56, textAlign: 'right', flexShrink: 0 }}>
+          <span className="tabular-nums font-semibold text-sm min-w-[56px] text-right shrink-0">
             {total > 0 ? fmt(total) : '—'}
           </span>
-          <button onClick={() => setOpen(o => !o)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 2 }}>
+          <button onClick={() => setOpen(o => !o)} className="bg-transparent border-0 cursor-pointer text-muted flex p-0.5">
             {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
         </div>
         {open && (
-          <div style={{ padding: '0 12px 8px' }}>
-            <div style={{ fontSize: 10, color: 'var(--muted)', padding: '4px 0 2px' }}>Tap label to rename · Long press to delete</div>
+          <div className="px-3 pb-2">
+            <div className="text-[10px] text-muted py-1">Tap label to rename · Long press to delete</div>
             {cat.items.map(item => (
               <ItemRow key={item.id} catKey={cat.key} item={item} onUpdateAmount={onUpdateAmount} onRemoveItem={onRemoveItem} onRenameItem={onRenameItem} />
             ))}
             {addingItem ? (
-              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                <input value={newItemLabel} onChange={e => setNewItemLabel(e.target.value)}
+              <div className="flex gap-1.5 mt-1.5">
+                <input
+                  value={newItemLabel}
+                  onChange={e => setNewItemLabel(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') submitItem(); if (e.key === 'Escape') setAddingItem(false) }}
-                  placeholder="Item name..." autoFocus
-                  style={{ flex: 1, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px', outline: 'none' }} />
-                <button onClick={submitItem} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}>Add</button>
-                <button onClick={() => setAddingItem(false)} style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}>Cancel</button>
+                  placeholder="Item name..."
+                  autoFocus
+                  className="flex-1 text-[13px] border-[1.5px] border-border rounded-md px-2 py-1 outline-none"
+                />
+                <button onClick={submitItem} className="bg-ink text-white border-0 rounded-md px-2.5 py-1 cursor-pointer text-xs">Add</button>
+                <button onClick={() => setAddingItem(false)} className="bg-transparent border-[1.5px] border-border rounded-md px-2.5 py-1 cursor-pointer text-xs">Cancel</button>
               </div>
             ) : (
-              <button onClick={() => setAddingItem(true)} style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }}>
+              <button
+                onClick={() => setAddingItem(true)}
+                className="flex items-center gap-1 mt-1.5 bg-transparent border-0 cursor-pointer text-muted text-xs"
+              >
                 <Plus size={12} /> Add item
               </button>
             )}
@@ -190,43 +235,47 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
 
 function SummaryBar({ totals }: { totals: ReturnType<typeof calcTotals> }) {
   const items = [
-    { label: 'Income', value: totals.totalInc, color: 'var(--income-text)' },
-    { label: 'Expenses', value: totals.totalExp, color: 'var(--expense-text)' },
-    { label: 'Savings', value: totals.totalSav, color: 'var(--savings-text)' },
-    { label: 'Leftover', value: totals.net, color: totals.net >= 0 ? 'var(--positive)' : 'var(--negative)' },
+    { label: 'Income',   value: totals.totalInc, cls: 'text-income-text' },
+    { label: 'Expenses', value: totals.totalExp, cls: 'text-expense-text' },
+    { label: 'Savings',  value: totals.totalSav, cls: 'text-savings-text' },
+    { label: 'Leftover', value: totals.net,       cls: totals.net >= 0 ? 'text-positive' : 'text-negative' },
   ]
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
-      {items.map(({ label, value, color }) => (
-        <div key={label} className="card" style={{ padding: '10px 12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>{label}</div>
-          <div style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color }}>{fmt(value)}</div>
+    <div className="grid grid-cols-4 gap-2 mb-4">
+      {items.map(({ label, value, cls }) => (
+        <div key={label} className="card px-3 py-2.5 text-center">
+          <div className="text-[10px] text-muted uppercase tracking-[0.05em] mb-0.5">{label}</div>
+          <div className={`text-base font-bold tabular-nums ${cls}`}>{fmt(value)}</div>
         </div>
       ))}
     </div>
   )
 }
 
-function PersonSummary({ name, inc, exp, sav, debt, hjExp, hjSav, hjDebt, color }: { name: string; inc: number; exp: number; sav: number; debt: number; hjExp: number; hjSav: number; hjDebt: number; color: string }) {
+function PersonSummary({ name, inc, exp, sav, debt, hjExp, hjSav, hjDebt, colorClass, borderClass }: {
+  name: string; inc: number; exp: number; sav: number; debt: number
+  hjExp: number; hjSav: number; hjDebt: number
+  colorClass: string; borderClass: string
+}) {
   const net = inc - exp - sav - debt - hjExp - hjSav - hjDebt
-  const Row = ({ label, value, c, bold }: { label: string; value: number; c: string; bold?: boolean }) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-      <span style={{ color: 'var(--muted)', fontWeight: bold ? 600 : 400 }}>{label}</span>
-      <span style={{ color: c, fontWeight: bold ? 700 : 500, fontVariantNumeric: 'tabular-nums' }}>{fmt(Math.abs(value))}</span>
+  const Row = ({ label, value, cls, bold }: { label: string; value: number; cls: string; bold?: boolean }) => (
+    <div className="flex justify-between text-xs">
+      <span className={`${bold ? 'font-semibold' : 'font-normal'} text-muted`}>{label}</span>
+      <span className={`${bold ? 'font-bold' : 'font-medium'} tabular-nums ${cls}`}>{fmt(Math.abs(value))}</span>
     </div>
   )
   return (
-    <div className="card" style={{ padding: '12px 14px', borderLeft: '3px solid ' + color }}>
-      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, color }}>{name}</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <Row label="Income" value={inc} c="var(--income-text)" />
-        <Row label="Personal exp." value={exp} c="var(--expense-text)" />
-        <Row label="Monthly contribution" value={hjExp + hjDebt} c="var(--expense-text)" />
-        <Row label="Joint savings" value={hjSav} c="var(--savings-text)" />
-        <Row label="Savings" value={sav} c="var(--savings-text)" />
-        {debt > 0 && <Row label="Personal debts" value={debt} c="var(--expense-text)" />}
-        <div style={{ borderTop: '1px solid var(--border)', marginTop: 4, paddingTop: 4 }}>
-          <Row label="Leftover" value={net} c={net >= 0 ? 'var(--positive)' : 'var(--negative)'} bold />
+    <div className={`card px-3.5 py-3 ${borderClass}`}>
+      <div className={`font-semibold text-sm mb-2 ${colorClass}`}>{name}</div>
+      <div className="flex flex-col gap-1">
+        <Row label="Income" value={inc} cls="text-income-text" />
+        <Row label="Personal exp." value={exp} cls="text-expense-text" />
+        <Row label="Monthly contribution" value={hjExp + hjDebt} cls="text-expense-text" />
+        <Row label="Joint savings" value={hjSav} cls="text-savings-text" />
+        <Row label="Savings" value={sav} cls="text-savings-text" />
+        {debt > 0 && <Row label="Personal debts" value={debt} cls="text-expense-text" />}
+        <div className="border-t border-border mt-1 pt-1">
+          <Row label="Leftover" value={net} cls={net >= 0 ? 'text-positive' : 'text-negative'} bold />
         </div>
       </div>
     </div>
@@ -252,75 +301,109 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
   const grouped = { INCOME: filtered.filter(c => c.type === 'INCOME'), EXPENSE: filtered.filter(c => c.type === 'EXPENSE'), SAVINGS: filtered.filter(c => c.type === 'SAVINGS') }
   const submitCat = () => { if (newCatLabel.trim()) { addCategory(newCatOwner, newCatType, newCatLabel.trim()); setNewCatLabel(''); setAddingCat(false) } }
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: 16 }}>
+    <div className="h-full overflow-y-auto p-4">
       <SummaryBar totals={totals} />
       {tab === 'ALL' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-          <PersonSummary name={data.nameNiamh || 'Person 1'} color="var(--niamh)" inc={totals.incN} exp={totals.expN} sav={totals.savN} debt={totals.debtN} hjExp={totals.halfJointExp} hjSav={totals.halfJointSav} hjDebt={totals.halfJointDebt} />
-          <PersonSummary name={data.nameRupert || 'Person 2'} color="var(--rupert)" inc={totals.incR} exp={totals.expR} sav={totals.savR} debt={totals.debtR} hjExp={totals.halfJointExp} hjSav={totals.halfJointSav} hjDebt={totals.halfJointDebt} />
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <PersonSummary
+            name={data.nameNiamh || 'Person 1'}
+            colorClass="text-niamh" borderClass="border-l-[3px] border-l-niamh"
+            inc={totals.incN} exp={totals.expN} sav={totals.savN} debt={totals.debtN}
+            hjExp={totals.halfJointExp} hjSav={totals.halfJointSav} hjDebt={totals.halfJointDebt}
+          />
+          <PersonSummary
+            name={data.nameRupert || 'Person 2'}
+            colorClass="text-rupert" borderClass="border-l-[3px] border-l-rupert"
+            inc={totals.incR} exp={totals.expR} sav={totals.savR} debt={totals.debtR}
+            hjExp={totals.halfJointExp} hjSav={totals.halfJointSav} hjDebt={totals.halfJointDebt}
+          />
         </div>
       )}
       {(['INCOME', 'EXPENSE', 'SAVINGS'] as EntryType[]).map(type => grouped[type].length > 0 && (
         <div key={type}>
-          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: 6, marginTop: 4 }}>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted mb-1.5 mt-1">
             {type === 'INCOME' ? 'Income' : type === 'EXPENSE' ? 'Expenses' : 'Savings'}
           </div>
           {grouped[type].map(cat => (
-            <CategoryCard key={cat.key} cat={cat} ownerName={ownerName(cat.owner)} onUpdateAmount={updateItemAmount} onAddItem={addItem} onRemoveItem={removeItem} onRenameItem={renameItem} onRenameCategory={renameCategory} onDeleteCategory={deleteCategory} />
+            <CategoryCard
+              key={cat.key} cat={cat} ownerName={ownerName(cat.owner)}
+              onUpdateAmount={updateItemAmount} onAddItem={addItem}
+              onRemoveItem={removeItem} onRenameItem={renameItem}
+              onRenameCategory={renameCategory} onDeleteCategory={deleteCategory}
+            />
           ))}
         </div>
       ))}
       {totals.totalDebt > 0 && (
         <div>
-          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: 6, marginTop: 4 }}>Debt Payments</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted mb-1.5 mt-1">Debt Payments</div>
           {data.debts.filter(d => tab === 'ALL' || d.owner === tab).map(d => (
-            <div key={d.id} className="card fade-up" style={{ marginBottom: 8, borderLeft: '3px solid ' + (d.owner === 'NIAMH' ? 'var(--niamh)' : d.owner === 'RUPERT' ? 'var(--rupert)' : 'var(--joint)') }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{d.label}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+            <div key={d.id} className={`card fade-up mb-2 ${ownerBorderClass(d.owner)}`}>
+              <div className="flex items-center gap-2 px-3 py-2.5">
+                <div className="flex-1">
+                  <div className="text-sm font-semibold">{d.label}</div>
+                  <div className="text-[11px] text-muted mt-0.5">
                     {ownerName(d.owner)}{d.isZeroPercent ? ' · 0%' : d.interestRate > 0 ? ` · ${d.interestRate}%` : ''}
                     {d.currentBalance > 0 ? ` · ${fmt(d.currentBalance)} remaining` : ''}
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, fontSize: 14, color: 'var(--expense-text)' }}>{fmt(d.monthlyPayment)}/mo</div>
+                <div className="text-right">
+                  <div className="tabular-nums font-bold text-sm text-expense-text">{fmt(d.monthlyPayment)}/mo</div>
                   {d.currentBalance > 0 && d.monthlyPayment > 0 && (
-                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>~{Math.ceil(d.currentBalance / d.monthlyPayment)} months left</div>
+                    <div className="text-[11px] text-muted">~{Math.ceil(d.currentBalance / d.monthlyPayment)} months left</div>
                   )}
                 </div>
               </div>
             </div>
           ))}
-          <button onClick={onNavigateToDebts} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }}>
+          <button
+            onClick={onNavigateToDebts}
+            className="flex items-center gap-1.5 mb-3 bg-transparent border-0 cursor-pointer text-muted text-xs"
+          >
             + Manage debts →
           </button>
         </div>
       )}
       {addingCat ? (
-        <div className="card" style={{ padding: 12, marginTop: 8 }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-            <input value={newCatLabel} onChange={e => setNewCatLabel(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submitCat() }}
-              placeholder="Category name..." autoFocus
-              style={{ flex: 1, minWidth: 160, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '6px 10px', outline: 'none' }} />
-            <select value={newCatOwner} onChange={e => setNewCatOwner(e.target.value as Owner)} style={{ fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '6px 8px', background: 'var(--card)', cursor: 'pointer' }}>
+        <div className="card p-3 mt-2">
+          <div className="flex gap-2 flex-wrap mb-2">
+            <input
+              value={newCatLabel}
+              onChange={e => setNewCatLabel(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') submitCat() }}
+              placeholder="Category name..."
+              autoFocus
+              className="flex-1 min-w-[160px] text-[13px] border-[1.5px] border-border rounded-md px-2.5 py-1.5 outline-none"
+            />
+            <select
+              value={newCatOwner}
+              onChange={e => setNewCatOwner(e.target.value as Owner)}
+              className="text-[13px] border-[1.5px] border-border rounded-md px-2 py-1.5 bg-card cursor-pointer"
+            >
               <option value="NIAMH">{data.nameNiamh || 'Person 1'}</option>
               <option value="RUPERT">{data.nameRupert || 'Person 2'}</option>
               <option value="JOINT">{data.nameJoint || 'Joint'}</option>
             </select>
-            <select value={newCatType} onChange={e => setNewCatType(e.target.value as EntryType)} style={{ fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '6px 8px', background: 'var(--card)', cursor: 'pointer' }}>
+            <select
+              value={newCatType}
+              onChange={e => setNewCatType(e.target.value as EntryType)}
+              className="text-[13px] border-[1.5px] border-border rounded-md px-2 py-1.5 bg-card cursor-pointer"
+            >
               <option value="INCOME">Income</option>
               <option value="EXPENSE">Expense</option>
               <option value="SAVINGS">Savings</option>
             </select>
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={submitCat} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 13 }}>Add</button>
-            <button onClick={() => setAddingCat(false)} style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+          <div className="flex gap-1.5">
+            <button onClick={submitCat} className="bg-ink text-white border-0 rounded-md px-3.5 py-1.5 cursor-pointer text-[13px]">Add</button>
+            <button onClick={() => setAddingCat(false)} className="bg-transparent border-[1.5px] border-border rounded-md px-3.5 py-1.5 cursor-pointer text-[13px]">Cancel</button>
           </div>
         </div>
       ) : (
-        <button onClick={() => setAddingCat(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, background: 'none', border: '1.5px dashed var(--border)', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', color: 'var(--muted)', fontSize: 13, width: '100%', justifyContent: 'center' }}>
+        <button
+          onClick={() => setAddingCat(true)}
+          className="flex items-center justify-center gap-1.5 mt-3 bg-transparent border-[1.5px] border-dashed border-border rounded-lg px-4 py-2 cursor-pointer text-muted text-[13px] w-full"
+        >
           <Plus size={14} /> Add category
         </button>
       )}

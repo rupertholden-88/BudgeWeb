@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { useBudget } from '@/hooks/useBudget'
 import BudgetScreen from '@/components/BudgetScreen'
@@ -22,6 +22,8 @@ const NAV = [
   { id: 'settings' as Screen, label: 'Settings', Icon: Settings },
 ]
 
+const SCREEN_ORDER: Screen[] = ['budget', 'charts', 'savings', 'debts', 'settings']
+
 function SetupScreen({ onDone, updateOwnerName, signIn }: {
   onDone: () => void
   updateOwnerName: (owner: 'NIAMH' | 'RUPERT' | 'JOINT', name: string) => void
@@ -35,28 +37,44 @@ function SetupScreen({ onDone, updateOwnerName, signIn }: {
     onDone()
   }
   return (
-    <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, background: 'var(--surface)' }}>
-      <h1 style={{ fontFamily: 'DM Serif Display, serif', fontSize: 36, margin: '0 0 8px', color: 'var(--ink)' }}>Budge</h1>
-      <p style={{ color: 'var(--muted)', fontSize: 15, marginBottom: 40, textAlign: 'center' }}>A shared household budget for two.</p>
-      <div className="card" style={{ width: '100%', maxWidth: 360, padding: 24 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Who's using Budge?</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+    <div className="h-[100dvh] flex flex-col items-center justify-center p-8 bg-surface">
+      <h1 className="font-serif text-4xl m-0 mb-2 text-ink">Budge</h1>
+      <p className="text-muted text-[15px] mb-10 text-center">A shared household budget for two.</p>
+      <div className="card w-full max-w-[360px] p-6">
+        <div className="text-[13px] font-semibold mb-4">Who's using Budge?</div>
+        <div className="flex flex-col gap-3 mb-6">
           <div>
-            <label htmlFor="setup-name1" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Person 1</label>
-            <input id="setup-name1" value={name1} onChange={e => setName1(e.target.value)} placeholder="e.g. Niamh"
-              style={{ width: '100%', fontSize: 15, border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px 12px', background: 'var(--card)' }} />
+            <label htmlFor="setup-name1" className="text-xs text-muted block mb-1">Person 1</label>
+            <input
+              id="setup-name1"
+              value={name1}
+              onChange={e => setName1(e.target.value)}
+              placeholder="e.g. Niamh"
+              className="w-full text-[15px] border-[1.5px] border-border rounded-lg px-3 py-2.5 bg-card"
+            />
           </div>
           <div>
-            <label htmlFor="setup-name2" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Person 2</label>
-            <input id="setup-name2" value={name2} onChange={e => setName2(e.target.value)} placeholder="e.g. Rupert"
+            <label htmlFor="setup-name2" className="text-xs text-muted block mb-1">Person 2</label>
+            <input
+              id="setup-name2"
+              value={name2}
+              onChange={e => setName2(e.target.value)}
+              placeholder="e.g. Rupert"
               onKeyDown={e => { if (e.key === 'Enter') submit() }}
-              style={{ width: '100%', fontSize: 15, border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px 12px', background: 'var(--card)' }} />
+              className="w-full text-[15px] border-[1.5px] border-border rounded-lg px-3 py-2.5 bg-card"
+            />
           </div>
         </div>
-        <button onClick={submit} style={{ width: '100%', background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 8, padding: '12px', cursor: 'pointer', fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
+        <button
+          onClick={submit}
+          className="w-full bg-ink text-white border-0 rounded-lg py-3 cursor-pointer text-[15px] font-semibold mb-3"
+        >
           Get started
         </button>
-        <button onClick={() => { signIn(); onDone() }} style={{ width: '100%', background: 'none', color: 'var(--muted)', border: '1.5px solid var(--border)', borderRadius: 8, padding: '12px', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <button
+          onClick={() => { signIn(); onDone() }}
+          className="w-full bg-transparent text-muted border-[1.5px] border-border rounded-lg py-3 cursor-pointer text-sm flex items-center justify-center gap-2"
+        >
           <User size={15} /> Sign in to restore existing budget
         </button>
       </div>
@@ -70,6 +88,7 @@ export default function HomePage() {
   const [tab, setTab] = useState<TabFilter>('ALL')
   const [setupDone, setSetupDone] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const swipeRef = useRef<{ x: number; y: number; t: number } | null>(null)
   const { data, user, savedAt, isRefreshing, signIn, signOutUser, refreshFromCloud, updateOwnerName } = budget
 
   const showToast = (msg: string) => {
@@ -82,54 +101,84 @@ export default function HomePage() {
     showToast('Synced!')
   }
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    swipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() }
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!swipeRef.current) return
+    const dx = e.changedTouches[0].clientX - swipeRef.current.x
+    const dy = e.changedTouches[0].clientY - swipeRef.current.y
+    const dt = Date.now() - swipeRef.current.t
+    swipeRef.current = null
+    if (dt > 500 || Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.75) return
+    const idx = SCREEN_ORDER.indexOf(screen)
+    if (dx < 0 && idx < SCREEN_ORDER.length - 1) setScreen(SCREEN_ORDER[idx + 1])
+    if (dx > 0 && idx > 0) setScreen(SCREEN_ORDER[idx - 1])
+  }
+
   const needsSetup = !setupDone && !user && !data.nameNiamh && !data.nameRupert
 
   if (needsSetup) {
-    return <SetupScreen onDone={() => setSetupDone(true)} updateOwnerName={updateOwnerName} signIn={() => { signIn(); setSetupDone(true) }} />
+    return (
+      <SetupScreen
+        onDone={() => setSetupDone(true)}
+        updateOwnerName={updateOwnerName}
+        signIn={() => { signIn(); setSetupDone(true) }}
+      />
+    )
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: 'var(--surface)' }}>
+    <div className="flex flex-col h-[100dvh] bg-surface">
 
       {toast && (
-        <div role="status" aria-live="polite" style={{
-          position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
-          background: 'var(--ink)', color: 'white', padding: '10px 20px',
-          borderRadius: 999, fontSize: 13, fontWeight: 500, zIndex: 100,
-          display: 'flex', alignItems: 'center', gap: 6,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-          animation: 'fadeUp 0.2s ease',
-        }}>
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-ink text-white px-5 py-2.5 rounded-full text-[13px] font-medium z-[100] flex items-center gap-1.5 shadow-[0_4px_12px_rgba(0,0,0,0.2)] fade-up"
+        >
           <CheckCircle size={14} /> {toast}
         </div>
       )}
 
-      <header style={{ background: 'var(--card)', borderBottom: '1px solid var(--border)', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, zIndex: 10 }}>
-        <h1 style={{ fontFamily: 'DM Serif Display, serif', fontSize: 24, margin: 0, flex: 1 }}>Budge</h1>
-        {savedAt && <span style={{ fontSize: 11, color: 'var(--muted)' }}>Saved {new Date(savedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>}
+      <header className="bg-card border-b border-border px-4 h-14 flex items-center gap-3 shrink-0 z-10">
+        <h1 className="font-serif text-2xl m-0 flex-1">Budge</h1>
+        {savedAt && (
+          <span className="text-[11px] text-muted">
+            Saved {new Date(savedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
         {user ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={handleRefresh}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRefresh}
               aria-label="Sync from cloud"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 8, display: 'flex', minWidth: 36, minHeight: 36, alignItems: 'center', justifyContent: 'center' }}>
+              className="bg-transparent border-0 cursor-pointer text-muted p-2 flex min-w-9 min-h-9 items-center justify-center"
+            >
               <RefreshCw size={16} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
             </button>
-            <button onClick={signOutUser}
+            <button
+              onClick={signOutUser}
               title={`${user.email} — tap to sign out`}
               aria-label={`Signed in as ${user.email}. Tap to sign out.`}
-              style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--rupert)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', padding: 0 }}>
+              className="w-8 h-8 rounded-full bg-rupert text-white flex items-center justify-center text-[13px] font-semibold cursor-pointer border-0 p-0"
+            >
               {user.email?.[0].toUpperCase()}
             </button>
           </div>
         ) : (
-          <button onClick={signIn} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--card)', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
+          <button
+            onClick={signIn}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border-[1.5px] border-border bg-card cursor-pointer text-[13px] font-medium"
+          >
             <User size={14} /> Sign in
           </button>
         )}
       </header>
 
       {screen === 'budget' && (
-        <div style={{ background: 'var(--card)', borderBottom: '1px solid var(--border)', padding: '8px 16px', display: 'flex', gap: 8, flexShrink: 0, overflowX: 'auto' }}>
+        <div className="bg-card border-b border-border px-4 py-2 flex gap-2 shrink-0 overflow-x-auto">
           {(['ALL', 'NIAMH', 'RUPERT', 'JOINT'] as TabFilter[]).map(t => {
             const label = t === 'ALL' ? 'All' : t === 'NIAMH' ? (data.nameNiamh || 'Person 1') : t === 'RUPERT' ? (data.nameRupert || 'Person 2') : (data.nameJoint || 'Joint')
             return (
@@ -141,7 +190,11 @@ export default function HomePage() {
         </div>
       )}
 
-      <main style={{ flex: 1, overflow: 'hidden' }}>
+      <main
+        className="flex-1 overflow-hidden touch-pan-y"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         {screen === 'budget'   && <BudgetScreen   budget={budget} tab={tab} onNavigateToDebts={() => setScreen('debts')} />}
         {screen === 'charts'   && <ChartsScreen   budget={budget} />}
         {screen === 'savings'  && <SavingsScreen  budget={budget} />}
@@ -149,11 +202,14 @@ export default function HomePage() {
         {screen === 'settings' && <SettingsScreen budget={budget} />}
       </main>
 
-      <nav aria-label="Main navigation" style={{ background: 'var(--card)', borderTop: '1px solid var(--border)', display: 'flex', flexShrink: 0 }}>
+      <nav aria-label="Main navigation" className="bg-card border-t border-border flex shrink-0">
         {NAV.map(({ id, label, Icon }) => (
-          <button key={id} onClick={() => setScreen(id)}
+          <button
+            key={id}
+            onClick={() => setScreen(id)}
             aria-current={screen === id ? 'page' : undefined}
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', color: screen === id ? 'var(--ink)' : 'var(--muted)', fontSize: 10, fontWeight: screen === id ? 600 : 400 }}>
+            className={`flex-1 flex flex-col items-center justify-center gap-[3px] py-2.5 bg-transparent border-0 cursor-pointer text-[10px] ${screen === id ? 'text-ink font-semibold' : 'text-muted font-normal'}`}
+          >
             <Icon size={20} strokeWidth={screen === id ? 2.5 : 1.8} />
             {label}
           </button>

@@ -24,6 +24,8 @@
   --savings-text: #2563EB;
   --positive: #2D7A44;
   --negative: #C0392B;
+  --pension: #7B5EA7;
+  --pension-light: #EDE9F6;
 }
 
 * { box-sizing: border-box; }
@@ -45,6 +47,8 @@
   --niamh-light: #2E1E1A;
   --rupert-light: #1A2030;
   --joint-light: #1A2E1A;
+  --pension: #A080C8;
+  --pension-light: #1E1728;
 }
 html, body { font-family: 'DM Sans', sans-serif; background: var(--surface); color: var(--ink); -webkit-font-smoothing: antialiased; }
 h1, h2, h3 { font-family: 'DM Serif Display', serif; }

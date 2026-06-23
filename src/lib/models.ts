@@ -1,7 +1,7 @@
 export type Owner = 'NIAMH' | 'RUPERT' | 'JOINT'
 export type EntryType = 'INCOME' | 'EXPENSE' | 'SAVINGS'
 export type SpendingPriority = 'NECESSITY' | 'DISCRETIONARY' | 'NONE'
-export type AssetType = 'CASH' | 'CASH_ISA' | 'STOCKS_SHARES_ISA' | 'JUNIOR_ISA' | 'LIFETIME_ISA' | 'SAVINGS_ACCOUNT' | 'CRYPTO' | 'OTHER'
+export type AssetType = 'CASH' | 'CASH_ISA' | 'STOCKS_SHARES_ISA' | 'JUNIOR_ISA' | 'LIFETIME_ISA' | 'SAVINGS_ACCOUNT' | 'CRYPTO' | 'OTHER' | 'PENSION'
 export type DebtType = 'CREDIT_CARD' | 'PERSONAL_LOAN' | 'CAR_FINANCE' | 'MORTGAGE' | 'STUDENT_LOAN' | 'OTHER'
 
 export interface LineItem { id: string; label: string; amount: number; priority: SpendingPriority }

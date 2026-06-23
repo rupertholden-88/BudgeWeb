@@ -23,17 +23,17 @@ function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   const total = payload.reduce((a: number, p: any) => a + (p.value || 0), 0)
   return (
-    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-      <div style={{ fontWeight: 600, marginBottom: 6, color: 'var(--ink)' }}>{label}</div>
+    <div className="bg-card border border-border rounded-lg px-3.5 py-2.5 text-xs shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
+      <div className="font-semibold mb-1.5 text-ink">{label}</div>
       {payload.map((p: any) => (
-        <div key={p.name} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, color: p.fill, marginBottom: 2 }}>
+        <div key={p.name} className="flex justify-between gap-4 mb-0.5" style={{ color: p.fill }}>
           <span>{p.name}</span>
-          <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(p.value)}</span>
+          <span className="font-semibold tabular-nums">{fmt(p.value)}</span>
         </div>
       ))}
-      <div style={{ borderTop: '1px solid var(--border)', marginTop: 6, paddingTop: 6, display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--ink)' }}>
+      <div className="border-t border-border mt-1.5 pt-1.5 flex justify-between font-bold text-ink">
         <span>Total</span>
-        <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(total)}</span>
+        <span className="tabular-nums">{fmt(total)}</span>
       </div>
     </div>
   )
@@ -78,14 +78,13 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
   ]
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: 16 }}>
-      <h2 style={{ fontSize: 20, marginBottom: 16, marginTop: 0 }}>Analysis</h2>
+    <div className="h-full overflow-y-auto p-4">
+      <h2 className="font-serif text-xl mb-4 mt-0">Analysis</h2>
 
-      {/* Expenses by category */}
       {expenseData.length > 0 && (
-        <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Expenses by Category</div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div className="card p-4 mb-3">
+          <div className="text-xs font-semibold text-muted uppercase tracking-[0.06em] mb-2.5">Expenses by Category</div>
+          <div className="flex gap-1.5 mb-3 flex-wrap">
             {(['ALL', 'NIAMH', 'RUPERT', 'JOINT'] as const).map(f => {
               const label = f === 'ALL' ? 'All' : f === 'NIAMH' ? (data.nameNiamh || 'Person 1') : f === 'RUPERT' ? (data.nameRupert || 'Person 2') : (data.nameJoint || 'Joint')
               return (
@@ -108,21 +107,20 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
             </PieChart>
           </ResponsiveContainer>
           {expenseData.map((d, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: PIE_COLORS[i % PIE_COLORS.length], display: 'inline-block', flexShrink: 0 }} />
+            <div key={i} className="flex justify-between text-xs py-1 border-b border-border">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full inline-block shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
                 {d.name}
               </span>
-              <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt(d.value)}</span>
+              <span className="tabular-nums font-semibold">{fmt(d.value)}</span>
             </div>
           ))}
         </div>
       )}
 
-      {/* Monthly stacked bar */}
-      <div className="card" style={{ padding: 16, marginBottom: 12, marginTop: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Monthly Spend & Savings</div>
-        <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>Stacked — tap a bar for breakdown</div>
+      <div className="card p-4 mb-3 mt-4">
+        <div className="text-xs font-semibold text-muted uppercase tracking-[0.06em] mb-1">Monthly Spend & Savings</div>
+        <div className="text-[11px] text-muted mb-3">Stacked — tap a bar for breakdown</div>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={monthlyData} barSize={40} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
             <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -141,9 +139,8 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
         </ResponsiveContainer>
       </div>
 
-      {/* This month */}
-      <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>This Month</div>
+      <div className="card p-4 mb-3">
+        <div className="text-xs font-semibold text-muted uppercase tracking-[0.06em] mb-3">This Month</div>
         <ResponsiveContainer width="100%" height={160}>
           <BarChart data={overviewData} barSize={40} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
             <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
@@ -157,10 +154,9 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
         </ResponsiveContainer>
       </div>
 
-      {/* By person */}
       {(totals.incN > 0 || totals.incR > 0) && (
-        <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>By Person</div>
+        <div className="card p-4 mb-3">
+          <div className="text-xs font-semibold text-muted uppercase tracking-[0.06em] mb-3">By Person</div>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={personData} barGap={4} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
               <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
@@ -180,7 +176,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
       )}
 
       {expenseData.length === 0 && totals.totalInc === 0 && (
-        <div style={{ textAlign: 'center', color: 'var(--muted)', marginTop: 48, fontSize: 14 }}>
+        <div className="text-center text-muted mt-12 text-sm">
           Add some figures on the Budget tab to see charts.
         </div>
       )}

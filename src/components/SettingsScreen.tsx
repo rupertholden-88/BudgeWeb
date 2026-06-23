@@ -1,33 +1,37 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Owner } from '@/lib/models'
 import { Check } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
-function NameRow({ label, value, onSave, color }: { label: string; value: string; onSave: (v: string) => void; color: string }) {
+function NameRow({ label, value, onSave, colorClass }: { label: string; value: string; onSave: (v: string) => void; colorClass: string }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const commit = () => { if (draft.trim()) { onSave(draft.trim()); setEditing(false) } }
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-      <div style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
-      <span style={{ fontSize: 12, color: 'var(--muted)', width: 60, flexShrink: 0 }}>{label}</span>
+    <div className="flex items-center gap-2 py-2.5 border-b border-border">
+      <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${colorClass}`} />
+      <span className="text-xs text-muted w-[60px] shrink-0">{label}</span>
       {editing ? (
         <>
-          <input value={draft} onChange={e => setDraft(e.target.value)}
+          <input
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') commit() }}
             onBlur={commit}
-            style={{ flex: 1, fontSize: 14, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '4px 8px', outline: 'none' }}
-            autoFocus />
-          <button onClick={commit} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex' }}>
+            className="flex-1 text-sm border-[1.5px] border-rupert rounded-md px-2 py-1 outline-none"
+            autoFocus
+          />
+          <button onClick={commit} className="bg-ink text-white border-0 rounded-md px-2 py-1 cursor-pointer flex">
             <Check size={14} />
           </button>
         </>
       ) : (
-        <span onClick={() => { setDraft(value); setEditing(true) }}
-          style={{ flex: 1, fontSize: 14, fontWeight: 600, cursor: 'text' }}>
+        <span
+          onClick={() => { setDraft(value); setEditing(true) }}
+          className="flex-1 text-sm font-semibold cursor-text"
+        >
           {value}
         </span>
       )}
@@ -84,73 +88,79 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
     e.target.value = ''
   }
 
-  return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: 16 }}>
-      <h2 style={{ fontSize: 20, marginBottom: 16, marginTop: 0 }}>Settings</h2>
+  const importOk = importResult?.includes('success') || importResult?.includes('copied') || importResult?.includes('Downloaded')
 
-      {/* Person names */}
-      <div className="card" style={{ padding: '4px 16px', marginBottom: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', padding: '10px 0 4px' }}>Person Names</div>
-        <NameRow label="Person 1" value={data.nameNiamh} color="var(--niamh)" onSave={v => updateOwnerName('NIAMH', v)} />
-        <NameRow label="Person 2" value={data.nameRupert} color="var(--rupert)" onSave={v => updateOwnerName('RUPERT', v)} />
-        <NameRow label="Joint" value={data.nameJoint} color="var(--joint)" onSave={v => updateOwnerName('JOINT', v)} />
-        <p style={{ fontSize: 12, color: 'var(--muted)', margin: '8px 0' }}>
+  return (
+    <div className="h-full overflow-y-auto p-4">
+      <h2 className="font-serif text-xl mb-4 mt-0">Settings</h2>
+
+      <div className="card py-1 px-4 mb-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted py-2.5 pb-1">Person Names</div>
+        <NameRow label="Person 1" value={data.nameNiamh} colorClass="bg-niamh" onSave={v => updateOwnerName('NIAMH', v)} />
+        <NameRow label="Person 2" value={data.nameRupert} colorClass="bg-rupert" onSave={v => updateOwnerName('RUPERT', v)} />
+        <NameRow label="Joint"    value={data.nameJoint}  colorClass="bg-joint"  onSave={v => updateOwnerName('JOINT', v)} />
+        <p className="text-xs text-muted my-2">
           These names appear throughout the app. Changes sync to all devices.
         </p>
       </div>
 
-      {/* Dark mode */}
-      <div className="card" style={{ padding: '4px 16px', marginBottom: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', padding: '10px 0 4px' }}>Appearance</div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
-          <span style={{ fontSize: 14 }}>Dark mode</span>
-          <button onClick={toggleDarkMode} style={{
-            width: 48, height: 26, borderRadius: 999, border: 'none', cursor: 'pointer',
-            background: darkMode ? 'var(--ink)' : 'var(--border)',
-            position: 'relative', transition: 'background 0.2s',
-          }}>
-            <div style={{
-              width: 20, height: 20, borderRadius: '50%', background: 'white',
-              position: 'absolute', top: 3, transition: 'left 0.2s',
-              left: darkMode ? 24 : 4,
-            }} />
+      <div className="card py-1 px-4 mb-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted py-2.5 pb-1">Appearance</div>
+        <div className="flex justify-between items-center py-2.5">
+          <span className="text-sm">Dark mode</span>
+          <button
+            onClick={toggleDarkMode}
+            className="w-12 h-[26px] rounded-full border-0 cursor-pointer relative transition-colors duration-200"
+            style={{ background: darkMode ? 'var(--ink)' : 'var(--border)' }}
+          >
+            <div
+              className="w-5 h-5 rounded-full bg-white absolute top-[3px] transition-[left] duration-200"
+              style={{ left: darkMode ? 24 : 4 }}
+            />
           </button>
         </div>
       </div>
 
-      {/* Export / Import */}
-      <div className="card" style={{ padding: '4px 16px', marginBottom: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', padding: '10px 0 4px' }}>Export / Import</div>
-        <button onClick={handleExport} style={{ width: '100%', marginTop: 8, background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+      <div className="card py-1 px-4 mb-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted py-2.5 pb-1">Export / Import</div>
+        <button
+          onClick={handleExport}
+          className="w-full mt-2 bg-ink text-white border-0 rounded-lg py-2.5 px-4 cursor-pointer text-sm font-medium"
+        >
           Download backup (.json)
         </button>
-        <div style={{ marginTop: 10 }}>
-          <label style={{ display: 'block', width: '100%', background: 'var(--rupert)', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 500, textAlign: 'center' }}>
+        <div className="mt-2.5">
+          <label className="block w-full bg-rupert text-white border-0 rounded-lg py-2.5 px-4 cursor-pointer text-sm font-medium text-center">
             Upload backup (.json)
-            <input type="file" accept=".json" onChange={handleFileUpload} style={{ display: 'none' }} />
+            <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
           </label>
         </div>
-        <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>Or paste JSON directly:</div>
-          <textarea value={importText} onChange={e => setImportText(e.target.value)}
+        <div className="mt-2.5">
+          <div className="text-xs text-muted mb-1.5">Or paste JSON directly:</div>
+          <textarea
+            value={importText}
+            onChange={e => setImportText(e.target.value)}
             placeholder="Paste exported JSON here..."
-            style={{ width: '100%', height: 80, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 8, padding: '8px', outline: 'none', resize: 'vertical', fontFamily: 'monospace' }} />
-          <button onClick={handleImport} disabled={!importText.trim()}
-            style={{ width: '100%', marginTop: 6, background: importText.trim() ? 'var(--rupert)' : 'var(--border)', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', cursor: importText.trim() ? 'pointer' : 'default', fontSize: 14, fontWeight: 500 }}>
+            className="w-full h-20 text-xs border-[1.5px] border-border rounded-lg p-2 outline-none resize-y font-mono"
+          />
+          <button
+            onClick={handleImport}
+            disabled={!importText.trim()}
+            className={`w-full mt-1.5 border-0 rounded-lg py-2.5 px-4 text-sm font-medium text-white ${importText.trim() ? 'bg-rupert cursor-pointer' : 'bg-border cursor-default'}`}
+          >
             Import from text
           </button>
         </div>
         {importResult && (
-          <div style={{ marginTop: 8, fontSize: 13, color: importResult.includes('success') || importResult.includes('copied') ? 'var(--positive)' : 'var(--negative)', padding: '6px 10px', borderRadius: 6, background: importResult.includes('success') || importResult.includes('copied') ? 'var(--income-bg)' : 'var(--expense-bg)' }}>
+          <div className={`mt-2 text-[13px] px-2.5 py-1.5 rounded-md ${importOk ? 'text-positive bg-income-bg' : 'text-negative bg-expense-bg'}`}>
             {importResult}
           </div>
         )}
       </div>
 
-      {/* About */}
-      <div className="card" style={{ padding: '12px 16px', marginBottom: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: 8 }}>About</div>
-        <p style={{ fontSize: 13, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
+      <div className="card px-4 py-3 mb-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted mb-2">About</div>
+        <p className="text-[13px] text-muted m-0 leading-relaxed">
           Budge syncs your household budget across devices in real time via Firebase. Sign in with Google to enable sync.
         </p>
       </div>

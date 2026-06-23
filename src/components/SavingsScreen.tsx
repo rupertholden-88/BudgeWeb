@@ -10,14 +10,15 @@ type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 const ASSET_LABELS: Record<AssetType, string> = {
   CASH: 'Cash', CASH_ISA: 'Cash ISA', STOCKS_SHARES_ISA: 'S&S ISA',
   JUNIOR_ISA: 'Junior ISA', LIFETIME_ISA: 'LISA',
-  SAVINGS_ACCOUNT: 'Savings Account', CRYPTO: 'Crypto', OTHER: 'Other'
+  SAVINGS_ACCOUNT: 'Savings Account', CRYPTO: 'Crypto', OTHER: 'Other',
+  PENSION: 'Pension',
 }
 const ASSET_COLORS: Record<AssetType, string> = {
   CASH: '#6BAF92', CASH_ISA: '#5B9BD5', STOCKS_SHARES_ISA: '#4472C4',
   JUNIOR_ISA: '#70AD47', LIFETIME_ISA: '#255E91', SAVINGS_ACCOUNT: '#8BAFD4',
-  CRYPTO: '#F4A460', OTHER: '#A9A9A9'
+  CRYPTO: '#F4A460', OTHER: '#A9A9A9', PENSION: '#7B5EA7',
 }
-const ASSET_TYPES: AssetType[] = ['CASH', 'CASH_ISA', 'STOCKS_SHARES_ISA', 'JUNIOR_ISA', 'LIFETIME_ISA', 'SAVINGS_ACCOUNT', 'CRYPTO', 'OTHER']
+const REGULAR_ASSET_TYPES: AssetType[] = ['CASH', 'CASH_ISA', 'STOCKS_SHARES_ISA', 'JUNIOR_ISA', 'LIFETIME_ISA', 'SAVINGS_ACCOUNT', 'CRYPTO', 'OTHER']
 const OWNER_COLORS: Record<Owner, string> = {
   NIAMH: 'var(--niamh)', RUPERT: 'var(--rupert)', JOINT: 'var(--joint)'
 }
@@ -32,18 +33,28 @@ function formatMonth(dateStr: string) {
   return `${MONTH_LABELS[parts[1]] ?? parts[1]} ${parts[0].slice(2)}`
 }
 
-function TapToEdit({ value, onSave, style }: { value: string; onSave: (v: string) => void; style?: React.CSSProperties }) {
+function ownerBorderClass(owner: Owner) {
+  if (owner === 'NIAMH') return 'border-l-[3px] border-l-niamh'
+  if (owner === 'RUPERT') return 'border-l-[3px] border-l-rupert'
+  return 'border-l-[3px] border-l-joint'
+}
+
+function TapToEdit({ value, onSave, className }: { value: string; onSave: (v: string) => void; className?: string }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const commit = () => { onSave(draft); setEditing(false) }
   if (editing) return (
-    <input value={draft} onChange={e => setDraft(e.target.value)}
-      onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit() }}
-      style={{ fontSize: 'inherit', fontWeight: 'inherit', border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', outline: 'none', background: 'var(--rupert-light)', ...style }}
-      autoFocus />
+    <input
+      value={draft}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') commit() }}
+      className={`text-[inherit] font-[inherit] border-[1.5px] border-rupert rounded-md px-1.5 py-0.5 outline-none bg-rupert-light ${className ?? ''}`}
+      autoFocus
+    />
   )
   return (
-    <span onClick={() => { setDraft(value); setEditing(true) }} style={{ cursor: 'text', ...style }}>
+    <span onClick={() => { setDraft(value); setEditing(true) }} className={`cursor-text ${className ?? ''}`}>
       {value}
     </span>
   )
@@ -54,14 +65,21 @@ function TapToEditAmount({ value, onChange }: { value: number; onChange: (v: num
   const [raw, setRaw] = useState('')
   const commit = () => { onChange(parseFloat(raw.replace(/[£,]/g, '')) || 0); setEditing(false) }
   if (editing) return (
-    <input value={raw} onChange={e => setRaw(e.target.value)}
-      onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit() }}
-      style={{ width: 90, textAlign: 'right', fontSize: 14, border: '1.5px solid var(--rupert)', borderRadius: 6, padding: '2px 6px', outline: 'none', background: 'var(--rupert-light)' }}
-      inputMode="decimal" autoFocus />
+    <input
+      value={raw}
+      onChange={e => setRaw(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') commit() }}
+      className="w-[90px] text-right text-sm border-[1.5px] border-rupert rounded-md px-1.5 py-0.5 outline-none bg-rupert-light"
+      inputMode="decimal"
+      autoFocus
+    />
   )
   return (
-    <span onClick={() => { setRaw(value === 0 ? '' : String(value)); setEditing(true) }}
-      style={{ cursor: 'text', fontVariantNumeric: 'tabular-nums', fontSize: 14, color: value > 0 ? 'var(--ink)' : 'var(--muted)', minWidth: 80, textAlign: 'right', display: 'inline-block', padding: '2px 4px', borderRadius: 4 }}>
+    <span
+      onClick={() => { setRaw(value === 0 ? '' : String(value)); setEditing(true) }}
+      className={`cursor-text tabular-nums text-sm min-w-[80px] text-right inline-block px-1 py-0.5 rounded ${value > 0 ? 'text-ink' : 'text-muted'}`}
+    >
       {value > 0 ? fmt(value) : '—'}
     </span>
   )
@@ -69,19 +87,23 @@ function TapToEditAmount({ value, onChange }: { value: number; onChange: (v: num
 
 function DeleteModal({ label, onConfirm, onCancel }: { label: string; onConfirm: () => void; onCancel: () => void }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div className="card" style={{ width: '100%', maxWidth: 320, padding: 24 }}>
-        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Delete asset?</div>
-        <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 24 }}>
+    <div className="fixed inset-0 bg-black/40 z-[1000] flex items-center justify-center p-6">
+      <div className="card w-full max-w-[320px] p-6">
+        <div className="text-base font-semibold mb-2">Delete asset?</div>
+        <div className="text-sm text-muted mb-6">
           Remove <strong>{label}</strong> from this month's snapshot?
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={onCancel}
-            style={{ flex: 1, background: 'none', border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14 }}>
+        <div className="flex gap-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 bg-transparent border-[1.5px] border-border rounded-lg py-2.5 cursor-pointer text-sm"
+          >
             Cancel
           </button>
-          <button onClick={onConfirm}
-            style={{ flex: 1, background: 'var(--negative)', color: 'white', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
+          <button
+            onClick={onConfirm}
+            className="flex-1 bg-negative text-white border-0 rounded-lg py-2.5 cursor-pointer text-sm font-semibold"
+          >
             Delete
           </button>
         </div>
@@ -90,11 +112,12 @@ function DeleteModal({ label, onConfirm, onCancel }: { label: string; onConfirm:
   )
 }
 
-function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
+function AssetRow({ asset, owner, today, updateAsset, deleteAsset, lockType }: {
   asset: { id: string; label: string; amount: number; type: AssetType; interestRate?: number; institution?: string }
   owner: Owner; today: string
   updateAsset: BudgetHook['updateAsset']
   deleteAsset: BudgetHook['deleteAsset']
+  lockType?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
@@ -119,53 +142,70 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset }: {
           onCancel={() => setDeleteModal(false)}
         />
       )}
-      <div style={{ borderBottom: '1px solid var(--border)' }}
+      <div
+        className="border-b border-border"
         onMouseDown={startLongPress} onMouseUp={cancelLongPress} onMouseLeave={cancelLongPress}
-        onTouchStart={startLongPress} onTouchEnd={cancelLongPress} onTouchCancel={cancelLongPress}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0' }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <TapToEdit value={asset.label}
+        onTouchStart={startLongPress} onTouchEnd={cancelLongPress} onTouchCancel={cancelLongPress}
+      >
+        <div className="flex items-center gap-1.5 py-2">
+          <div className="flex-1 min-w-0">
+            <TapToEdit
+              value={asset.label}
               onSave={v => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution, v)}
-              style={{ fontSize: 13, fontWeight: 500, display: 'block' }} />
-            <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>
+              className="text-[13px] font-medium block"
+            />
+            <div className="text-[10px] text-muted mt-px">
               {ASSET_LABELS[asset.type] ?? asset.type}
               {asset.institution ? ` · ${asset.institution}` : ''}
               {asset.interestRate && asset.amount > 0 ? (
-                <span style={{ color: 'var(--positive)', fontWeight: 600, marginLeft: 4 }}>
+                <span className="text-positive font-semibold ml-1">
                   {` · £${((asset.amount * asset.interestRate) / 100 / 12).toFixed(0)}/mo (${asset.interestRate}% = £${((asset.amount * asset.interestRate) / 100).toFixed(0)}/yr)`}
                 </span>
               ) : asset.interestRate ? <span>{` · ${asset.interestRate}%`}</span> : null}
             </div>
           </div>
           <TapToEditAmount value={asset.amount || 0} onChange={v => updateAsset(owner, today, asset.id, v, asset.interestRate, asset.institution)} />
-          <button onClick={() => setExpanded(e => !e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 10, padding: '2px 4px' }}>
+          <button
+            onClick={() => setExpanded(e => !e)}
+            className="bg-transparent border-0 cursor-pointer text-muted text-[10px] px-1 py-0.5"
+          >
             {expanded ? '▲' : '▼'}
           </button>
         </div>
         {expanded && (
-          <div style={{ padding: '0 0 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Type</label>
-              <select value={asset.type} onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution, undefined, e.target.value as AssetType)}
-                style={{ fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', background: 'var(--card)' }}>
-                {Object.entries(ASSET_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rate %</label>
-              <input type="number" value={asset.interestRate || ''} placeholder="0"
+          <div className="pb-2 flex flex-wrap gap-2">
+            {!lockType && (
+              <div className="flex flex-col gap-0.5">
+                <label className="text-[10px] text-muted uppercase tracking-[0.05em]">Type</label>
+                <select
+                  value={asset.type}
+                  onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution, undefined, e.target.value as AssetType)}
+                  className="text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 bg-card"
+                >
+                  {Object.entries(ASSET_LABELS).filter(([k]) => k !== 'PENSION').map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </div>
+            )}
+            <div className="flex flex-col gap-0.5">
+              <label className="text-[10px] text-muted uppercase tracking-[0.05em]">Rate %</label>
+              <input
+                type="number"
+                value={asset.interestRate || ''}
+                placeholder="0"
                 onChange={e => updateAsset(owner, today, asset.id, asset.amount, parseFloat(e.target.value) || undefined, asset.institution)}
-                style={{ width: 70, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', outline: 'none' }} />
+                className="w-[70px] text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none"
+              />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <label style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Institution</label>
-              <input value={asset.institution || ''} placeholder="e.g. Monzo"
+            <div className="flex flex-col gap-0.5">
+              <label className="text-[10px] text-muted uppercase tracking-[0.05em]">Institution</label>
+              <input
+                value={asset.institution || ''}
+                placeholder="e.g. Monzo"
                 onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, e.target.value)}
-                style={{ width: 110, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 6px', outline: 'none' }} />
+                className="w-[110px] text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none"
+              />
             </div>
-            <div style={{ fontSize: 10, color: 'var(--muted)', width: '100%', marginTop: 4 }}>
-              💡 Long press the row to delete
-            </div>
+            <div className="text-[10px] text-muted w-full mt-1">💡 Long press the row to delete</div>
           </div>
         )}
       </div>
@@ -180,7 +220,7 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset, t
   deleteAsset: BudgetHook['deleteAsset']
 }) {
   const snap = budget.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
-  const assets = Array.isArray(snap?.assets) ? snap!.assets : []
+  const assets = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type !== 'PENSION')
   const total = assets.reduce((a, i) => a + (i.amount || 0), 0)
   const [adding, setAdding] = useState(false)
   const [newLabel, setNewLabel] = useState('')
@@ -188,30 +228,90 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset, t
   const submit = () => { if (newLabel.trim()) { addAsset(owner, today, newType, newLabel.trim()); setNewLabel(''); setAdding(false) } }
 
   return (
-    <div className="card" style={{ marginBottom: 12, borderLeft: `3px solid ${OWNER_COLORS[owner]}` }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
-        <span style={{ fontWeight: 600, fontSize: 14 }}>{name}</span>
-        <span style={{ fontWeight: 700, fontSize: 16, fontVariantNumeric: 'tabular-nums', color: total > 0 ? 'var(--positive)' : 'var(--muted)' }}>{fmt(total)}</span>
+    <div className={`card mb-3 ${ownerBorderClass(owner)}`}>
+      <div className="flex justify-between items-center px-3 py-2.5 border-b border-border">
+        <span className="font-semibold text-sm">{name}</span>
+        <span className={`font-bold text-base tabular-nums ${total > 0 ? 'text-positive' : 'text-muted'}`}>{fmt(total)}</span>
       </div>
-      <div style={{ padding: '4px 12px 8px' }}>
+      <div className="px-3 pt-1 pb-2">
         {assets.map(asset => (
           <AssetRow key={asset.id} asset={asset as any} owner={owner} today={today} updateAsset={updateAsset} deleteAsset={deleteAsset} />
         ))}
         {adding ? (
-          <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-            <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submit() }}
-              placeholder="Account name..." autoFocus
-              style={{ flex: 1, minWidth: 120, fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px', outline: 'none' }} />
-            <select value={newType} onChange={e => setNewType(e.target.value as AssetType)}
-              style={{ fontSize: 13, border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 8px', background: 'var(--card)', cursor: 'pointer' }}>
-              {Object.entries(ASSET_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          <div className="flex gap-1.5 mt-2 flex-wrap">
+            <input
+              value={newLabel}
+              onChange={e => setNewLabel(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') submit() }}
+              placeholder="Account name..."
+              autoFocus
+              className="flex-1 min-w-[120px] text-[13px] border-[1.5px] border-border rounded-md px-2 py-1 outline-none"
+            />
+            <select
+              value={newType}
+              onChange={e => setNewType(e.target.value as AssetType)}
+              className="text-[13px] border-[1.5px] border-border rounded-md px-2 py-1 bg-card cursor-pointer"
+            >
+              {REGULAR_ASSET_TYPES.map(t => <option key={t} value={t}>{ASSET_LABELS[t]}</option>)}
             </select>
-            <button onClick={submit} style={{ background: 'var(--ink)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontSize: 13 }}>Add</button>
-            <button onClick={() => setAdding(false)} style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+            <button onClick={submit} className="bg-ink text-white border-0 rounded-md px-3 py-1 cursor-pointer text-[13px]">Add</button>
+            <button onClick={() => setAdding(false)} className="bg-transparent border-[1.5px] border-border rounded-md px-3 py-1 cursor-pointer text-[13px]">Cancel</button>
           </div>
         ) : (
-          <button onClick={() => setAdding(true)} style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }}>
+          <button
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-1 mt-2 bg-transparent border-0 cursor-pointer text-muted text-xs"
+          >
             <Plus size={12} /> Add asset
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function PensionOwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset, today }: {
+  owner: Owner; name: string; budget: BudgetHook['data']; today: string
+  addAsset: BudgetHook['addAsset']
+  updateAsset: BudgetHook['updateAsset']
+  deleteAsset: BudgetHook['deleteAsset']
+}) {
+  const snap = budget.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
+  const assets = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type === 'PENSION')
+  const total = assets.reduce((a, i) => a + (i.amount || 0), 0)
+  const [adding, setAdding] = useState(false)
+  const [newLabel, setNewLabel] = useState('')
+  const submit = () => { if (newLabel.trim()) { addAsset(owner, today, 'PENSION', newLabel.trim()); setNewLabel(''); setAdding(false) } }
+
+  return (
+    <div className="card mb-3 border-l-[3px] border-l-pension">
+      <div className="flex justify-between items-center px-3 py-2.5 border-b border-border">
+        <span className="font-semibold text-sm">{name}</span>
+        <span className={`font-bold text-base tabular-nums ${total > 0 ? 'text-positive' : 'text-muted'}`}>{fmt(total)}</span>
+      </div>
+      <div className="px-3 pt-1 pb-2">
+        {assets.map(asset => (
+          <AssetRow key={asset.id} asset={asset as any} owner={owner} today={today} updateAsset={updateAsset} deleteAsset={deleteAsset} lockType />
+        ))}
+        {adding ? (
+          <div className="flex gap-1.5 mt-2 flex-wrap">
+            <input
+              value={newLabel}
+              onChange={e => setNewLabel(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') submit() }}
+              placeholder="e.g. Workplace Pension"
+              autoFocus
+              className="flex-1 min-w-[120px] text-[13px] border-[1.5px] border-border rounded-md px-2 py-1 outline-none"
+            />
+            <button onClick={submit} className="bg-pension text-white border-0 rounded-md px-3 py-1 cursor-pointer text-[13px]">Add</button>
+            <button onClick={() => setAdding(false)} className="bg-transparent border-[1.5px] border-border rounded-md px-3 py-1 cursor-pointer text-[13px]">Cancel</button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-1 mt-2 bg-transparent border-0 cursor-pointer text-muted text-xs"
+          >
+            <Plus size={12} /> Add pension
           </button>
         )}
       </div>
@@ -232,20 +332,39 @@ function TotalLabel(props: any) {
   )
 }
 
+function PensionTotalLabel(props: any) {
+  const { x, y, width, index, chartData, ownerKeys } = props
+  const row = chartData[index]
+  if (!row) return null
+  const total = ownerKeys.reduce((sum: number, k: string) => sum + (row[k] || 0), 0)
+  if (total === 0) return null
+  return (
+    <text x={x + width / 2} y={y - 8} textAnchor="middle" fontSize={11} fontWeight={700} fill="var(--ink)">
+      {fmt(total)}
+    </text>
+  )
+}
+
 export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   const { data, addAsset, updateAsset, deleteAsset, resyncInterest, copyForwardAssets } = budget
   const today = new Date().toISOString().slice(0, 7)
 
   const totalAll = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
-    const assets = Array.isArray(snap?.assets) ? snap!.assets : []
+    const assets = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type !== 'PENSION')
+    return acc + assets.reduce((a, i) => a + (i.amount || 0), 0)
+  }, 0)
+
+  const totalPensions = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
+    const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
+    const assets = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type === 'PENSION')
     return acc + assets.reduce((a, i) => a + (i.amount || 0), 0)
   }, 0)
 
   const lastMonth = (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7) })()
   const totalLastMonth = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === lastMonth)
-    const assets = Array.isArray(snap?.assets) ? snap!.assets : []
+    const assets = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type !== 'PENSION')
     return acc + assets.reduce((a, i) => a + (i.amount || 0), 0)
   }, 0)
   const monthDiff = totalLastMonth > 0 ? totalAll - totalLastMonth : null
@@ -265,44 +384,58 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   if (!months.includes(today)) months.push(today)
 
   const chartData = months.map(month => {
-    const allAssets = data.savingsHistory.filter(s => s.date.slice(0, 7) === month).flatMap(s => Array.isArray(s.assets) ? s.assets : [])
+    const allAssets = data.savingsHistory.filter(s => s.date.slice(0, 7) === month).flatMap(s => Array.isArray(s.assets) ? s.assets : []).filter((a: any) => a.type !== 'PENSION')
     const row: any = { month: formatMonth(month) }
-    ASSET_TYPES.forEach(type => { row[ASSET_LABELS[type]] = allAssets.filter((a: any) => a.type === type).reduce((sum: number, a: any) => sum + (a.amount || 0), 0) })
+    REGULAR_ASSET_TYPES.forEach(type => { row[ASSET_LABELS[type]] = allAssets.filter((a: any) => a.type === type).reduce((sum: number, a: any) => sum + (a.amount || 0), 0) })
     return row
   })
+  const activeTypes = REGULAR_ASSET_TYPES.filter(type => chartData.some(row => (row[ASSET_LABELS[type]] || 0) > 0))
 
-  const activeTypes = ASSET_TYPES.filter(type => chartData.some(row => (row[ASSET_LABELS[type]] || 0) > 0))
-
-  const byOwner = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(owner => {
-    const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
-    const assets = Array.isArray(snap?.assets) ? snap!.assets.filter((a: any) => a.interestRate && a.amount > 0) : []
-    const monthly = assets.reduce((acc: number, a: any) => acc + (a.amount * (a.interestRate || 0)) / 100 / 12, 0)
-    return { owner, monthly, assets }
-  }).filter(o => o.monthly > 0)
-
-  const totalMonthly = byOwner.reduce((a, o) => a + o.monthly, 0)
   const n1 = data.nameNiamh || 'Person 1'
   const n2 = data.nameRupert || 'Person 2'
   const n3 = data.nameJoint || 'Joint'
 
+  const pensionChartData = months.map(month => {
+    const row: any = { month: formatMonth(month) }
+    ;(['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).forEach(owner => {
+      const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === month)
+      const pension = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type === 'PENSION').reduce((sum: number, a: any) => sum + (a.amount || 0), 0)
+      const ownerName = owner === 'NIAMH' ? n1 : owner === 'RUPERT' ? n2 : n3
+      row[ownerName] = pension
+    })
+    return row
+  })
+  const pensionOwnerKeys = [n1, n2, n3].filter(name => pensionChartData.some(r => (r[name] || 0) > 0))
+
+  const byOwner = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(owner => {
+    const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
+    const assets = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.interestRate && a.amount > 0 && a.type !== 'PENSION')
+    const monthly = assets.reduce((acc: number, a: any) => acc + (a.amount * (a.interestRate || 0)) / 100 / 12, 0)
+    return { owner, monthly, assets }
+  }).filter(o => o.monthly > 0)
+  const totalMonthly = byOwner.reduce((a, o) => a + o.monthly, 0)
+
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
-        <h2 style={{ fontSize: 20, margin: 0 }}>Assets</h2>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: totalAll > 0 ? 'var(--positive)' : 'var(--muted)' }}>
+    <div className="h-full overflow-y-auto p-4">
+
+      {/* Assets header */}
+      <div className="flex justify-between items-baseline mb-4">
+        <h2 className="font-serif text-xl m-0">Assets</h2>
+        <div className="text-right">
+          <div className={`text-lg font-bold tabular-nums ${totalAll > 0 ? 'text-positive' : 'text-muted'}`}>
             {fmt(totalAll)}
           </div>
           {monthDiff !== null && (
-            <div style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', color: monthDiff >= 0 ? 'var(--positive)' : 'var(--negative)', marginTop: 1 }}>
+            <div className={`text-[11px] tabular-nums mt-px ${monthDiff >= 0 ? 'text-positive' : 'text-negative'}`}>
               {monthDiff >= 0 ? '▲' : '▼'} {fmt(Math.abs(monthDiff))} ({monthDiffPct!.toFixed(1)}%) vs last month
             </div>
           )}
         </div>
       </div>
 
-      <div className="card" style={{ padding: 16, marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Assets Over Time</div>
+      {/* Assets Over Time chart */}
+      <div className="card p-4 mb-4">
+        <div className="text-xs font-semibold text-muted uppercase tracking-[0.06em] mb-3">Assets Over Time</div>
         <ResponsiveContainer width="100%" height={180}>
           <BarChart data={chartData} barSize={40} margin={{ top: 30, right: 16, left: 8, bottom: 0 }}>
             <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -311,69 +444,139 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
             {activeTypes.map((type, i) => (
               <Bar key={type} dataKey={ASSET_LABELS[type]} stackId="a"
                 fill={ASSET_COLORS[type]}
-                radius={i === activeTypes.length - 1 ? [4,4,0,0] : [0,0,0,0]}
+                radius={i === activeTypes.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                 label={i === activeTypes.length - 1 ? (props: any) => <TotalLabel {...props} chartData={chartData} activeTypes={activeTypes} /> : undefined}
               />
             ))}
           </BarChart>
         </ResponsiveContainer>
-        <div style={{ marginTop: 12 }}>
+        <div className="mt-3">
           {activeTypes.map(type => {
             const value = chartData[chartData.length - 1]?.[ASSET_LABELS[type]] || 0
             const pct = totalAll > 0 ? ((value / totalAll) * 100).toFixed(0) : '0'
             if (value === 0) return null
             return (
-              <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: ASSET_COLORS[type], flexShrink: 0 }} />
-                <span style={{ flex: 1, fontSize: 12 }}>{ASSET_LABELS[type]}</span>
-                <span style={{ fontSize: 12, color: 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
-                <span style={{ fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(value)}</span>
+              <div key={type} className="flex items-center gap-2 py-1 border-b border-border">
+                <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: ASSET_COLORS[type] }} />
+                <span className="flex-1 text-xs">{ASSET_LABELS[type]}</span>
+                <span className="text-xs text-muted tabular-nums">{pct}%</span>
+                <span className="text-xs font-semibold tabular-nums">{fmt(value)}</span>
               </div>
             )
           })}
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+      {/* Edit controls */}
+      <div className="flex justify-between items-center mb-3">
+        <div className="text-[11px] text-muted">
           {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })} · tap to edit · long press to delete
         </div>
         {hasPreviousData && (
-          <button onClick={copyForwardAssets}
-            style={{ fontSize: 11, background: 'none', color: 'var(--muted)', border: '1.5px solid var(--border)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>
+          <button
+            onClick={copyForwardAssets}
+            className="text-[11px] bg-transparent text-muted border-[1.5px] border-border rounded-md px-2 py-[3px] cursor-pointer"
+          >
             Reset to last month
           </button>
         )}
       </div>
 
+      {/* Owner panels */}
       <OwnerPanel owner="NIAMH"  name={n1} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
       <OwnerPanel owner="RUPERT" name={n2} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
       <OwnerPanel owner="JOINT"  name={n3} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
 
+      {/* Interest income */}
       {byOwner.length > 0 && (
-        <div className="card" style={{ padding: 16, marginTop: 4 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Interest Income</div>
+        <div className="card p-4 mt-1">
+          <div className="text-xs font-semibold text-muted uppercase tracking-[0.06em] mb-3">Interest Income</div>
           {byOwner.map(({ owner, monthly }) => (
-            <div key={owner} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ color: 'var(--muted)' }}>{owner === 'NIAMH' ? n1 : owner === 'RUPERT' ? n2 : n3}</span>
-              <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: 'var(--positive)' }}>
+            <div key={owner} className="flex justify-between text-[13px] py-1 border-b border-border">
+              <span className="text-muted">{owner === 'NIAMH' ? n1 : owner === 'RUPERT' ? n2 : n3}</span>
+              <span className="tabular-nums font-semibold text-positive">
                 {fmt(monthly)}/mo · {fmt(monthly * 12)}/yr
               </span>
             </div>
           ))}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, padding: '8px 0 12px', color: 'var(--positive)' }}>
+          <div className="flex justify-between text-sm font-bold py-2 pb-3 text-positive">
             <span>Total</span>
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(totalMonthly)}/mo · {fmt(totalMonthly * 12)}/yr</span>
+            <span className="tabular-nums">{fmt(totalMonthly)}/mo · {fmt(totalMonthly * 12)}/yr</span>
           </div>
-          <button onClick={() => resyncInterest(byOwner.map(({ owner, assets }) => ({ owner, assets })))}
-            style={{ width: '100%', background: 'var(--positive)', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+          <button
+            onClick={() => resyncInterest(byOwner.map(({ owner, assets }) => ({ owner, assets })))}
+            className="w-full bg-positive text-white border-0 rounded-lg px-4 py-2.5 cursor-pointer text-[13px] font-semibold"
+          >
             Re-sync interest to budget income
           </button>
-          <p style={{ fontSize: 11, color: 'var(--muted)', margin: '8px 0 0', textAlign: 'center' }}>
+          <p className="text-[11px] text-muted mt-2 mb-0 text-center">
             Automatically removes old interest items and recreates with current values
           </p>
         </div>
       )}
+
+      {/* Pensions section */}
+      <div className="mt-6 pt-6 border-t-2 border-pension-light">
+        <div className="flex justify-between items-baseline mb-4">
+          <h2 className="font-serif text-xl m-0 text-pension">Pensions</h2>
+          <div className={`text-lg font-bold tabular-nums ${totalPensions > 0 ? 'text-pension' : 'text-muted'}`}>
+            {fmt(totalPensions)}
+          </div>
+        </div>
+
+        {/* Pension growth chart */}
+        {pensionOwnerKeys.length > 0 && (
+          <div className="card p-4 mb-4 border-l-[3px] border-l-pension">
+            <div className="text-xs font-semibold text-muted uppercase tracking-[0.06em] mb-3">Pension Growth Over Time</div>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={pensionChartData} barSize={40} margin={{ top: 30, right: 16, left: 8, bottom: 0 }}>
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis hide />
+                <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} formatter={(v: number) => fmt(v)} />
+                {pensionOwnerKeys.map((key, i) => (
+                  <Bar
+                    key={key}
+                    dataKey={key}
+                    stackId="p"
+                    fill={key === n1 ? 'var(--niamh)' : key === n2 ? 'var(--rupert)' : 'var(--joint)'}
+                    radius={i === pensionOwnerKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                    label={i === pensionOwnerKeys.length - 1
+                      ? (props: any) => <PensionTotalLabel {...props} chartData={pensionChartData} ownerKeys={pensionOwnerKeys} />
+                      : undefined
+                    }
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+            {pensionOwnerKeys.length > 0 && (
+              <div className="mt-3">
+                {pensionOwnerKeys.map(key => {
+                  const value = pensionChartData[pensionChartData.length - 1]?.[key] || 0
+                  const pct = totalPensions > 0 ? ((value / totalPensions) * 100).toFixed(0) : '0'
+                  if (value === 0) return null
+                  const color = key === n1 ? 'var(--niamh)' : key === n2 ? 'var(--rupert)' : 'var(--joint)'
+                  return (
+                    <div key={key} className="flex items-center gap-2 py-1 border-b border-border">
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                      <span className="flex-1 text-xs">{key}</span>
+                      <span className="text-xs text-muted tabular-nums">{pct}%</span>
+                      <span className="text-xs font-semibold tabular-nums">{fmt(value)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="text-[11px] text-muted mb-3">
+          Tap to edit values · Long press to delete
+        </div>
+
+        <PensionOwnerPanel owner="NIAMH"  name={n1} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
+        <PensionOwnerPanel owner="RUPERT" name={n2} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
+        <PensionOwnerPanel owner="JOINT"  name={n3} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
+      </div>
     </div>
   )
 }
