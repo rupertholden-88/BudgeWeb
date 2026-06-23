@@ -162,9 +162,12 @@ export default function HomePage() {
               onClick={signOutUser}
               title={`${user.email} — tap to sign out`}
               aria-label={`Signed in as ${user.email}. Tap to sign out.`}
-              className="w-8 h-8 rounded-full bg-rupert text-white flex items-center justify-center text-[13px] font-semibold cursor-pointer border-0 p-0"
+              className="w-8 h-8 rounded-full bg-rupert text-white flex items-center justify-center text-[13px] font-semibold cursor-pointer border-0 p-0 overflow-hidden"
             >
-              {user.email?.[0].toUpperCase()}
+              {user.photoURL
+                ? <img src={user.photoURL} alt={user.email ?? ''} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                : user.email?.[0].toUpperCase()
+              }
             </button>
           </div>
         ) : (
