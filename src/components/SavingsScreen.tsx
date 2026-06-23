@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Owner, AssetType, fmt } from '@/lib/models'
-import { Plus } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { Plus, TrendingUp, TrendingDown } from 'lucide-react'
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -19,9 +19,6 @@ const ASSET_COLORS: Record<AssetType, string> = {
   CRYPTO: '#F4A460', OTHER: '#A9A9A9', PENSION: '#7B5EA7',
 }
 const REGULAR_ASSET_TYPES: AssetType[] = ['CASH', 'CASH_ISA', 'STOCKS_SHARES_ISA', 'JUNIOR_ISA', 'LIFETIME_ISA', 'SAVINGS_ACCOUNT', 'CRYPTO', 'OTHER']
-const OWNER_COLORS: Record<Owner, string> = {
-  NIAMH: 'var(--niamh)', RUPERT: 'var(--rupert)', JOINT: 'var(--joint)'
-}
 const MONTH_LABELS: Record<string, string> = {
   '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr',
   '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug',
@@ -33,10 +30,56 @@ function formatMonth(dateStr: string) {
   return `${MONTH_LABELS[parts[1]] ?? parts[1]} ${parts[0].slice(2)}`
 }
 
+function fmtK(n: number) {
+  if (Math.abs(n) >= 1000) return `£${(n / 1000).toFixed(1)}k`
+  return fmt(n)
+}
+
 function ownerBorderClass(owner: Owner) {
   if (owner === 'NIAMH') return 'border-l-[3px] border-l-niamh'
   if (owner === 'RUPERT') return 'border-l-[3px] border-l-rupert'
   return 'border-l-[3px] border-l-joint'
+}
+
+function StatCard({ label, value, sub, intent }: {
+  label: string; value: string; sub?: string
+  intent?: 'positive' | 'negative' | 'neutral'
+}) {
+  const valueClass = intent === 'positive' ? 'text-positive' : intent === 'negative' ? 'text-negative' : 'text-ink'
+  return (
+    <div className="card p-3 flex-1 min-w-0">
+      <div className="text-[10px] font-semibold text-muted uppercase tracking-[0.06em] mb-1 truncate">{label}</div>
+      <div className={`text-lg font-bold tabular-nums leading-none ${valueClass}`}>{value}</div>
+      {sub && <div className="text-[10px] text-muted mt-1 leading-tight">{sub}</div>}
+    </div>
+  )
+}
+
+function ChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null
+  const filtered = payload.filter((p: any) => (p.value ?? 0) > 0)
+  if (!filtered.length) return null
+  return (
+    <div className="bg-card border border-border rounded-xl px-3 py-2.5 text-xs shadow-[0_4px_20px_rgba(0,0,0,0.12)]">
+      <div className="font-semibold text-ink mb-1.5">{label}</div>
+      {filtered.map((p: any) => (
+        <div key={p.name} className="flex justify-between gap-4 mb-0.5">
+          <span className="text-muted">{p.name}</span>
+          <span className="font-semibold tabular-nums" style={{ color: p.color }}>{fmt(p.value)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function AllocationBar({ segments }: { segments: { color: string; pct: number }[] }) {
+  return (
+    <div className="flex h-2 rounded-full overflow-hidden gap-[2px] mb-3">
+      {segments.filter(s => s.pct > 0.5).map((s, i) => (
+        <div key={i} className="h-full" style={{ width: `${s.pct}%`, background: s.color, minWidth: 4 }} />
+      ))}
+    </div>
+  )
 }
 
 function TapToEdit({ value, onSave, className }: { value: string; onSave: (v: string) => void; className?: string }) {
@@ -94,18 +137,8 @@ function DeleteModal({ label, onConfirm, onCancel }: { label: string; onConfirm:
           Remove <strong>{label}</strong> from this month's snapshot?
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={onCancel}
-            className="flex-1 bg-transparent border-[1.5px] border-border rounded-lg py-2.5 cursor-pointer text-sm"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 bg-negative text-white border-0 rounded-lg py-2.5 cursor-pointer text-sm font-semibold"
-          >
-            Delete
-          </button>
+          <button onClick={onCancel} className="flex-1 bg-transparent border-[1.5px] border-border rounded-lg py-2.5 cursor-pointer text-sm">Cancel</button>
+          <button onClick={onConfirm} className="flex-1 bg-negative text-white border-0 rounded-lg py-2.5 cursor-pointer text-sm font-semibold">Delete</button>
         </div>
       </div>
     </div>
@@ -258,10 +291,7 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset, t
             <button onClick={() => setAdding(false)} className="bg-transparent border-[1.5px] border-border rounded-md px-3 py-1 cursor-pointer text-[13px]">Cancel</button>
           </div>
         ) : (
-          <button
-            onClick={() => setAdding(true)}
-            className="flex items-center gap-1 mt-2 bg-transparent border-0 cursor-pointer text-muted text-xs"
-          >
+          <button onClick={() => setAdding(true)} className="flex items-center gap-1 mt-2 bg-transparent border-0 cursor-pointer text-muted text-xs">
             <Plus size={12} /> Add asset
           </button>
         )}
@@ -287,7 +317,7 @@ function PensionOwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteA
     <div className="card mb-3 border-l-[3px] border-l-pension">
       <div className="flex justify-between items-center px-3 py-2.5 border-b border-border">
         <span className="font-semibold text-sm">{name}</span>
-        <span className={`font-bold text-base tabular-nums ${total > 0 ? 'text-positive' : 'text-muted'}`}>{fmt(total)}</span>
+        <span className={`font-bold text-base tabular-nums ${total > 0 ? 'text-pension' : 'text-muted'}`}>{fmt(total)}</span>
       </div>
       <div className="px-3 pt-1 pb-2">
         {assets.map(asset => (
@@ -307,10 +337,7 @@ function PensionOwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteA
             <button onClick={() => setAdding(false)} className="bg-transparent border-[1.5px] border-border rounded-md px-3 py-1 cursor-pointer text-[13px]">Cancel</button>
           </div>
         ) : (
-          <button
-            onClick={() => setAdding(true)}
-            className="flex items-center gap-1 mt-2 bg-transparent border-0 cursor-pointer text-muted text-xs"
-          >
+          <button onClick={() => setAdding(true)} className="flex items-center gap-1 mt-2 bg-transparent border-0 cursor-pointer text-muted text-xs">
             <Plus size={12} /> Add pension
           </button>
         )}
@@ -319,56 +346,38 @@ function PensionOwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteA
   )
 }
 
-function TotalLabel(props: any) {
-  const { x, y, width, index, chartData, activeTypes } = props
-  const row = chartData[index]
-  if (!row) return null
-  const total = activeTypes.reduce((sum: number, type: AssetType) => sum + (row[ASSET_LABELS[type]] || 0), 0)
-  if (total === 0) return null
-  return (
-    <text x={x + width / 2} y={y - 8} textAnchor="middle" fontSize={11} fontWeight={700} fill="var(--ink)">
-      {fmt(total)}
-    </text>
-  )
-}
-
-function PensionTotalLabel(props: any) {
-  const { x, y, width, index, chartData, ownerKeys } = props
-  const row = chartData[index]
-  if (!row) return null
-  const total = ownerKeys.reduce((sum: number, k: string) => sum + (row[k] || 0), 0)
-  if (total === 0) return null
-  return (
-    <text x={x + width / 2} y={y - 8} textAnchor="middle" fontSize={11} fontWeight={700} fill="var(--ink)">
-      {fmt(total)}
-    </text>
-  )
-}
-
 export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   const { data, addAsset, updateAsset, deleteAsset, resyncInterest, copyForwardAssets } = budget
   const today = new Date().toISOString().slice(0, 7)
 
+  const n1 = data.nameNiamh || 'Person 1'
+  const n2 = data.nameRupert || 'Person 2'
+  const n3 = data.nameJoint || 'Joint'
+
   const totalAll = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
-    const assets = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type !== 'PENSION')
-    return acc + assets.reduce((a, i) => a + (i.amount || 0), 0)
+    return acc + (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type !== 'PENSION').reduce((a, i) => a + (i.amount || 0), 0)
   }, 0)
 
   const totalPensions = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
-    const assets = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type === 'PENSION')
-    return acc + assets.reduce((a, i) => a + (i.amount || 0), 0)
+    return acc + (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type === 'PENSION').reduce((a, i) => a + (i.amount || 0), 0)
   }, 0)
 
   const lastMonth = (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7) })()
   const totalLastMonth = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === lastMonth)
-    const assets = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type !== 'PENSION')
-    return acc + assets.reduce((a, i) => a + (i.amount || 0), 0)
+    return acc + (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type !== 'PENSION').reduce((a, i) => a + (i.amount || 0), 0)
   }, 0)
+  const totalPensionsLastMonth = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
+    const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === lastMonth)
+    return acc + (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type === 'PENSION').reduce((a, i) => a + (i.amount || 0), 0)
+  }, 0)
+
   const monthDiff = totalLastMonth > 0 ? totalAll - totalLastMonth : null
-  const monthDiffPct = totalLastMonth > 0 ? ((totalAll - totalLastMonth) / totalLastMonth * 100) : null
+  const netWorthDiff = (totalLastMonth > 0 || totalPensionsLastMonth > 0)
+    ? (totalAll + totalPensions) - (totalLastMonth + totalPensionsLastMonth)
+    : null
 
   const currentMonthHasData = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).some(owner => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
@@ -382,24 +391,30 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
 
   const months = Array.from(new Set(data.savingsHistory.map(s => s.date.slice(0, 7)))).sort()
   if (!months.includes(today)) months.push(today)
+  const hasHistory = months.length > 1
 
+  // Asset chart data (stacked by type)
   const chartData = months.map(month => {
-    const allAssets = data.savingsHistory.filter(s => s.date.slice(0, 7) === month).flatMap(s => Array.isArray(s.assets) ? s.assets : []).filter((a: any) => a.type !== 'PENSION')
+    const allAssets = data.savingsHistory
+      .filter(s => s.date.slice(0, 7) === month)
+      .flatMap(s => Array.isArray(s.assets) ? s.assets : [])
+      .filter((a: any) => a.type !== 'PENSION')
     const row: any = { month: formatMonth(month) }
-    REGULAR_ASSET_TYPES.forEach(type => { row[ASSET_LABELS[type]] = allAssets.filter((a: any) => a.type === type).reduce((sum: number, a: any) => sum + (a.amount || 0), 0) })
+    REGULAR_ASSET_TYPES.forEach(type => {
+      row[ASSET_LABELS[type]] = allAssets.filter((a: any) => a.type === type).reduce((sum: number, a: any) => sum + (a.amount || 0), 0)
+    })
     return row
   })
   const activeTypes = REGULAR_ASSET_TYPES.filter(type => chartData.some(row => (row[ASSET_LABELS[type]] || 0) > 0))
 
-  const n1 = data.nameNiamh || 'Person 1'
-  const n2 = data.nameRupert || 'Person 2'
-  const n3 = data.nameJoint || 'Joint'
-
+  // Pension chart data (stacked by owner)
   const pensionChartData = months.map(month => {
     const row: any = { month: formatMonth(month) }
     ;(['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).forEach(owner => {
       const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === month)
-      const pension = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type === 'PENSION').reduce((sum: number, a: any) => sum + (a.amount || 0), 0)
+      const pension = (Array.isArray(snap?.assets) ? snap!.assets : [])
+        .filter((a: any) => a.type === 'PENSION')
+        .reduce((sum: number, a: any) => sum + (a.amount || 0), 0)
       const ownerName = owner === 'NIAMH' ? n1 : owner === 'RUPERT' ? n2 : n3
       row[ownerName] = pension
     })
@@ -407,6 +422,21 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   })
   const pensionOwnerKeys = [n1, n2, n3].filter(name => pensionChartData.some(r => (r[name] || 0) > 0))
 
+  // Current allocation
+  const currentRow = chartData[chartData.length - 1] ?? {}
+  const allocationSegments = activeTypes.map(type => ({
+    color: ASSET_COLORS[type],
+    pct: totalAll > 0 ? ((currentRow[ASSET_LABELS[type]] || 0) / totalAll) * 100 : 0,
+  }))
+
+  // Current pension allocation
+  const currentPensionRow = pensionChartData[pensionChartData.length - 1] ?? {}
+  const pensionAllocationSegments = pensionOwnerKeys.map(key => ({
+    color: key === n1 ? 'var(--niamh)' : key === n2 ? 'var(--rupert)' : 'var(--joint)',
+    pct: totalPensions > 0 ? ((currentPensionRow[key] || 0) / totalPensions) * 100 : 0,
+  }))
+
+  // Interest income
   const byOwner = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(owner => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
     const assets = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.interestRate && a.amount > 0 && a.type !== 'PENSION')
@@ -418,54 +448,95 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   return (
     <div className="h-full overflow-y-auto p-4">
 
-      {/* Assets header */}
-      <div className="flex justify-between items-baseline mb-4">
-        <h2 className="font-serif text-xl m-0">Assets</h2>
-        <div className="text-right">
-          <div className={`text-lg font-bold tabular-nums ${totalAll > 0 ? 'text-positive' : 'text-muted'}`}>
-            {fmt(totalAll)}
-          </div>
-          {monthDiff !== null && (
-            <div className={`text-[11px] tabular-nums mt-px ${monthDiff >= 0 ? 'text-positive' : 'text-negative'}`}>
-              {monthDiff >= 0 ? '▲' : '▼'} {fmt(Math.abs(monthDiff))} ({monthDiffPct!.toFixed(1)}%) vs last month
-            </div>
-          )}
-        </div>
+      {/* Summary stat cards */}
+      <div className="flex gap-2 mb-4">
+        <StatCard
+          label="Assets"
+          value={fmtK(totalAll)}
+          sub={monthDiff !== null ? `${monthDiff >= 0 ? '+' : ''}${fmtK(monthDiff)} vs last mo` : undefined}
+          intent={totalAll > 0 ? 'positive' : 'neutral'}
+        />
+        <StatCard
+          label="Pensions"
+          value={fmtK(totalPensions)}
+          intent={totalPensions > 0 ? 'positive' : 'neutral'}
+        />
+        <StatCard
+          label="Net Worth"
+          value={fmtK(totalAll + totalPensions)}
+          sub={netWorthDiff !== null ? `${netWorthDiff >= 0 ? '+' : ''}${fmtK(netWorthDiff)} vs last mo` : undefined}
+          intent={totalAll + totalPensions > 0 ? 'positive' : 'neutral'}
+        />
       </div>
 
-      {/* Assets Over Time chart */}
-      <div className="card p-4 mb-4">
-        <div className="text-xs font-semibold text-muted uppercase tracking-[0.06em] mb-3">Assets Over Time</div>
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={chartData} barSize={40} margin={{ top: 30, right: 16, left: 8, bottom: 0 }}>
-            <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis hide />
-            <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} formatter={(v: number) => fmt(v)} />
-            {activeTypes.map((type, i) => (
-              <Bar key={type} dataKey={ASSET_LABELS[type]} stackId="a"
-                fill={ASSET_COLORS[type]}
-                radius={i === activeTypes.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                label={i === activeTypes.length - 1 ? (props: any) => <TotalLabel {...props} chartData={chartData} activeTypes={activeTypes} /> : undefined}
-              />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-        <div className="mt-3">
-          {activeTypes.map(type => {
-            const value = chartData[chartData.length - 1]?.[ASSET_LABELS[type]] || 0
-            const pct = totalAll > 0 ? ((value / totalAll) * 100).toFixed(0) : '0'
-            if (value === 0) return null
-            return (
-              <div key={type} className="flex items-center gap-2 py-1 border-b border-border">
-                <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: ASSET_COLORS[type] }} />
-                <span className="flex-1 text-xs">{ASSET_LABELS[type]}</span>
-                <span className="text-xs text-muted tabular-nums">{pct}%</span>
-                <span className="text-xs font-semibold tabular-nums">{fmt(value)}</span>
+      {/* Portfolio chart */}
+      {(totalAll > 0 || activeTypes.length > 0) && (
+        <div className="card p-4 mb-4">
+          <div className="flex justify-between items-baseline mb-3">
+            <div className="text-xs font-semibold text-muted uppercase tracking-[0.06em]">Portfolio</div>
+            {netWorthDiff !== null && (
+              <div className={`flex items-center gap-1 text-[11px] font-semibold tabular-nums ${netWorthDiff >= 0 ? 'text-positive' : 'text-negative'}`}>
+                {netWorthDiff >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                {netWorthDiff >= 0 ? '+' : ''}{fmtK(netWorthDiff)}
               </div>
-            )
-          })}
+            )}
+          </div>
+
+          <AllocationBar segments={allocationSegments} />
+
+          {hasHistory && (
+            <ResponsiveContainer width="100%" height={160}>
+              <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis hide />
+                <Tooltip content={<ChartTooltip />} />
+                {activeTypes.map(type => (
+                  <Area
+                    key={type}
+                    type="monotone"
+                    dataKey={ASSET_LABELS[type]}
+                    name={ASSET_LABELS[type]}
+                    stackId="a"
+                    stroke={ASSET_COLORS[type]}
+                    fill={ASSET_COLORS[type]}
+                    fillOpacity={0.8}
+                    strokeWidth={0}
+                  />
+                ))}
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+
+          {/* Allocation breakdown */}
+          <div className="mt-3 space-y-2">
+            {activeTypes.map(type => {
+              const value = currentRow[ASSET_LABELS[type]] || 0
+              const pct = totalAll > 0 ? (value / totalAll) * 100 : 0
+              if (value === 0) return null
+              return (
+                <div key={type}>
+                  <div className="flex justify-between items-baseline mb-1">
+                    <span className="text-[12px] font-medium text-ink flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-sm shrink-0 inline-block" style={{ background: ASSET_COLORS[type] }} />
+                      {ASSET_LABELS[type]}
+                    </span>
+                    <span className="text-xs tabular-nums text-muted">
+                      {fmt(value)} <span className="text-[10px]">{pct.toFixed(0)}%</span>
+                    </span>
+                  </div>
+                  <div className="h-[6px] bg-surface rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.max(pct, 0.5)}%`, background: ASSET_COLORS[type] }} />
+                  </div>
+                </div>
+              )
+            })}
+            <div className="flex justify-between text-xs pt-2 mt-1 border-t border-border">
+              <span className="text-muted font-medium">Total assets</span>
+              <span className="tabular-nums font-bold text-positive">{fmt(totalAll)}</span>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Edit controls */}
       <div className="flex justify-between items-center mb-3">
@@ -524,48 +595,64 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
           </div>
         </div>
 
-        {/* Pension growth chart */}
         {pensionOwnerKeys.length > 0 && (
           <div className="card p-4 mb-4 border-l-[3px] border-l-pension">
             <div className="text-xs font-semibold text-muted uppercase tracking-[0.06em] mb-3">Pension Growth Over Time</div>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={pensionChartData} barSize={40} margin={{ top: 30, right: 16, left: 8, bottom: 0 }}>
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis hide />
-                <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} formatter={(v: number) => fmt(v)} />
-                {pensionOwnerKeys.map((key, i) => (
-                  <Bar
-                    key={key}
-                    dataKey={key}
-                    stackId="p"
-                    fill={key === n1 ? 'var(--niamh)' : key === n2 ? 'var(--rupert)' : 'var(--joint)'}
-                    radius={i === pensionOwnerKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                    label={i === pensionOwnerKeys.length - 1
-                      ? (props: any) => <PensionTotalLabel {...props} chartData={pensionChartData} ownerKeys={pensionOwnerKeys} />
-                      : undefined
-                    }
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-            {pensionOwnerKeys.length > 0 && (
-              <div className="mt-3">
-                {pensionOwnerKeys.map(key => {
-                  const value = pensionChartData[pensionChartData.length - 1]?.[key] || 0
-                  const pct = totalPensions > 0 ? ((value / totalPensions) * 100).toFixed(0) : '0'
-                  if (value === 0) return null
-                  const color = key === n1 ? 'var(--niamh)' : key === n2 ? 'var(--rupert)' : 'var(--joint)'
-                  return (
-                    <div key={key} className="flex items-center gap-2 py-1 border-b border-border">
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-                      <span className="flex-1 text-xs">{key}</span>
-                      <span className="text-xs text-muted tabular-nums">{pct}%</span>
-                      <span className="text-xs font-semibold tabular-nums">{fmt(value)}</span>
-                    </div>
-                  )
-                })}
-              </div>
+
+            <AllocationBar segments={pensionAllocationSegments} />
+
+            {hasHistory && (
+              <ResponsiveContainer width="100%" height={160}>
+                <AreaChart data={pensionChartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis hide />
+                  <Tooltip content={<ChartTooltip />} />
+                  {pensionOwnerKeys.map(key => (
+                    <Area
+                      key={key}
+                      type="monotone"
+                      dataKey={key}
+                      name={key}
+                      stackId="p"
+                      stroke={key === n1 ? 'var(--niamh)' : key === n2 ? 'var(--rupert)' : 'var(--joint)'}
+                      fill={key === n1 ? 'var(--niamh)' : key === n2 ? 'var(--rupert)' : 'var(--joint)'}
+                      fillOpacity={0.8}
+                      strokeWidth={0}
+                    />
+                  ))}
+                </AreaChart>
+              </ResponsiveContainer>
             )}
+
+            {/* Per-owner breakdown */}
+            <div className="mt-3 space-y-2">
+              {pensionOwnerKeys.map(key => {
+                const value = currentPensionRow[key] || 0
+                const pct = totalPensions > 0 ? (value / totalPensions) * 100 : 0
+                const color = key === n1 ? 'var(--niamh)' : key === n2 ? 'var(--rupert)' : 'var(--joint)'
+                if (value === 0) return null
+                return (
+                  <div key={key}>
+                    <div className="flex justify-between items-baseline mb-1">
+                      <span className="text-[12px] font-medium text-ink flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full shrink-0 inline-block" style={{ background: color }} />
+                        {key}
+                      </span>
+                      <span className="text-xs tabular-nums text-muted">
+                        {fmt(value)} <span className="text-[10px]">{pct.toFixed(0)}%</span>
+                      </span>
+                    </div>
+                    <div className="h-[6px] bg-surface rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.max(pct, 0.5)}%`, background: color }} />
+                    </div>
+                  </div>
+                )
+              })}
+              <div className="flex justify-between text-xs pt-2 mt-1 border-t border-border">
+                <span className="text-muted font-medium">Total pensions</span>
+                <span className="tabular-nums font-bold text-pension">{fmt(totalPensions)}</span>
+              </div>
+            </div>
           </div>
         )}
 
