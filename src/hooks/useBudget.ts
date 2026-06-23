@@ -8,12 +8,24 @@ import { BudgetData, Debt, Owner, EntryType, AssetType, DebtType, defaultBudgetD
 
 function uuid() { return crypto.randomUUID() }
 
-function mergeNames(incoming: BudgetData, current: BudgetData): BudgetData {
+function mergeBudgets(incoming: BudgetData, current: BudgetData): BudgetData {
+  // Union savingsHistory by owner+month — local entries preserved even if absent from cloud
+  const savingsMap = new Map<string, BudgetData['savingsHistory'][number]>()
+  current.savingsHistory.forEach(s => savingsMap.set(`${s.owner}:${s.date.slice(0, 7)}`, s))
+  incoming.savingsHistory.forEach(s => savingsMap.set(`${s.owner}:${s.date.slice(0, 7)}`, s))
+
+  // Union spendHistory by month
+  const spendMap = new Map<string, SpendSnapshot>()
+  ;(current.spendHistory || []).forEach(s => spendMap.set(s.date, s))
+  ;(incoming.spendHistory || []).forEach(s => spendMap.set(s.date, s))
+
   return {
     ...incoming,
     nameNiamh:  incoming.nameNiamh  || current.nameNiamh  || 'Niamh',
     nameRupert: incoming.nameRupert || current.nameRupert || 'Rupert',
     nameJoint:  incoming.nameJoint  || current.nameJoint  || 'Joint',
+    savingsHistory: Array.from(savingsMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
+    spendHistory:   Array.from(spendMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
   }
 }
 
@@ -51,7 +63,7 @@ export function useBudget() {
         const cloudTs = new Date(cloudData.savedAt || '1970-01-01').getTime()
         if (cloudTs > lastSavedAt.current) {
           lastSavedAt.current = cloudTs
-          const merged = mergeNames(cloudData, currentData.current)
+          const merged = mergeBudgets(cloudData, currentData.current)
           setData(merged)
           setSavedAt(cloudData.savedAt)
         }
@@ -72,7 +84,7 @@ export function useBudget() {
       const snap = await getDoc(doc(db, 'users', user.email))
       if (snap.exists()) {
         const cloudData: BudgetData = JSON.parse(snap.data().json)
-        const merged = mergeNames(cloudData, currentData.current)
+        const merged = mergeBudgets(cloudData, currentData.current)
         setData(merged)
         setSavedAt(cloudData.savedAt)
       }
@@ -245,7 +257,7 @@ export function useBudget() {
   const importFromJson = (json: string): boolean => {
     try {
       const parsed = JSON.parse(json)
-      const merged = mergeNames(parsed, currentData.current)
+      const merged = mergeBudgets(parsed, currentData.current)
       setData(merged)
       return true
     } catch { return false }
