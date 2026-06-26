@@ -150,12 +150,13 @@ function PersonCard({ name, net, inc, exp, sav, debt, hjExp, hjSav, hjDebt, colo
   debt: number; hjExp: number; hjSav: number; hjDebt: number
   colorClass: string; borderClass: string
 }) {
+  const jointContrib = hjExp + hjSav + hjDebt
   const rows = [
-    { label: 'Income',       value: inc,                   cls: 'text-income-text' },
-    { label: 'Expenses',     value: exp + hjExp + hjDebt,  cls: 'text-expense-text' },
-    { label: 'Savings',      value: sav + hjSav,           cls: 'text-savings-text' },
-    ...(debt > 0 ? [{ label: 'Debts', value: debt, cls: 'text-expense-text' }] : []),
-  ]
+    { label: 'Income',           value: inc,          cls: 'text-income-text' },
+    { label: 'Personal expenses', value: exp + debt,  cls: 'text-expense-text' },
+    { label: 'Joint account',    value: jointContrib, cls: 'text-expense-text' },
+    { label: 'Savings',          value: sav,          cls: 'text-savings-text' },
+  ].filter(r => r.value > 0)
   return (
     <div className={`card p-3.5 ${borderClass}`}>
       <div className={`text-[11px] font-bold uppercase tracking-[0.08em] mb-1 ${colorClass}`}>{name}</div>
