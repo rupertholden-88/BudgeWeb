@@ -89,7 +89,7 @@ export default function HomePage() {
   const [setupDone, setSetupDone] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const swipeRef = useRef<{ x: number; y: number; t: number } | null>(null)
-  const { data, user, savedAt, isRefreshing, signIn, signOutUser, refreshFromCloud, updateOwnerName } = budget
+  const { data, user, authLoading, savedAt, isRefreshing, signIn, signOutUser, refreshFromCloud, updateOwnerName } = budget
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -117,7 +117,9 @@ export default function HomePage() {
     if (dx > 0 && idx > 0) setScreen(SCREEN_ORDER[idx - 1])
   }
 
-  const needsSetup = !setupDone && !user && !data.nameNiamh && !data.nameRupert
+  const needsSetup = !authLoading && !setupDone && !user && !data.nameNiamh && !data.nameRupert
+
+  if (authLoading) return <div className="h-[100dvh] bg-surface" />
 
   if (needsSetup) {
     return (
