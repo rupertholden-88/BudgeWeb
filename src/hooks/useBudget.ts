@@ -153,7 +153,7 @@ export function useBudget() {
       byOwner.forEach(({ owner, assets }) => {
         const catKey = owner === 'NIAMH' ? 'inc_n' : owner === 'RUPERT' ? 'inc_r' : 'inc_joint'
         assets.forEach(a => {
-          const monthly = Math.round((a.amount * (a.interestRate || 0)) / 100 / 12)
+          const monthly = Math.round((a.amount * (a.interestRate || 0)) / 100 / 365 * 30.44)
           if (monthly > 0) {
             updated = {
               ...updated,

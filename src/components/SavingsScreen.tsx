@@ -192,7 +192,7 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset, lockType }: {
               {asset.institution ? ` · ${asset.institution}` : ''}
               {asset.interestRate && asset.amount > 0 ? (
                 <span className="text-positive font-semibold ml-1">
-                  {` · £${((asset.amount * asset.interestRate) / 100 / 12).toFixed(0)}/mo (${asset.interestRate}% = £${((asset.amount * asset.interestRate) / 100).toFixed(0)}/yr)`}
+                  {` · £${((asset.amount * asset.interestRate) / 100 / 365 * 30.44).toFixed(0)}/mo (${asset.interestRate}% = £${((asset.amount * asset.interestRate) / 100).toFixed(0)}/yr)`}
                 </span>
               ) : asset.interestRate ? <span>{` · ${asset.interestRate}%`}</span> : null}
             </div>
@@ -440,7 +440,7 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   const byOwner = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(owner => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
     const assets = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.interestRate && a.amount > 0 && a.type !== 'PENSION')
-    const monthly = assets.reduce((acc: number, a: any) => acc + (a.amount * (a.interestRate || 0)) / 100 / 12, 0)
+    const monthly = assets.reduce((acc: number, a: any) => acc + (a.amount * (a.interestRate || 0)) / 100 / 365 * 30.44, 0)
     return { owner, monthly, assets }
   }).filter(o => o.monthly > 0)
   const totalMonthly = byOwner.reduce((a, o) => a + o.monthly, 0)
