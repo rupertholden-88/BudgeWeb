@@ -144,7 +144,7 @@ export default function HomePage() {
         </div>
       )}
 
-      <header className="bg-card border-b border-border px-4 h-14 flex items-center gap-3 shrink-0 z-10">
+      <header className="glass border-b border-border px-4 h-14 flex items-center gap-3 shrink-0 z-10">
         <h1 className="font-serif text-2xl m-0 flex-1">Budge</h1>
         {savedAt && (
           <span className="text-[11px] text-muted">
@@ -164,7 +164,7 @@ export default function HomePage() {
               onClick={signOutUser}
               title={`${user.email} — tap to sign out`}
               aria-label={`Signed in as ${user.email}. Tap to sign out.`}
-              className="w-8 h-8 rounded-full bg-rupert text-white flex items-center justify-center text-[13px] font-semibold cursor-pointer border-0 p-0 overflow-hidden"
+              className="w-8 h-8 rounded-full bg-rupert text-white flex items-center justify-center text-[13px] font-semibold cursor-pointer border-0 p-0 overflow-hidden ring-2 ring-border"
             >
               {user.photoURL
                 ? <img src={user.photoURL} alt={user.email ?? ''} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -200,22 +200,26 @@ export default function HomePage() {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {screen === 'budget'   && <BudgetScreen   budget={budget} tab={tab} onNavigateToDebts={() => setScreen('debts')} />}
-        {screen === 'charts'   && <ChartsScreen   budget={budget} />}
-        {screen === 'savings'  && <SavingsScreen  budget={budget} />}
-        {screen === 'debts'    && <DebtsScreen    budget={budget} />}
-        {screen === 'settings' && <SettingsScreen budget={budget} />}
+        <div key={screen} className="h-full screen-enter">
+          {screen === 'budget'   && <BudgetScreen   budget={budget} tab={tab} onNavigateToDebts={() => setScreen('debts')} />}
+          {screen === 'charts'   && <ChartsScreen   budget={budget} />}
+          {screen === 'savings'  && <SavingsScreen  budget={budget} />}
+          {screen === 'debts'    && <DebtsScreen    budget={budget} />}
+          {screen === 'settings' && <SettingsScreen budget={budget} />}
+        </div>
       </main>
 
-      <nav aria-label="Main navigation" className="bg-card border-t border-border flex shrink-0">
+      <nav aria-label="Main navigation" className="glass border-t border-border flex shrink-0 pb-[env(safe-area-inset-bottom)]">
         {NAV.map(({ id, label, Icon }) => (
           <button
             key={id}
             onClick={() => setScreen(id)}
             aria-current={screen === id ? 'page' : undefined}
-            className={`flex-1 flex flex-col items-center justify-center gap-[3px] py-2.5 bg-transparent border-0 cursor-pointer text-[10px] ${screen === id ? 'text-ink font-semibold' : 'text-muted font-normal'}`}
+            className={`flex-1 flex flex-col items-center justify-center gap-[3px] py-2 bg-transparent border-0 cursor-pointer text-[10px] ${screen === id ? 'text-ink font-semibold' : 'text-muted font-normal'}`}
           >
-            <Icon size={20} strokeWidth={screen === id ? 2.5 : 1.8} />
+            <span className={`nav-pill flex ${screen === id ? 'nav-pill-active' : ''}`}>
+              <Icon size={20} strokeWidth={screen === id ? 2.4 : 1.8} />
+            </span>
             {label}
           </button>
         ))}

@@ -18,11 +18,6 @@ function ownerTextClass(owner: Owner) {
   if (owner === 'RUPERT') return 'text-rupert'
   return 'text-joint'
 }
-function typeBadgeClass(type: EntryType) {
-  if (type === 'INCOME') return 'bg-income-bg text-income-text'
-  if (type === 'EXPENSE') return 'bg-expense-bg text-expense-text'
-  return 'bg-savings-bg text-savings-text'
-}
 function typeSectionClass(type: EntryType) {
   if (type === 'INCOME') return 'text-income-text'
   if (type === 'EXPENSE') return 'text-expense-text'
@@ -160,9 +155,10 @@ function PersonCard({ name, net, inc, exp, sav, debt, hjExp, hjSav, hjDebt, colo
   return (
     <div className={`card p-3.5 ${borderClass}`}>
       <div className={`text-[11px] font-bold uppercase tracking-[0.08em] mb-1 ${colorClass}`}>{name}</div>
-      <div className={`font-serif text-2xl font-bold tabular-nums leading-none mb-3 ${net >= 0 ? 'text-ink' : 'text-negative'}`}>
+      <div className={`font-serif text-2xl font-bold tabular-nums leading-none ${net >= 0 ? 'text-ink' : 'text-negative'}`}>
         {net >= 0 ? '+' : ''}{fmt(net)}
       </div>
+      <div className="text-[10px] text-muted mt-0.5 mb-3">left this month</div>
       <div className="space-y-1 pt-2.5 border-t border-border">
         {rows.map(r => (
           <div key={r.label} className="flex justify-between items-center">
@@ -343,10 +339,6 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
             </div>
           )}
 
-          <span className={`text-[11px] px-2 py-0.5 rounded-md font-semibold shrink-0 ${typeBadgeClass(cat.type)}`}>
-            {cat.type === 'INCOME' ? 'Income' : cat.type === 'EXPENSE' ? 'Expense' : 'Savings'}
-          </span>
-
           <span className={`font-bold text-sm tabular-nums shrink-0 min-w-[60px] text-right ${total > 0 ? 'text-ink' : 'text-muted/40'}`}>
             {total > 0 ? fmt(total) : '—'}
           </span>
@@ -362,7 +354,6 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
         {/* items */}
         {open && (
           <div className="px-3.5 pb-2 pt-0.5">
-            <div className="text-[10px] text-muted/60 pt-1 pb-1 select-none">Tap label to rename · Long press to delete</div>
             {cat.items.map(item => (
               <ItemRow key={item.id} catKey={cat.key} item={item} onUpdateAmount={onUpdateAmount} onRemoveItem={onRemoveItem} onRenameItem={onRenameItem} />
             ))}
@@ -475,8 +466,13 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
         if (visibleDebts.length === 0) return null
         return (
           <div>
-            <SectionDivider type="EXPENSE" total={visibleDebts.reduce((a, d) => a + d.monthlyPayment, 0)} />
-            <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-expense-text -mt-1 mb-2">Debt payments</div>
+            <div className="flex items-center gap-2 mb-2 mt-5">
+              <span className="text-[11px] font-bold uppercase tracking-[0.1em] shrink-0 text-expense-text">Debt payments</span>
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-[11px] font-bold tabular-nums shrink-0 text-expense-text">
+                {fmt(visibleDebts.reduce((a, d) => a + d.monthlyPayment, 0))}
+              </span>
+            </div>
             {visibleDebts.map(d => (
               <div key={d.id} className={`card mb-2 ${ownerBorderClass(d.owner)} fade-up`}>
                 <div className="flex items-center gap-3 px-3.5 py-3">
@@ -551,6 +547,10 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
           <Plus size={14} /> Add category
         </button>
       )}
+
+      <p className="text-[10px] text-muted/60 text-center mt-5 mb-1 select-none">
+        Tap any name or amount to edit · Long press to delete
+      </p>
 
     </div>
   )

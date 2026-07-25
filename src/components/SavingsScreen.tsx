@@ -238,7 +238,6 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset, lockType }: {
                 className="w-[110px] text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none"
               />
             </div>
-            <div className="text-[10px] text-muted w-full mt-1">💡 Long press the row to delete</div>
           </div>
         )}
       </div>
@@ -667,10 +666,6 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
             </div>
           </div>
         )}
-
-        <div className="text-[11px] text-muted mb-3">
-          Tap to edit values · Long press to delete
-        </div>
 
         <PensionOwnerPanel owner="NIAMH"  name={n1} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
         <PensionOwnerPanel owner="RUPERT" name={n2} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
