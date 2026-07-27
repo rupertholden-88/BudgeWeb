@@ -21,9 +21,9 @@ function mergeBudgets(incoming: BudgetData, current: BudgetData): BudgetData {
 
   return {
     ...incoming,
-    nameNiamh:  incoming.nameNiamh  || current.nameNiamh  || 'Niamh',
-    nameRupert: incoming.nameRupert || current.nameRupert || 'Rupert',
-    nameJoint:  incoming.nameJoint  || current.nameJoint  || 'Joint',
+    nameNiamh:  incoming.nameNiamh  || current.nameNiamh  || '',
+    nameRupert: incoming.nameRupert || current.nameRupert || '',
+    nameJoint:  incoming.nameJoint  || current.nameJoint  || '',
     savingsHistory: Array.from(savingsMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
     spendHistory:   Array.from(spendMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
   }

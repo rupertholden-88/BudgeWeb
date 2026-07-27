@@ -176,7 +176,7 @@ export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
   const [newOwner, setNewOwner] = useState<Owner>('JOINT')
   const [newType, setNewType] = useState<DebtType>('CREDIT_CARD')
 
-  const ownerName = (o: Owner) => o === 'NIAMH' ? data.nameNiamh : o === 'RUPERT' ? data.nameRupert : data.nameJoint
+  const ownerName = (o: Owner) => o === 'NIAMH' ? (data.nameNiamh || 'Person 1') : o === 'RUPERT' ? (data.nameRupert || 'Person 2') : (data.nameJoint || 'Joint')
   const submit = () => { if (newLabel.trim()) { addDebt(newOwner, newType, newLabel.trim()); setNewLabel(''); setAdding(false) } }
   const totalBalance = data.debts.reduce((a, d) => a + d.currentBalance, 0)
 
@@ -190,9 +190,9 @@ export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
       {data.debts.length > 0 && (
         <div className="grid grid-cols-3 gap-2 mb-4">
           {[
-            { label: data.nameNiamh,  total: totals.debtN,     bgClass: 'bg-niamh-light' },
-            { label: data.nameRupert, total: totals.debtR,     bgClass: 'bg-rupert-light' },
-            { label: data.nameJoint,  total: totals.debtJoint, bgClass: 'bg-joint-light' },
+            { label: ownerName('NIAMH'),  total: totals.debtN,     bgClass: 'bg-niamh-light' },
+            { label: ownerName('RUPERT'), total: totals.debtR,     bgClass: 'bg-rupert-light' },
+            { label: ownerName('JOINT'),  total: totals.debtJoint, bgClass: 'bg-joint-light' },
           ].map(({ label, total, bgClass }) => (
             <div key={label} className={`card px-2.5 py-2 text-center ${bgClass}`}>
               <div className="text-[10px] text-muted mb-0.5">{label}</div>
@@ -226,9 +226,9 @@ export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
               onChange={e => setNewOwner(e.target.value as Owner)}
               className="text-[13px] border-[1.5px] border-border rounded-md px-2 py-1.5 bg-card cursor-pointer"
             >
-              <option value="NIAMH">{data.nameNiamh}</option>
-              <option value="RUPERT">{data.nameRupert}</option>
-              <option value="JOINT">{data.nameJoint}</option>
+              <option value="NIAMH">{ownerName('NIAMH')}</option>
+              <option value="RUPERT">{ownerName('RUPERT')}</option>
+              <option value="JOINT">{ownerName('JOINT')}</option>
             </select>
             <select
               value={newType}

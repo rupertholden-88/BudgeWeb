@@ -49,7 +49,7 @@ function SetupScreen({ onDone, updateOwnerName, signIn }: {
               id="setup-name1"
               value={name1}
               onChange={e => setName1(e.target.value)}
-              placeholder="e.g. Niamh"
+              placeholder="First name"
               className="w-full text-[15px] border-[1.5px] border-border rounded-lg px-3 py-2.5 bg-card"
             />
           </div>
@@ -59,7 +59,7 @@ function SetupScreen({ onDone, updateOwnerName, signIn }: {
               id="setup-name2"
               value={name2}
               onChange={e => setName2(e.target.value)}
-              placeholder="e.g. Rupert"
+              placeholder="First name"
               onKeyDown={e => { if (e.key === 'Enter') submit() }}
               className="w-full text-[15px] border-[1.5px] border-border rounded-lg px-3 py-2.5 bg-card"
             />

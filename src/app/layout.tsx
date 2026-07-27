@@ -3,7 +3,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Budge',
-  description: 'Household budget for Niamh & Rupert',
+  description: 'A shared household budget for two.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
