@@ -119,7 +119,12 @@ export default function HomePage() {
 
   const needsSetup = !authLoading && !setupDone && !user && !data.nameNiamh && !data.nameRupert
 
-  if (authLoading) return <div className="h-[100dvh] bg-surface" />
+  if (authLoading) return (
+    <div className="splash h-[100dvh]">
+      <div className="splash-monogram">B<span>.</span></div>
+      <div className="splash-tag">Budge</div>
+    </div>
+  )
 
   if (needsSetup) {
     return (

@@ -107,6 +107,43 @@ button:active { transform: scale(0.96); }
 
 .hairline-v { width: 1px; align-self: stretch; background: var(--border); }
 
+/* Night Ledger splash — deep ink in both themes, by design */
+.splash {
+  background: #14141E;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.splash-monogram {
+  font-family: 'DM Serif Display', serif;
+  font-size: 96px;
+  line-height: 1;
+  color: #F0EDE6;
+  animation: splashIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.splash-monogram span { color: #B25B4C; }
+.splash-tag {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.42em;
+  padding-left: 0.42em;
+  color: #6E6E82;
+  margin-top: 18px;
+  animation: splashTag 0.8s ease 0.25s both;
+}
+@keyframes splashIn {
+  from { opacity: 0; filter: blur(10px); transform: scale(1.06); }
+  to   { opacity: 1; filter: blur(0);    transform: scale(1); }
+}
+@keyframes splashTag {
+  from { opacity: 0; letter-spacing: 0.3em; }
+  to   { opacity: 1; letter-spacing: 0.42em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash-monogram, .splash-tag { animation: none; }
+}
+
 @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .fade-up { animation: fadeUp 0.2s ease both; }
 @keyframes screenIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
