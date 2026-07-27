@@ -86,9 +86,8 @@ function SetupScreen({ onDone, updateOwnerName, signIn, isSignedIn }: {
               <User size={15} /> Continue with Google
             </button>
             <p className="text-[11px] text-muted leading-relaxed mt-4 mb-0 text-center">
-              Signing in saves your budget and syncs it across your devices —
-              and lets you pick up an existing one. Without it, nothing is kept
-              once you close the tab.
+              Your budget saves to this device either way. Signing in backs it up
+              and syncs it across your devices — and lets you pick up an existing one.
             </p>
           </>
         )}
@@ -104,7 +103,7 @@ export default function HomePage() {
   const [setupDone, setSetupDone] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const swipeRef = useRef<{ x: number; y: number; t: number } | null>(null)
-  const { data, user, authLoading, cloudLoading, savedAt, isRefreshing, signIn, signOutUser, refreshFromCloud, updateOwnerName } = budget
+  const { data, user, authLoading, cloudLoading, localLoading, savedAt, isRefreshing, signIn, signOutUser, refreshFromCloud, updateOwnerName } = budget
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -132,11 +131,11 @@ export default function HomePage() {
     if (dx > 0 && idx > 0) setScreen(SCREEN_ORDER[idx - 1])
   }
 
-  // Wait for the cloud check too, so we don't prompt for names before
-  // an existing budget has had a chance to load.
-  const needsSetup = !authLoading && !cloudLoading && !setupDone && !data.nameNiamh && !data.nameRupert
+  // Wait for both the local and cloud reads, so we don't prompt for names
+  // before an existing budget has had a chance to load.
+  const needsSetup = !authLoading && !cloudLoading && !localLoading && !setupDone && !data.nameNiamh && !data.nameRupert
 
-  if (authLoading || cloudLoading) return (
+  if (authLoading || cloudLoading || localLoading) return (
     <div className="splash h-[100dvh]">
       <div className="splash-monogram">B<span>.</span></div>
       <div className="splash-tag">Budge</div>
@@ -208,10 +207,10 @@ export default function HomePage() {
       {!user && (
         <button
           onClick={signIn}
-          className="bg-expense-bg text-expense-text border-0 border-b border-border px-4 py-2 shrink-0 flex items-center justify-center gap-1.5 text-[11px] cursor-pointer w-full text-left"
+          className="bg-surface text-muted border-0 border-b border-border px-4 py-2 shrink-0 flex items-center justify-center gap-1.5 text-[11px] cursor-pointer w-full text-left"
         >
           <AlertCircle size={12} className="shrink-0" />
-          <span>Not signed in — this budget won't be saved. <span className="font-semibold underline">Sign in to keep it.</span></span>
+          <span>Saved on this device only. <span className="font-semibold underline text-ink">Sign in to back up and sync.</span></span>
         </button>
       )}
 

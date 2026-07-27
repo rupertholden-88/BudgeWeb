@@ -8,6 +8,8 @@ import { BudgetData, Debt, Owner, EntryType, AssetType, DebtType, defaultBudgetD
 
 function uuid() { return crypto.randomUUID() }
 
+const LOCAL_KEY = 'budge-data'
+
 function mergeBudgets(incoming: BudgetData, current: BudgetData): BudgetData {
   // Union savingsHistory by owner+month — local entries preserved even if absent from cloud
   const savingsMap = new Map<string, BudgetData['savingsHistory'][number]>()
@@ -34,12 +36,31 @@ export function useBudget() {
   const [user, setUser]               = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [cloudLoading, setCloudLoading] = useState(false)
+  const [localLoading, setLocalLoading] = useState(true)
   const [savedAt, setSavedAt]         = useState<string | null>(null)
   const [isRefreshing, setRefreshing] = useState(false)
   const lastSavedAt                   = useRef<number>(0)
   const saveTimer                     = useRef<ReturnType<typeof setTimeout> | null>(null)
   const unsubscribeCloud              = useRef<(() => void) | null>(null)
   const currentData                   = useRef<BudgetData>(defaultBudgetData())
+
+  // Restore whatever was last saved on this device. Timestamped like the cloud
+  // path so a stale local copy can never clobber fresher cloud data.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LOCAL_KEY)
+      if (raw) {
+        const local: BudgetData = JSON.parse(raw)
+        const ts = new Date(local.savedAt || '1970-01-01').getTime()
+        if (ts > lastSavedAt.current) {
+          lastSavedAt.current = ts
+          setData(prev => mergeBudgets(local, prev))
+          setSavedAt(local.savedAt)
+        }
+      }
+    } catch { }
+    setLocalLoading(false)
+  }, [])
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
@@ -57,7 +78,16 @@ export function useBudget() {
   useEffect(() => { currentData.current = data }, [data])
 
   const signIn = () => signInWithPopup(auth, provider)
-  const signOutUser = () => signOut(auth)
+
+  // Signing out clears this device's copy — otherwise your budget would be
+  // left behind in the browser of whoever's device you signed in on.
+  const signOutUser = async () => {
+    await signOut(auth)
+    try { localStorage.removeItem(LOCAL_KEY) } catch { }
+    lastSavedAt.current = 0
+    setData(defaultBudgetData())
+    setSavedAt(null)
+  }
 
   function startCloudListener(email: string) {
     unsubscribeCloud.current?.()
@@ -111,6 +141,9 @@ export function useBudget() {
         lastSavedAt.current = new Date(now).getTime()
         const stamped = { ...next, savedAt: now }
         setSavedAt(now)
+        // Always keep a local copy — it's the only store when signed out,
+        // and an offline cache when signed in.
+        try { localStorage.setItem(LOCAL_KEY, JSON.stringify(stamped)) } catch { }
         if (user?.email) syncToCloud(user.email, stamped)
       }, 1000)
       return next
@@ -301,7 +334,7 @@ export function useBudget() {
   }, [data.categories, data.debts]) // eslint-disable-line
 
   return {
-    data, user, authLoading, cloudLoading, savedAt, isRefreshing, totals,
+    data, user, authLoading, cloudLoading, localLoading, savedAt, isRefreshing, totals,
     signIn, signOutUser, refreshFromCloud,
     updateOwnerName, addCategory, renameCategory, deleteCategory,
     updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem,
