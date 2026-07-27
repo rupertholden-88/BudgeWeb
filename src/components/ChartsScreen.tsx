@@ -128,9 +128,14 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
         const days = Math.ceil((expiry.getTime() - now.getTime()) / 86400000)
         const monthsLeft = Math.max(0, days / 30.44)
         const balanceAtExpiry = Math.max(0, d.currentBalance - d.monthlyPayment * monthsLeft)
-        const monthlyInterestAfter = (balanceAtExpiry * d.interestRate) / 100 / 12
-        return { debt: d, days, expiry, balanceAtExpiry, monthlyInterestAfter }
+        // Rate is often left blank on a 0% card — treat it as unknown rather
+        // than letting undefined poison the arithmetic.
+        const rate = Number(d.interestRate) || 0
+        const monthlyInterestAfter = (balanceAtExpiry * rate) / 100 / 12
+        return { debt: d, days, expiry, balanceAtExpiry, monthlyInterestAfter, rate }
       })
+      // Nothing to warn about if the current payments clear it before expiry.
+      .filter(e => e.balanceAtExpiry > 0)
       .sort((a, b) => a.days - b.days)
   }, [data.debts])
 
@@ -228,7 +233,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
       </div>
 
       {/* 0% expiry warnings — time-sensitive, so they lead */}
-      {expiries.map(({ debt, days, expiry, balanceAtExpiry, monthlyInterestAfter }) => (
+      {expiries.map(({ debt, days, expiry, balanceAtExpiry, monthlyInterestAfter, rate }) => (
         <div
           key={debt.id}
           className={`card p-4 mb-3 border-l-[3px] ${days <= 90 ? 'border-l-negative' : 'border-l-expense-text'}`}
@@ -241,7 +246,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
               </div>
               <div className="text-[11px] text-muted mt-0.5">
                 {expiry.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-                {' · then '}{debt.interestRate}% APR
+                {rate > 0 ? ` · then ${rate}% APR` : ' · rate after 0% not set'}
               </div>
             </div>
           </div>
@@ -252,7 +257,10 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
             </div>
             <div>
               <div className="text-[10px] text-muted mb-0.5">Interest starts costing</div>
-              <div className="text-sm font-bold tabular-nums text-negative">{fmt(monthlyInterestAfter)}/mo</div>
+              {rate > 0
+                ? <div className="text-sm font-bold tabular-nums text-negative">{fmt(monthlyInterestAfter)}/mo</div>
+                : <div className="text-sm font-medium text-muted">Add the rate on Debts</div>
+              }
             </div>
           </div>
           {balanceAtExpiry > 0 && days > 0 && (

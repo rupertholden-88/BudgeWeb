@@ -157,12 +157,16 @@ export default function HomePage() {
     <div className="flex flex-col h-[100dvh] bg-surface">
 
       {toast && (
+        // Centred by flex, not by transform — the fade-up animation sets its own
+        // transform and would otherwise cancel a -translate-x-1/2.
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-ink text-white px-5 py-2.5 rounded-full text-[13px] font-medium z-[100] flex items-center gap-1.5 shadow-[0_4px_12px_rgba(0,0,0,0.2)] fade-up"
+          className="fixed bottom-20 inset-x-0 z-[100] flex justify-center pointer-events-none px-4"
         >
-          <CheckCircle size={14} /> {toast}
+          <div className="bg-ink text-white px-5 py-2.5 rounded-full text-[13px] font-medium flex items-center gap-1.5 shadow-[0_4px_12px_rgba(0,0,0,0.2)] fade-up">
+            <CheckCircle size={14} /> {toast}
+          </div>
         </div>
       )}
 
