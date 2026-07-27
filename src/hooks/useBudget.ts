@@ -33,6 +33,7 @@ export function useBudget() {
   const [data, setData]               = useState<BudgetData>(defaultBudgetData())
   const [user, setUser]               = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
+  const [cloudLoading, setCloudLoading] = useState(false)
   const [savedAt, setSavedAt]         = useState<string | null>(null)
   const [isRefreshing, setRefreshing] = useState(false)
   const lastSavedAt                   = useRef<number>(0)
@@ -44,8 +45,11 @@ export function useBudget() {
     return onAuthStateChanged(auth, (u) => {
       setUser(u)
       setAuthLoading(false)
-      if (u) startCloudListener(u.email!)
-      else { unsubscribeCloud.current?.(); unsubscribeCloud.current = null }
+      if (u) { setCloudLoading(true); startCloudListener(u.email!) }
+      else {
+        setCloudLoading(false)
+        unsubscribeCloud.current?.(); unsubscribeCloud.current = null
+      }
     })
   }, [])
 
@@ -59,6 +63,8 @@ export function useBudget() {
     unsubscribeCloud.current?.()
     const ref = doc(db, 'users', email)
     unsubscribeCloud.current = onSnapshot(ref, (snap) => {
+      // First response settles whether an account exists, either way.
+      setCloudLoading(false)
       if (!snap.exists()) return
       try {
         const cloudData: BudgetData = JSON.parse(snap.data().json)
@@ -70,6 +76,9 @@ export function useBudget() {
           setSavedAt(cloudData.savedAt)
         }
       } catch { }
+    }, () => {
+      // Permission denied or offline — don't leave the app stuck on the splash.
+      setCloudLoading(false)
     })
   }
 
@@ -292,7 +301,7 @@ export function useBudget() {
   }, [data.categories, data.debts]) // eslint-disable-line
 
   return {
-    data, user, authLoading, savedAt, isRefreshing, totals,
+    data, user, authLoading, cloudLoading, savedAt, isRefreshing, totals,
     signIn, signOutUser, refreshFromCloud,
     updateOwnerName, addCategory, renameCategory, deleteCategory,
     updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem,

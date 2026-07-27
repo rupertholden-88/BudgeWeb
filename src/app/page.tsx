@@ -24,10 +24,11 @@ const NAV = [
 
 const SCREEN_ORDER: Screen[] = ['budget', 'charts', 'savings', 'debts', 'settings']
 
-function SetupScreen({ onDone, updateOwnerName, signIn }: {
+function SetupScreen({ onDone, updateOwnerName, signIn, isSignedIn }: {
   onDone: () => void
   updateOwnerName: (owner: 'NIAMH' | 'RUPERT' | 'JOINT', name: string) => void
   signIn: () => void
+  isSignedIn: boolean
 }) {
   const [name1, setName1] = useState('')
   const [name2, setName2] = useState('')
@@ -41,7 +42,12 @@ function SetupScreen({ onDone, updateOwnerName, signIn }: {
       <h1 className="font-serif text-4xl m-0 mb-2 text-ink">Budge</h1>
       <p className="text-muted text-[15px] mb-10 text-center">A shared household budget for two.</p>
       <div className="card w-full max-w-[360px] p-6">
-        <div className="text-[13px] font-semibold mb-4">Who's using Budge?</div>
+        <div className="text-[13px] font-semibold mb-1">Who's using Budge?</div>
+        <p className="text-[12px] text-muted mb-4 mt-0">
+          {isSignedIn
+            ? "You're all set up — we just need your names to get started."
+            : 'You can change these later in Settings.'}
+        </p>
         <div className="flex flex-col gap-3 mb-6">
           <div>
             <label htmlFor="setup-name1" className="text-xs text-muted block mb-1">Person 1</label>
@@ -67,16 +73,18 @@ function SetupScreen({ onDone, updateOwnerName, signIn }: {
         </div>
         <button
           onClick={submit}
-          className="w-full bg-ink text-white border-0 rounded-lg py-3 cursor-pointer text-[15px] font-semibold mb-3"
+          className="w-full bg-ink text-white border-0 rounded-lg py-3 cursor-pointer text-[15px] font-semibold"
         >
           Get started
         </button>
-        <button
-          onClick={() => { signIn(); onDone() }}
-          className="w-full bg-transparent text-muted border-[1.5px] border-border rounded-lg py-3 cursor-pointer text-sm flex items-center justify-center gap-2"
-        >
-          <User size={15} /> Sign in to restore existing budget
-        </button>
+        {!isSignedIn && (
+          <button
+            onClick={signIn}
+            className="w-full mt-3 bg-transparent text-muted border-[1.5px] border-border rounded-lg py-3 cursor-pointer text-sm flex items-center justify-center gap-2"
+          >
+            <User size={15} /> Sign in to restore existing budget
+          </button>
+        )}
       </div>
     </div>
   )
@@ -89,7 +97,7 @@ export default function HomePage() {
   const [setupDone, setSetupDone] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const swipeRef = useRef<{ x: number; y: number; t: number } | null>(null)
-  const { data, user, authLoading, savedAt, isRefreshing, signIn, signOutUser, refreshFromCloud, updateOwnerName } = budget
+  const { data, user, authLoading, cloudLoading, savedAt, isRefreshing, signIn, signOutUser, refreshFromCloud, updateOwnerName } = budget
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -117,9 +125,11 @@ export default function HomePage() {
     if (dx > 0 && idx > 0) setScreen(SCREEN_ORDER[idx - 1])
   }
 
-  const needsSetup = !authLoading && !setupDone && !user && !data.nameNiamh && !data.nameRupert
+  // Wait for the cloud check too, so we don't prompt for names before
+  // an existing budget has had a chance to load.
+  const needsSetup = !authLoading && !cloudLoading && !setupDone && !data.nameNiamh && !data.nameRupert
 
-  if (authLoading) return (
+  if (authLoading || cloudLoading) return (
     <div className="splash h-[100dvh]">
       <div className="splash-monogram">B<span>.</span></div>
       <div className="splash-tag">Budge</div>
@@ -131,7 +141,8 @@ export default function HomePage() {
       <SetupScreen
         onDone={() => setSetupDone(true)}
         updateOwnerName={updateOwnerName}
-        signIn={() => { signIn(); setSetupDone(true) }}
+        signIn={signIn}
+        isSignedIn={!!user}
       />
     )
   }
