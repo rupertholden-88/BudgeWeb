@@ -8,7 +8,7 @@ import SavingsScreen from '@/components/SavingsScreen'
 import DebtsScreen from '@/components/DebtsScreen'
 import SettingsScreen from '@/components/SettingsScreen'
 import { TabFilter } from '@/lib/models'
-import { LayoutDashboard, BarChart3, PiggyBank, CreditCard, User, RefreshCw, Settings, CheckCircle } from 'lucide-react'
+import { LayoutDashboard, BarChart3, PiggyBank, CreditCard, User, RefreshCw, Settings, CheckCircle, AlertCircle } from 'lucide-react'
 
 const ChartsScreen = dynamic(() => import('@/components/ChartsScreen'))
 
@@ -78,12 +78,19 @@ function SetupScreen({ onDone, updateOwnerName, signIn, isSignedIn }: {
           Get started
         </button>
         {!isSignedIn && (
-          <button
-            onClick={signIn}
-            className="w-full mt-3 bg-transparent text-muted border-[1.5px] border-border rounded-lg py-3 cursor-pointer text-sm flex items-center justify-center gap-2"
-          >
-            <User size={15} /> Sign in to restore existing budget
-          </button>
+          <>
+            <button
+              onClick={signIn}
+              className="w-full mt-3 bg-transparent text-ink border-[1.5px] border-border rounded-lg py-3 cursor-pointer text-sm font-medium flex items-center justify-center gap-2"
+            >
+              <User size={15} /> Continue with Google
+            </button>
+            <p className="text-[11px] text-muted leading-relaxed mt-4 mb-0 text-center">
+              Signing in saves your budget and syncs it across your devices —
+              and lets you pick up an existing one. Without it, nothing is kept
+              once you close the tab.
+            </p>
+          </>
         )}
       </div>
     </div>
@@ -197,6 +204,16 @@ export default function HomePage() {
           </button>
         )}
       </header>
+
+      {!user && (
+        <button
+          onClick={signIn}
+          className="bg-expense-bg text-expense-text border-0 border-b border-border px-4 py-2 shrink-0 flex items-center justify-center gap-1.5 text-[11px] cursor-pointer w-full text-left"
+        >
+          <AlertCircle size={12} className="shrink-0" />
+          <span>Not signed in — this budget won't be saved. <span className="font-semibold underline">Sign in to keep it.</span></span>
+        </button>
+      )}
 
       {screen === 'budget' && (
         <div className="bg-card border-b border-border px-4 py-2 flex gap-2 shrink-0 overflow-x-auto">
