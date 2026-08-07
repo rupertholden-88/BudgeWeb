@@ -1,9 +1,9 @@
 'use client'
 
 import { useMemo } from 'react'
-import { fmt, Owner } from '@/lib/models'
+import { fmt, Owner, upcomingRenewals } from '@/lib/models'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown } from 'lucide-react'
+import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown, CalendarClock } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -198,6 +198,10 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
 
   const savingsRate = totals.totalInc > 0 ? Math.round((totals.totalSav / totals.totalInc) * 100) : 0
 
+  const renewals = useMemo(() => upcomingRenewals(data), [data])
+  // Anything inside the switching window, plus anything already lapsed.
+  const dueSoon = renewals.filter(r => r.days <= 60)
+
   if (totals.totalInc === 0 && totals.totalExp === 0) {
     return (
       <div className="h-full flex items-center justify-center p-8">
@@ -274,6 +278,52 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
           )}
         </div>
       ))}
+
+      {/* Renewals */}
+      {renewals.length > 0 && (
+        <SectionCard
+          title="Renewals"
+          sub={dueSoon.length > 0
+            ? `${dueSoon.length} ${dueSoon.length === 1 ? 'contract needs' : 'contracts need'} attention`
+            : 'Nothing due in the next 60 days'}
+          icon={<CalendarClock size={14} />}
+        >
+          <div className="space-y-2.5">
+            {renewals.map(r => {
+              const passed = r.days < 0
+              const urgent = r.days >= 0 && r.days <= 30
+              const soon = r.days > 30 && r.days <= 60
+              return (
+                <div key={r.id} className="flex items-center gap-3">
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${passed || urgent ? 'bg-negative' : soon ? 'bg-expense-text' : 'bg-border'}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-medium text-ink truncate">{r.label}</div>
+                    <div className="text-[10px] text-muted">
+                      {r.category} · {new Date(r.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className={`text-[11px] font-semibold tabular-nums ${passed || urgent ? 'text-negative' : soon ? 'text-expense-text' : 'text-muted'}`}>
+                      {passed ? 'Date passed'
+                        : r.days === 0 ? 'Today'
+                        : r.days === 1 ? 'Tomorrow'
+                        : `${r.days} days`}
+                    </div>
+                    {r.amount > 0 && (
+                      <div className="text-[10px] text-muted tabular-nums">{fmt(r.amount)}/mo</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-[10px] text-muted mt-3 pt-3 border-t border-border mb-0">
+            {renewals.some(r => r.days < 0)
+              ? 'Dates in the past need updating to next year’s renewal.'
+              : 'Insurers and energy suppliers rarely offer their best price on renewal — worth comparing about a month out.'}
+          </p>
+        </SectionCard>
+      )}
 
       {/* Runway detail */}
       {runway != null && liquidAssets > 0 && (

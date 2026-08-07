@@ -213,6 +213,10 @@ export function useBudget() {
     })
   }
 
+  const updateItemRenewal = (catKey: string, itemId: string, renewalDate: string) => {
+    mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.map(i => i.id === itemId ? { ...i, renewalDate: renewalDate || undefined } : i) }) }))
+  }
+
   const removeItem = (catKey: string, itemId: string) => {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.filter(i => i.id !== itemId) }) }))
   }
@@ -337,7 +341,7 @@ export function useBudget() {
     data, user, authLoading, cloudLoading, localLoading, savedAt, isRefreshing, totals,
     signIn, signOutUser, refreshFromCloud,
     updateOwnerName, addCategory, renameCategory, deleteCategory,
-    updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem,
+    updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal,
     addAsset, updateAsset, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,

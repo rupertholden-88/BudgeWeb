@@ -4,7 +4,7 @@ export type SpendingPriority = 'NECESSITY' | 'DISCRETIONARY' | 'NONE'
 export type AssetType = 'CASH' | 'CASH_ISA' | 'STOCKS_SHARES_ISA' | 'JUNIOR_ISA' | 'LIFETIME_ISA' | 'SAVINGS_ACCOUNT' | 'CRYPTO' | 'OTHER' | 'PENSION'
 export type DebtType = 'CREDIT_CARD' | 'PERSONAL_LOAN' | 'CAR_FINANCE' | 'MORTGAGE' | 'STUDENT_LOAN' | 'OTHER'
 
-export interface LineItem { id: string; label: string; amount: number; priority: SpendingPriority }
+export interface LineItem { id: string; label: string; amount: number; priority: SpendingPriority; renewalDate?: string }
 export interface Category { key: string; owner: Owner; type: EntryType; label: string; shared?: boolean; note?: string; items: LineItem[] }
 export interface Asset { id: string; type: AssetType; label: string; amount: number; interestRate?: number; institution?: string }
 export interface SavingsSnapshot { date: string; owner: Owner; assets: Asset[] }
@@ -92,6 +92,35 @@ export function calcTotals(budget: BudgetData): Totals {
 export const fmt = (n: number) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(n)
 export type TabFilter = 'ALL' | 'NIAMH' | 'RUPERT' | 'JOINT'
+
+/** Whole days until a renewal date. Negative once the date has passed. */
+export function daysUntil(dateStr: string): number {
+  const target = new Date(dateStr)
+  if (isNaN(target.getTime())) return NaN
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+  target.setHours(0, 0, 0, 0)
+  return Math.round((target.getTime() - startOfToday.getTime()) / 86400000)
+}
+
+/** Every expense line carrying a renewal date, soonest first. */
+export function upcomingRenewals(data: BudgetData) {
+  return data.categories
+    .filter(c => c.type === 'EXPENSE')
+    .flatMap(c => c.items
+      .filter(i => i.renewalDate)
+      .map(i => ({
+        id: i.id,
+        label: i.label,
+        amount: i.amount,
+        category: c.label,
+        owner: c.owner,
+        date: i.renewalDate!,
+        days: daysUntil(i.renewalDate!),
+      })))
+    .filter(r => !isNaN(r.days))
+    .sort((a, b) => a.days - b.days)
+}
 
 export function isFirstRun(data: BudgetData): boolean {
   return !data.nameNiamh && !data.nameRupert

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Category, TabFilter, Owner, EntryType, fmt, calcTotals } from '@/lib/models'
-import { Plus, ChevronDown, ChevronUp, Check, TrendingUp, TrendingDown } from 'lucide-react'
+import { Category, TabFilter, Owner, EntryType, fmt, calcTotals, daysUntil } from '@/lib/models'
+import { Plus, ChevronDown, ChevronUp, Check, TrendingUp, TrendingDown, CalendarClock } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -221,53 +221,109 @@ function AmountCell({ value, onChange }: { value: number; onChange: (v: number) 
 
 // ─── item row ────────────────────────────────────────────────────────────────
 
-function ItemRow({ catKey, item, onUpdateAmount, onRemoveItem, onRenameItem }: {
+function RenewalBadge({ days }: { days: number }) {
+  const urgent = days <= 30
+  const passed = days < 0
+  const text = passed
+    ? 'Renewal date passed'
+    : days === 0 ? 'Renews today'
+    : days === 1 ? 'Renews tomorrow'
+    : days <= 60 ? `Renews in ${days} days`
+    : null
+  if (!text) return null
+  return (
+    <span className={`text-[10px] font-medium ${passed || urgent ? 'text-expense-text' : 'text-muted'}`}>
+      {text}
+    </span>
+  )
+}
+
+function ItemRow({ catKey, item, canRenew, onUpdateAmount, onRemoveItem, onRenameItem, onUpdateRenewal }: {
   catKey: string
-  item: { id: string; label: string; amount: number }
+  item: { id: string; label: string; amount: number; renewalDate?: string }
+  canRenew: boolean
   onUpdateAmount: (catKey: string, itemId: string, v: number) => void
   onRemoveItem: (catKey: string, itemId: string) => void
   onRenameItem: (catKey: string, itemId: string, label: string) => void
+  onUpdateRenewal: (catKey: string, itemId: string, date: string) => void
 }) {
   const [editingLabel, setEditingLabel] = useState(false)
   const [labelDraft, setLabelDraft] = useState(item.label)
   const [deleteModal, setDeleteModal] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const commitLabel = () => { onRenameItem(catKey, item.id, labelDraft); setEditingLabel(false) }
   const startLongPress = () => {
     longPressTimer.current = setTimeout(() => { if (navigator.vibrate) navigator.vibrate(50); setDeleteModal(true) }, 600)
   }
   const cancelLongPress = () => { if (longPressTimer.current) clearTimeout(longPressTimer.current) }
+  const days = item.renewalDate ? daysUntil(item.renewalDate) : null
+
   return (
     <>
       {deleteModal && <DeleteModal label={item.label} onConfirm={() => { onRemoveItem(catKey, item.id); setDeleteModal(false) }} onCancel={() => setDeleteModal(false)} />}
-      <div
-        className="flex items-center gap-2 py-2 border-b border-border last:border-0"
-        onMouseDown={startLongPress} onMouseUp={cancelLongPress} onMouseLeave={cancelLongPress}
-        onTouchStart={startLongPress} onTouchEnd={cancelLongPress} onTouchCancel={cancelLongPress}
-      >
-        {editingLabel ? (
-          <>
-            <input
-              value={labelDraft}
-              onChange={e => setLabelDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') commitLabel() }}
-              onBlur={commitLabel}
-              className="flex-1 text-[13px] border-[1.5px] border-rupert rounded-lg px-2 py-1 outline-none bg-rupert-light"
-              autoFocus
-            />
-            <button onClick={commitLabel} className="bg-ink text-white border-0 rounded-lg px-2 py-1 cursor-pointer flex items-center">
-              <Check size={12} />
+      <div className="border-b border-border last:border-0">
+        <div
+          className="flex items-center gap-2 py-2"
+          onMouseDown={startLongPress} onMouseUp={cancelLongPress} onMouseLeave={cancelLongPress}
+          onTouchStart={startLongPress} onTouchEnd={cancelLongPress} onTouchCancel={cancelLongPress}
+        >
+          {editingLabel ? (
+            <>
+              <input
+                value={labelDraft}
+                onChange={e => setLabelDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') commitLabel() }}
+                onBlur={commitLabel}
+                className="flex-1 text-[13px] border-[1.5px] border-rupert rounded-lg px-2 py-1 outline-none bg-rupert-light"
+                autoFocus
+              />
+              <button onClick={commitLabel} className="bg-ink text-white border-0 rounded-lg px-2 py-1 cursor-pointer flex items-center">
+                <Check size={12} />
+              </button>
+            </>
+          ) : (
+            <div className="flex-1 min-w-0">
+              <span
+                onClick={() => { setLabelDraft(item.label); setEditingLabel(true) }}
+                className="text-[13px] text-muted cursor-text select-none block"
+              >
+                {item.label}
+              </span>
+              {days != null && <RenewalBadge days={days} />}
+            </div>
+          )}
+          <AmountCell value={item.amount} onChange={v => onUpdateAmount(catKey, item.id, v)} />
+          {canRenew && (
+            <button
+              onClick={() => setExpanded(e => !e)}
+              onMouseDown={e => e.stopPropagation()}
+              aria-label={`Renewal date for ${item.label}`}
+              className={`bg-transparent border-0 cursor-pointer flex p-0.5 shrink-0 ${item.renewalDate ? 'text-expense-text' : 'text-muted/40'}`}
+            >
+              <CalendarClock size={13} />
             </button>
-          </>
-        ) : (
-          <span
-            onClick={() => { setLabelDraft(item.label); setEditingLabel(true) }}
-            className="flex-1 text-[13px] text-muted cursor-text select-none"
-          >
-            {item.label}
-          </span>
+          )}
+        </div>
+        {expanded && canRenew && (
+          <div className="flex items-center gap-2 pb-2 -mt-0.5">
+            <label className="text-[10px] text-muted shrink-0">Renews / contract ends</label>
+            <input
+              type="date"
+              value={item.renewalDate ?? ''}
+              onChange={e => onUpdateRenewal(catKey, item.id, e.target.value)}
+              className="text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none bg-card"
+            />
+            {item.renewalDate && (
+              <button
+                onClick={() => onUpdateRenewal(catKey, item.id, '')}
+                className="text-[10px] text-muted bg-transparent border-0 cursor-pointer underline"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         )}
-        <AmountCell value={item.amount} onChange={v => onUpdateAmount(catKey, item.id, v)} />
       </div>
     </>
   )
@@ -275,7 +331,7 @@ function ItemRow({ catKey, item, onUpdateAmount, onRemoveItem, onRenameItem }: {
 
 // ─── category card ────────────────────────────────────────────────────────────
 
-function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem, onRenameItem, onRenameCategory, onDeleteCategory }: {
+function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem, onRenameItem, onRenameCategory, onDeleteCategory, onUpdateRenewal }: {
   cat: Category; ownerName: string
   onUpdateAmount: (catKey: string, itemId: string, v: number) => void
   onAddItem: (catKey: string, label: string) => void
@@ -283,6 +339,7 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
   onRenameItem: (catKey: string, itemId: string, label: string) => void
   onRenameCategory: (catKey: string, label: string) => void
   onDeleteCategory: (catKey: string) => void
+  onUpdateRenewal: (catKey: string, itemId: string, date: string) => void
 }) {
   const [open, setOpen] = useState(true)
   const [addingItem, setAddingItem] = useState(false)
@@ -355,7 +412,12 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
         {open && (
           <div className="px-3.5 pb-2 pt-0.5">
             {cat.items.map(item => (
-              <ItemRow key={item.id} catKey={cat.key} item={item} onUpdateAmount={onUpdateAmount} onRemoveItem={onRemoveItem} onRenameItem={onRenameItem} />
+              <ItemRow
+                key={item.id} catKey={cat.key} item={item}
+                canRenew={cat.type === 'EXPENSE'}
+                onUpdateAmount={onUpdateAmount} onRemoveItem={onRemoveItem}
+                onRenameItem={onRenameItem} onUpdateRenewal={onUpdateRenewal}
+              />
             ))}
             {addingItem ? (
               <div className="flex gap-1.5 mt-2 pt-2 border-t border-border">
@@ -390,7 +452,7 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
 const OWNER_ORDER: Owner[] = ['NIAMH', 'RUPERT', 'JOINT']
 
 export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budget: BudgetHook; tab: TabFilter; onNavigateToDebts: () => void }) {
-  const { data, totals, updateItemAmount, addItem, removeItem, renameItem, renameCategory, deleteCategory, addCategory } = budget
+  const { data, totals, updateItemAmount, addItem, removeItem, renameItem, renameCategory, deleteCategory, addCategory, updateItemRenewal } = budget
   const [addingCat, setAddingCat] = useState(false)
   const [newCatLabel, setNewCatLabel] = useState('')
   const [newCatOwner, setNewCatOwner] = useState<Owner>('JOINT')
@@ -454,6 +516,7 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
                 onUpdateAmount={updateItemAmount} onAddItem={addItem}
                 onRemoveItem={removeItem} onRenameItem={renameItem}
                 onRenameCategory={renameCategory} onDeleteCategory={deleteCategory}
+                onUpdateRenewal={updateItemRenewal}
               />
             ))}
           </div>
