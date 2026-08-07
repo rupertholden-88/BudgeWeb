@@ -299,9 +299,14 @@ function ItemRow({ catKey, item, canRenew, onUpdateAmount, onRemoveItem, onRenam
               onClick={() => setExpanded(e => !e)}
               onMouseDown={e => e.stopPropagation()}
               aria-label={`Renewal date for ${item.label}`}
-              className={`bg-transparent border-0 cursor-pointer flex p-0.5 shrink-0 ${item.renewalDate ? 'text-expense-text' : 'text-muted/40'}`}
+              aria-expanded={expanded}
+              className={`border-0 cursor-pointer flex items-center justify-center shrink-0 w-8 h-8 rounded-lg ${
+                item.renewalDate
+                  ? 'bg-expense-bg text-expense-text'
+                  : expanded ? 'bg-surface text-ink' : 'bg-surface text-muted'
+              }`}
             >
-              <CalendarClock size={13} />
+              <CalendarClock size={15} />
             </button>
           )}
         </div>
