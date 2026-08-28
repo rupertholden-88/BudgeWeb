@@ -4,7 +4,8 @@ import type { FinancialSummary } from '@/lib/financialSummary'
 
 export const runtime = 'nodejs'
 
-const MODEL = 'claude-opus-5'
+// User's choice — Sonnet 5 for a good cost/quality balance on this task.
+const MODEL = 'claude-sonnet-5'
 
 function buildPrompt(summary: FinancialSummary): string {
   return `You are reviewing the household finances of a UK couple who share a budgeting app. Below is an anonymised numeric summary — no names, no account or provider details, currency is GBP. Assess their financial health compared with general, well-established UK personal-finance guidelines (e.g. typical savings-rate targets, a 3–6 month emergency fund, pension contribution norms, and reasonable debt costs) — not a real individualised peer database, since you don't have access to one. Be specific and reference their actual figures rather than writing generically. Where something is a genuine strength, say so plainly; don't manufacture a concern to seem balanced.
