@@ -3,6 +3,9 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { FinancialSummary } from '@/lib/financialSummary'
 
 export const runtime = 'nodejs'
+// A detailed, high-effort report with adaptive thinking can take well over
+// Vercel's default function duration to generate — raise the ceiling.
+export const maxDuration = 60
 
 // User's choice — Sonnet 5 for a good cost/quality balance on this task.
 const MODEL = 'claude-sonnet-5'
@@ -84,7 +87,10 @@ export async function POST(req: NextRequest) {
 
   let response: Anthropic.Message
   try {
-    response = await client.messages.create({
+    // Streamed internally rather than a single blocking create() call — a
+    // long non-streamed request risks the underlying connection timing out
+    // before Anthropic finishes, independent of Vercel's own function limit.
+    const stream = client.messages.stream({
       model: MODEL,
       max_tokens: 16000,
       thinking: { type: 'adaptive' },
@@ -93,6 +99,7 @@ export async function POST(req: NextRequest) {
       output_config: { effort: 'high' },
       messages: [{ role: 'user', content: buildPrompt(summary) }],
     })
+    response = await stream.finalMessage()
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) {
       return NextResponse.json(
@@ -109,31 +116,43 @@ export async function POST(req: NextRequest) {
         { status: 502 }
       )
     }
-    return NextResponse.json({ error: 'upstream_unreachable', message: 'Could not reach the assessment service.' }, { status: 502 })
-  }
-
-  // From here on the request definitely reached Anthropic and has real usage
-  // to report, even on a refusal or an empty/unparseable reply — include it
-  // on every branch rather than only when there's a result to show.
-  const usage = estimateCostUsd(response.usage)
-
-  if (response.stop_reason === 'refusal') {
     return NextResponse.json(
-      { error: 'refused', message: 'The assessment service declined to respond to this request.', ...usage },
+      { error: 'upstream_unreachable', message: 'Could not reach the assessment service — check your connection and try again.', detail: err instanceof Error ? err.message : String(err) },
       { status: 502 }
     )
   }
 
-  const raw = extractText(response.content)
-  const parsed = parseAssessment(raw)
+  try {
+    // From here on the request definitely reached Anthropic and has real usage
+    // to report, even on a refusal or an empty/unparseable reply — include it
+    // on every branch rather than only when there's a result to show.
+    const usage = estimateCostUsd(response.usage)
 
-  if (parsed) return NextResponse.json({ result: parsed, ...usage })
-  if (raw.trim()) return NextResponse.json({ result: null, rawText: raw, ...usage })
+    if (response.stop_reason === 'refusal') {
+      return NextResponse.json(
+        { error: 'refused', message: 'The assessment service declined to respond to this request.', ...usage },
+        { status: 502 }
+      )
+    }
 
-  // No text block at all (e.g. stopped mid-thinking) — nothing useful to show,
-  // but it was still a billed request, so still report what it cost.
-  return NextResponse.json(
-    { error: 'empty_response', message: "Didn't get a usable response — try again.", ...usage },
-    { status: 502 }
-  )
+    const raw = extractText(response.content)
+    const parsed = parseAssessment(raw)
+
+    if (parsed) return NextResponse.json({ result: parsed, ...usage })
+    if (raw.trim()) return NextResponse.json({ result: null, rawText: raw, ...usage })
+
+    // No text block at all (e.g. stopped mid-thinking) — nothing useful to show,
+    // but it was still a billed request, so still report what it cost.
+    return NextResponse.json(
+      { error: 'empty_response', message: "Didn't get a usable response — try again.", ...usage },
+      { status: 502 }
+    )
+  } catch (err) {
+    // Belt and braces: any unexpected failure here still returns clean JSON
+    // rather than a bare 500 the client can't extract a message from.
+    return NextResponse.json(
+      { error: 'internal_error', message: 'Something went wrong processing the response — try again.', detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    )
+  }
 }
