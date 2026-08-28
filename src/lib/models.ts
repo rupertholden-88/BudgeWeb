@@ -10,7 +10,18 @@ export interface Asset { id: string; type: AssetType; label: string; amount: num
 export interface SavingsSnapshot { date: string; owner: Owner; assets: Asset[] }
 export interface Debt { id: string; owner: Owner; type: DebtType; label: string; currentBalance: number; monthlyPayment: number; interestRate: number; isZeroPercent: boolean; zeroPercentExpiryDate?: string; institution?: string }
 export interface SpendSnapshot { date: string; totalInc: number; totalExp: number; totalSav: number }
-export interface BudgetData { categories: Category[]; savingsHistory: SavingsSnapshot[]; spendHistory: SpendSnapshot[]; debts: Debt[]; savedAt: string; nameNiamh: string; nameRupert: string; nameJoint: string }
+export type FinancialHealthStatus = 'strong' | 'solid' | 'attention' | 'at_risk'
+export interface FinancialHealthResult {
+  headline: string
+  status: FinancialHealthStatus
+  summary: string
+  benchmarks: { metric: string; yours: string; typical: string; status: FinancialHealthStatus }[]
+  strengths: string[]
+  watchouts: string[]
+}
+/** Cached AI health check — synced like everything else so it follows the account, not just the device. */
+export interface FinancialHealthCache { hash: string; result: FinancialHealthResult | null; rawText: string | null; generatedAt: string }
+export interface BudgetData { categories: Category[]; savingsHistory: SavingsSnapshot[]; spendHistory: SpendSnapshot[]; debts: Debt[]; savedAt: string; nameNiamh: string; nameRupert: string; nameJoint: string; financialHealth?: FinancialHealthCache | null }
 export interface Totals { incN: number; incR: number; expN: number; expR: number; savN: number; savR: number; debtN: number; debtR: number; expJoint: number; savJoint: number; debtJoint: number; halfJointExp: number; halfJointSav: number; halfJointDebt: number; netN: number; netR: number; totalInc: number; totalExp: number; totalSav: number; totalDebt: number; net: number }
 
 export function defaultBudgetData(): BudgetData {

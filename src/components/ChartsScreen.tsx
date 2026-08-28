@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { fmt, Owner, upcomingRenewals } from '@/lib/models'
 import { buildFinancialSummary, hashSummary } from '@/lib/financialSummary'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
@@ -81,18 +81,6 @@ function ChartTooltip({ active, payload, label }: any) {
   )
 }
 
-const HEALTH_CACHE_KEY = 'budge-financial-health'
-
-type HealthStatus = 'strong' | 'solid' | 'attention' | 'at_risk'
-interface HealthResult {
-  headline: string
-  status: HealthStatus
-  summary: string
-  benchmarks: { metric: string; yours: string; typical: string; status: HealthStatus }[]
-  strengths: string[]
-  watchouts: string[]
-}
-
 function healthIntent(status: string): 'positive' | 'negative' | 'neutral' {
   if (status === 'strong' || status === 'solid') return 'positive'
   if (status === 'at_risk') return 'negative'
@@ -102,33 +90,24 @@ function healthLabel(status: string) {
   return status === 'strong' ? 'Strong' : status === 'solid' ? 'Solid' : status === 'at_risk' ? 'At risk' : 'Needs attention'
 }
 
-function FinancialHealthCard({ data, totals }: { data: BudgetHook['data']; totals: BudgetHook['totals'] }) {
+function FinancialHealthCard({ data, totals, updateFinancialHealth }: {
+  data: BudgetHook['data']; totals: BudgetHook['totals']
+  updateFinancialHealth: BudgetHook['updateFinancialHealth']
+}) {
   const summary = useMemo(() => buildFinancialSummary(data, totals), [data, totals])
   const currentHash = useMemo(() => hashSummary(summary), [summary])
 
-  const [result, setResult] = useState<HealthResult | null>(null)
-  const [rawText, setRawText] = useState<string | null>(null)
-  const [cachedHash, setCachedHash] = useState<string | null>(null)
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null)
+  // The result is synced via Firestore alongside the rest of the budget, so
+  // it follows the account across devices rather than living per-browser.
+  const cached = data.financialHealth ?? null
+  const result = cached?.result ?? null
+  const rawText = cached?.rawText ?? null
+  const generatedAt = cached?.generatedAt ?? null
+  const stale = cached != null && cached.hash !== currentHash
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<{ notConfigured: boolean; message: string } | null>(null)
 
-  // Restore whatever was last generated on this device — cheap, and avoids
-  // spending an API call just to redisplay an unchanged assessment.
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(HEALTH_CACHE_KEY)
-      if (raw) {
-        const cached = JSON.parse(raw)
-        setResult(cached.result ?? null)
-        setRawText(cached.rawText ?? null)
-        setCachedHash(cached.hash ?? null)
-        setGeneratedAt(cached.generatedAt ?? null)
-      }
-    } catch { }
-  }, [])
-
-  const stale = cachedHash != null && cachedHash !== currentHash
   const hasEnoughData = totals.totalInc > 0 || totals.totalExp > 0
 
   const run = async () => {
@@ -145,14 +124,12 @@ function FinancialHealthCard({ data, totals }: { data: BudgetHook['data']; total
         setError({ notConfigured: body.error === 'not_configured', message: body.message || 'Something went wrong — try again.' })
         return
       }
-      const now = new Date().toISOString()
-      setResult(body.result ?? null)
-      setRawText(body.rawText ?? null)
-      setGeneratedAt(now)
-      setCachedHash(currentHash)
-      try {
-        localStorage.setItem(HEALTH_CACHE_KEY, JSON.stringify({ result: body.result ?? null, rawText: body.rawText ?? null, hash: currentHash, generatedAt: now }))
-      } catch { }
+      updateFinancialHealth({
+        hash: currentHash,
+        result: body.result ?? null,
+        rawText: body.rawText ?? null,
+        generatedAt: new Date().toISOString(),
+      })
     } catch {
       setError({ notConfigured: false, message: 'Could not reach the assessment service — check your connection and try again.' })
     } finally {
@@ -261,7 +238,7 @@ function FinancialHealthCard({ data, totals }: { data: BudgetHook['data']; total
 }
 
 export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, totals } = budget
+  const { data, totals, updateFinancialHealth } = budget
   const today = new Date().toISOString().slice(0, 7)
 
   const n1 = data.nameNiamh || 'Person 1'
@@ -416,7 +393,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
         />
       </div>
 
-      <FinancialHealthCard data={data} totals={totals} />
+      <FinancialHealthCard data={data} totals={totals} updateFinancialHealth={updateFinancialHealth} />
 
       {/* 0% expiry warnings — time-sensitive, so they lead */}
       {expiries.map(({ debt, days, expiry, balanceAtExpiry, monthlyInterestAfter, rate }) => (

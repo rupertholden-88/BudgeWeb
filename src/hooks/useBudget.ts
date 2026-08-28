@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore'
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth'
 import { db, auth, provider } from '@/lib/firebase'
-import { BudgetData, Debt, Owner, EntryType, AssetType, DebtType, defaultBudgetData, calcTotals, Totals, SpendSnapshot } from '@/lib/models'
+import { BudgetData, Debt, Owner, EntryType, AssetType, DebtType, defaultBudgetData, calcTotals, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
 
 function uuid() { return crypto.randomUUID() }
 
@@ -217,6 +217,10 @@ export function useBudget() {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.map(i => i.id === itemId ? { ...i, renewalDate: renewalDate || undefined } : i) }) }))
   }
 
+  const updateFinancialHealth = (cache: FinancialHealthCache | null) => {
+    mutate(b => ({ ...b, financialHealth: cache }))
+  }
+
   const removeItem = (catKey: string, itemId: string) => {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.filter(i => i.id !== itemId) }) }))
   }
@@ -341,7 +345,7 @@ export function useBudget() {
     data, user, authLoading, cloudLoading, localLoading, savedAt, isRefreshing, totals,
     signIn, signOutUser, refreshFromCloud,
     updateOwnerName, addCategory, renameCategory, deleteCategory,
-    updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal,
+    updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, updateFinancialHealth,
     addAsset, updateAsset, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,
