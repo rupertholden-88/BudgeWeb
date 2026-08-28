@@ -17,6 +17,8 @@ export interface Asset { id: string; type: AssetType; label: string; amount: num
 export interface SavingsSnapshot { date: string; owner: Owner; assets: Asset[] }
 export interface Debt { id: string; owner: Owner; type: DebtType; label: string; currentBalance: number; monthlyPayment: number; interestRate: number; isZeroPercent: boolean; zeroPercentExpiryDate?: string; institution?: string; sharedContribution?: boolean }
 export interface SpendSnapshot { date: string; totalInc: number; totalExp: number; totalSav: number }
+/** Birth month as YYYY-MM — stored rather than an age so it never goes stale. */
+export interface Dependant { id: string; born: string }
 export type FinancialHealthStatus = 'strong' | 'solid' | 'attention' | 'at_risk'
 export interface FinancialHealthResult {
   headline: string
@@ -36,7 +38,7 @@ export interface FinancialHealthCache {
 }
 /** Running total across every check ever run on this account — the cache above only holds the latest. */
 export interface FinancialHealthUsage { totalRuns: number; totalCostUsd: number }
-export interface BudgetData { categories: Category[]; savingsHistory: SavingsSnapshot[]; spendHistory: SpendSnapshot[]; debts: Debt[]; savedAt: string; nameNiamh: string; nameRupert: string; nameJoint: string; financialHealth?: FinancialHealthCache | null; financialHealthUsage?: FinancialHealthUsage | null }
+export interface BudgetData { categories: Category[]; savingsHistory: SavingsSnapshot[]; spendHistory: SpendSnapshot[]; debts: Debt[]; savedAt: string; nameNiamh: string; nameRupert: string; nameJoint: string; financialHealth?: FinancialHealthCache | null; financialHealthUsage?: FinancialHealthUsage | null; bornNiamh?: string; bornRupert?: string; dependants?: Dependant[] }
 export interface Totals { incN: number; incR: number; expN: number; expR: number; savN: number; savR: number; debtN: number; debtR: number; expJoint: number; savJoint: number; debtJoint: number; halfJointExp: number; halfJointSav: number; halfJointDebt: number; netN: number; netR: number; totalInc: number; totalExp: number; totalSav: number; totalDebt: number; net: number }
 
 export function defaultBudgetData(): BudgetData {
@@ -156,6 +158,21 @@ export function monthsToClear(balance: number, payment: number, annualRate: numb
   if (r <= 0) return Math.ceil(balance / payment)
   if (payment <= balance * r) return null // payment doesn't even cover the interest
   return Math.ceil(-Math.log(1 - (balance * r) / payment) / Math.log(1 + r))
+}
+
+/** Whole months since a YYYY-MM birth month, or null if unset/malformed. */
+export function ageInMonths(born: string | undefined): number | null {
+  if (!born) return null
+  const m = /^(\d{4})-(\d{2})$/.exec(born)
+  if (!m) return null
+  const now = new Date()
+  const months = (now.getFullYear() - Number(m[1])) * 12 + (now.getMonth() + 1 - Number(m[2]))
+  return months >= 0 ? months : null
+}
+
+export function ageInYears(born: string | undefined): number | null {
+  const months = ageInMonths(born)
+  return months == null ? null : Math.floor(months / 12)
 }
 
 /** Whole days until a renewal date. Negative once the date has passed. */

@@ -155,6 +155,26 @@ export function useBudget() {
     mutate(b => ({ ...b, nameNiamh: owner === 'NIAMH' ? name.trim() : b.nameNiamh, nameRupert: owner === 'RUPERT' ? name.trim() : b.nameRupert, nameJoint: owner === 'JOINT' ? name.trim() : b.nameJoint }))
   }
 
+  const updateBirthMonth = (owner: Owner, born: string) => {
+    mutate(b => ({
+      ...b,
+      bornNiamh: owner === 'NIAMH' ? (born || undefined) : b.bornNiamh,
+      bornRupert: owner === 'RUPERT' ? (born || undefined) : b.bornRupert,
+    }))
+  }
+
+  const addDependant = () => {
+    mutate(b => ({ ...b, dependants: [...(b.dependants ?? []), { id: uuid(), born: '' }] }))
+  }
+
+  const updateDependant = (id: string, born: string) => {
+    mutate(b => ({ ...b, dependants: (b.dependants ?? []).map(d => d.id === id ? { ...d, born } : d) }))
+  }
+
+  const removeDependant = (id: string) => {
+    mutate(b => ({ ...b, dependants: (b.dependants ?? []).filter(d => d.id !== id) }))
+  }
+
   const addCategory = (owner: Owner, type: EntryType, label: string) => {
     if (!label.trim()) return
     mutate(b => ({ ...b, categories: [...b.categories, { key: `custom_${uuid()}`, owner, type, label: label.trim(), items: [] }] }))
@@ -357,7 +377,8 @@ export function useBudget() {
   return {
     data, user, authLoading, cloudLoading, localLoading, savedAt, isRefreshing, totals,
     signIn, signOutUser, refreshFromCloud,
-    updateOwnerName, addCategory, renameCategory, deleteCategory,
+    updateOwnerName, updateBirthMonth, addDependant, updateDependant, removeDependant,
+    addCategory, renameCategory, deleteCategory,
     updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, toggleItemShared, recordFinancialHealthRun,
     addAsset, updateAsset, deleteAsset,
     addDebt, updateDebt, deleteDebt,

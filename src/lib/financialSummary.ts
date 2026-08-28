@@ -1,4 +1,4 @@
-import { BudgetData, Totals, Owner, daysUntil, monthsToClear, upcomingRenewals, householdCostSplit } from './models'
+import { BudgetData, Totals, Owner, daysUntil, monthsToClear, upcomingRenewals, householdCostSplit, ageInYears, ageInMonths } from './models'
 
 /**
  * A numbers-only snapshot of the household's finances for an AI assessment.
@@ -16,6 +16,15 @@ export interface FinancialSummary {
   }
   earners: number
   incomeSplitPct: number[] // e.g. [38, 62] — proportion of household income each earner brings
+  /**
+   * Life stage, where the user has supplied it. Ages are what make a benchmark
+   * meaningful — a pension pot or emergency fund is judged very differently at
+   * 32 with a toddler than at 55 with none. Null when nothing is set.
+   */
+  household: {
+    adultAges: number[] // same person order as incomeSplitPct
+    dependantAgesMonths: number[]
+  } | null
   /**
    * Household costs and who actually bears them. `jointPot` is split evenly by
    * convention; `paidAloneForHousehold` is what each person covers by
@@ -112,6 +121,14 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
 
   const monthsOfData = new Set((data.spendHistory || []).map(s => s.date)).size
 
+  const adultAges = [ageInYears(data.bornNiamh), ageInYears(data.bornRupert)].filter((a): a is number => a != null)
+  const dependantAgesMonths = (data.dependants ?? [])
+    .map(d => ageInMonths(d.born))
+    .filter((a): a is number => a != null)
+  const household = (adultAges.length > 0 || dependantAgesMonths.length > 0)
+    ? { adultAges, dependantAgesMonths }
+    : null
+
   return {
     monthly: {
       totalIncome: totals.totalInc,
@@ -123,6 +140,7 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
     },
     earners: incomes.length,
     incomeSplitPct,
+    household,
     householdCosts,
     assets: {
       liquidTotal,

@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Check, KeyRound } from 'lucide-react'
+import { Check, KeyRound, Plus } from 'lucide-react'
 import { useApiKey } from '@/hooks/useApiKey'
+import { ageInYears, ageInMonths } from '@/lib/models'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -41,7 +42,7 @@ function NameRow({ label, value, onSave, colorClass }: { label: string; value: s
 }
 
 export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, user, updateOwnerName, getJsonString, importFromJson } = budget
+  const { data, user, updateOwnerName, getJsonString, importFromJson, updateBirthMonth, addDependant, updateDependant, removeDependant } = budget
   const [importText, setImportText] = useState('')
   const [importResult, setImportResult] = useState<string | null>(null)
   const [darkMode, setDarkMode] = useState(false)
@@ -128,6 +129,69 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
         <NameRow label="Joint"    value={data.nameJoint}  colorClass="bg-joint"  onSave={v => updateOwnerName('JOINT', v)} />
         <p className="text-xs text-muted my-2">
           These names appear throughout the app. Changes sync to all devices.
+        </p>
+      </div>
+
+      <div className="card py-1 px-4 mb-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted py-2.5 pb-1">Household</div>
+
+        {([
+          { owner: 'NIAMH' as const, label: data.nameNiamh || 'Person 1', value: data.bornNiamh, colour: 'bg-niamh' },
+          { owner: 'RUPERT' as const, label: data.nameRupert || 'Person 2', value: data.bornRupert, colour: 'bg-rupert' },
+        ]).map(p => (
+          <div key={p.owner} className="flex items-center gap-2 py-2.5 border-b border-border">
+            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${p.colour}`} />
+            <span className="text-sm flex-1 min-w-0 truncate">{p.label}</span>
+            <input
+              type="month"
+              value={p.value ?? ''}
+              onChange={e => updateBirthMonth(p.owner, e.target.value)}
+              aria-label={`${p.label} born`}
+              className="text-xs border-[1.5px] border-border rounded-md px-2 py-1 outline-none bg-card shrink-0"
+            />
+            {p.value && (
+              <span className="text-[11px] text-muted tabular-nums shrink-0 w-8 text-right">{ageInYears(p.value)}y</span>
+            )}
+          </div>
+        ))}
+
+        {(data.dependants ?? []).map((d, i) => {
+          const months = ageInMonths(d.born)
+          return (
+            <div key={d.id} className="flex items-center gap-2 py-2.5 border-b border-border">
+              <div className="w-2.5 h-2.5 rounded-full shrink-0 bg-joint" />
+              <span className="text-sm flex-1 min-w-0 truncate">Child {i + 1}</span>
+              <input
+                type="month"
+                value={d.born}
+                onChange={e => updateDependant(d.id, e.target.value)}
+                aria-label={`Child ${i + 1} born`}
+                className="text-xs border-[1.5px] border-border rounded-md px-2 py-1 outline-none bg-card shrink-0"
+              />
+              <span className="text-[11px] text-muted tabular-nums shrink-0 w-8 text-right">
+                {months == null ? '' : months < 24 ? `${months}m` : `${Math.floor(months / 12)}y`}
+              </span>
+              <button
+                onClick={() => removeDependant(d.id)}
+                aria-label={`Remove child ${i + 1}`}
+                className="bg-transparent border-0 cursor-pointer text-muted text-sm shrink-0 px-1"
+              >
+                ✕
+              </button>
+            </div>
+          )
+        })}
+
+        <button
+          onClick={addDependant}
+          className="flex items-center gap-1 mt-2 bg-transparent border-0 cursor-pointer text-muted text-xs"
+        >
+          <Plus size={12} /> Add a child
+        </button>
+
+        <p className="text-xs text-muted my-2 leading-relaxed">
+          Used only by the financial health check, so it can compare you against households at
+          the same stage rather than generic guidance. Birth months are stored, so ages stay current.
         </p>
       </div>
 
