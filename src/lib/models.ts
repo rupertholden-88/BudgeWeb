@@ -4,11 +4,18 @@ export type SpendingPriority = 'NECESSITY' | 'DISCRETIONARY' | 'NONE'
 export type AssetType = 'CASH' | 'CASH_ISA' | 'STOCKS_SHARES_ISA' | 'JUNIOR_ISA' | 'LIFETIME_ISA' | 'SAVINGS_ACCOUNT' | 'CRYPTO' | 'OTHER' | 'PENSION'
 export type DebtType = 'CREDIT_CARD' | 'PERSONAL_LOAN' | 'CAR_FINANCE' | 'MORTGAGE' | 'STUDENT_LOAN' | 'OTHER'
 
-export interface LineItem { id: string; label: string; amount: number; priority: SpendingPriority; renewalDate?: string }
+/**
+ * `sharedContribution` marks a cost paid out of one person's own column that
+ * nonetheless benefits the household — a mortgage one partner covers alone,
+ * say. It doesn't change who pays it (the totals already reflect that); it
+ * makes the cost visible to the fairness comparison, which would otherwise
+ * treat it as personal spending and understate that person's contribution.
+ */
+export interface LineItem { id: string; label: string; amount: number; priority: SpendingPriority; renewalDate?: string; sharedContribution?: boolean }
 export interface Category { key: string; owner: Owner; type: EntryType; label: string; shared?: boolean; note?: string; items: LineItem[] }
 export interface Asset { id: string; type: AssetType; label: string; amount: number; interestRate?: number; institution?: string }
 export interface SavingsSnapshot { date: string; owner: Owner; assets: Asset[] }
-export interface Debt { id: string; owner: Owner; type: DebtType; label: string; currentBalance: number; monthlyPayment: number; interestRate: number; isZeroPercent: boolean; zeroPercentExpiryDate?: string; institution?: string }
+export interface Debt { id: string; owner: Owner; type: DebtType; label: string; currentBalance: number; monthlyPayment: number; interestRate: number; isZeroPercent: boolean; zeroPercentExpiryDate?: string; institution?: string; sharedContribution?: boolean }
 export interface SpendSnapshot { date: string; totalInc: number; totalExp: number; totalSav: number }
 export type FinancialHealthStatus = 'strong' | 'solid' | 'attention' | 'at_risk'
 export interface FinancialHealthResult {
@@ -109,6 +116,35 @@ export function calcTotals(budget: BudgetData): Totals {
 export const fmt = (n: number) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(n)
 export type TabFilter = 'ALL' | 'NIAMH' | 'RUPERT' | 'JOINT'
+
+/**
+ * How household costs actually break down, accounting for costs one person
+ * pays alone on the household's behalf. `jointPot` is split evenly by
+ * convention; `sharedByN`/`sharedByR` are borne entirely by that person.
+ */
+export function householdCostSplit(budget: BudgetData, totals: Totals) {
+  const sharedFor = (owner: Owner) => {
+    const fromItems = budget.categories
+      .filter(c => c.owner === owner && c.type === 'EXPENSE')
+      .reduce((a, c) => a + c.items.filter(i => i.sharedContribution).reduce((b, i) => b + i.amount, 0), 0)
+    const fromDebts = budget.debts
+      .filter(d => d.owner === owner && d.sharedContribution)
+      .reduce((a, d) => a + d.monthlyPayment, 0)
+    return fromItems + fromDebts
+  }
+  const jointPot = totals.expJoint + totals.savJoint + totals.debtJoint
+  const sharedByN = sharedFor('NIAMH')
+  const sharedByR = sharedFor('RUPERT')
+  return {
+    jointPot,
+    sharedByN,
+    sharedByR,
+    householdTotal: jointPot + sharedByN + sharedByR,
+    // What each person actually puts towards the household.
+    contributionN: jointPot / 2 + sharedByN,
+    contributionR: jointPot / 2 + sharedByR,
+  }
+}
 
 /** Months to clear a balance at a given APR, or null if the payment never clears it. */
 export function monthsToClear(balance: number, payment: number, annualRate: number): number | null {

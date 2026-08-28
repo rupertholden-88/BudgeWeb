@@ -23,6 +23,8 @@ function estimateCostUsd(usage: Anthropic.Usage) {
 function buildPrompt(summary: FinancialSummary): string {
   return `You are writing a detailed financial health review for a UK couple who share a budgeting app. Below is an anonymised numeric summary — no names, no account or provider details, currency is GBP. Assess their financial health compared with general, well-established UK personal-finance guidelines (e.g. typical savings-rate targets, a 3–6 month emergency fund, pension contribution norms, and reasonable debt costs) — not a real individualised peer database, since you don't have access to one. Be specific and reference their actual figures throughout rather than writing generically. Where something is a genuine strength, say so plainly; don't manufacture a concern to seem balanced, and don't pad a section with filler if there's little to say.
 
+On fairness: judge it on householdCosts.perPerson — totalContribution and pctOfOwnIncome already include anything a person pays alone on the household's behalf (paidAloneForHousehold), not just their half of the joint pot. If one person carries a large paidAloneForHousehold figure, say so explicitly and factor it in; do not describe the split as uneven purely because the joint pot is halved. If householdCosts is null, or both paidAloneForHousehold figures are 0 while you'd expect a major shared cost like rent or a mortgage to exist, note that costs paid individually may not be flagged as household contributions yet, rather than assuming they don't exist.
+
 Household summary (monthly figures unless stated; debts and renewals include per-item detail):
 ${JSON.stringify(summary, null, 2)}
 

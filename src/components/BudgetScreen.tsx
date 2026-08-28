@@ -238,14 +238,16 @@ function RenewalBadge({ days }: { days: number }) {
   )
 }
 
-function ItemRow({ catKey, item, canRenew, onUpdateAmount, onRemoveItem, onRenameItem, onUpdateRenewal }: {
+function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemoveItem, onRenameItem, onUpdateRenewal, onToggleShared }: {
   catKey: string
-  item: { id: string; label: string; amount: number; renewalDate?: string }
+  item: { id: string; label: string; amount: number; renewalDate?: string; sharedContribution?: boolean }
   canRenew: boolean
+  canMarkShared: boolean
   onUpdateAmount: (catKey: string, itemId: string, v: number) => void
   onRemoveItem: (catKey: string, itemId: string) => void
   onRenameItem: (catKey: string, itemId: string, label: string) => void
   onUpdateRenewal: (catKey: string, itemId: string, date: string) => void
+  onToggleShared: (catKey: string, itemId: string) => void
 }) {
   const [editingLabel, setEditingLabel] = useState(false)
   const [labelDraft, setLabelDraft] = useState(item.label)
@@ -290,18 +292,23 @@ function ItemRow({ catKey, item, canRenew, onUpdateAmount, onRemoveItem, onRenam
               >
                 {item.label}
               </span>
-              {days != null && <RenewalBadge days={days} />}
+              <span className="flex items-center gap-2 flex-wrap">
+                {days != null && <RenewalBadge days={days} />}
+                {item.sharedContribution && (
+                  <span className="text-[10px] font-medium text-joint">Counts as household</span>
+                )}
+              </span>
             </div>
           )}
           <AmountCell value={item.amount} onChange={v => onUpdateAmount(catKey, item.id, v)} />
-          {canRenew && (
+          {(canRenew || canMarkShared) && (
             <button
               onClick={() => setExpanded(e => !e)}
               onMouseDown={e => e.stopPropagation()}
-              aria-label={`Renewal date for ${item.label}`}
+              aria-label={`Options for ${item.label}`}
               aria-expanded={expanded}
               className={`border-0 cursor-pointer flex items-center justify-center shrink-0 w-8 h-8 rounded-lg ${
-                item.renewalDate
+                item.renewalDate || item.sharedContribution
                   ? 'bg-expense-bg text-expense-text'
                   : expanded ? 'bg-surface text-ink' : 'bg-surface text-muted'
               }`}
@@ -329,6 +336,19 @@ function ItemRow({ catKey, item, canRenew, onUpdateAmount, onRemoveItem, onRenam
             )}
           </div>
         )}
+        {expanded && canMarkShared && (
+          <label className="flex items-start gap-2 pb-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!item.sharedContribution}
+              onChange={() => onToggleShared(catKey, item.id)}
+              className="mt-0.5 shrink-0"
+            />
+            <span className="text-[10px] text-muted leading-snug">
+              I pay this, but it&apos;s for the household — count it towards my share of joint costs
+            </span>
+          </label>
+        )}
       </div>
     </>
   )
@@ -336,7 +356,7 @@ function ItemRow({ catKey, item, canRenew, onUpdateAmount, onRemoveItem, onRenam
 
 // ─── category card ────────────────────────────────────────────────────────────
 
-function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem, onRenameItem, onRenameCategory, onDeleteCategory, onUpdateRenewal }: {
+function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem, onRenameItem, onRenameCategory, onDeleteCategory, onUpdateRenewal, onToggleShared }: {
   cat: Category; ownerName: string
   onUpdateAmount: (catKey: string, itemId: string, v: number) => void
   onAddItem: (catKey: string, label: string) => void
@@ -345,6 +365,7 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
   onRenameCategory: (catKey: string, label: string) => void
   onDeleteCategory: (catKey: string) => void
   onUpdateRenewal: (catKey: string, itemId: string, date: string) => void
+  onToggleShared: (catKey: string, itemId: string) => void
 }) {
   const [open, setOpen] = useState(true)
   const [addingItem, setAddingItem] = useState(false)
@@ -420,8 +441,12 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
               <ItemRow
                 key={item.id} catKey={cat.key} item={item}
                 canRenew={cat.type === 'EXPENSE'}
+                // Joint costs are already shared, so the flag only applies to
+                // an expense sitting in one person's own column.
+                canMarkShared={cat.type === 'EXPENSE' && cat.owner !== 'JOINT'}
                 onUpdateAmount={onUpdateAmount} onRemoveItem={onRemoveItem}
                 onRenameItem={onRenameItem} onUpdateRenewal={onUpdateRenewal}
+                onToggleShared={onToggleShared}
               />
             ))}
             {addingItem ? (
@@ -457,7 +482,7 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
 const OWNER_ORDER: Owner[] = ['NIAMH', 'RUPERT', 'JOINT']
 
 export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budget: BudgetHook; tab: TabFilter; onNavigateToDebts: () => void }) {
-  const { data, totals, updateItemAmount, addItem, removeItem, renameItem, renameCategory, deleteCategory, addCategory, updateItemRenewal } = budget
+  const { data, totals, updateItemAmount, addItem, removeItem, renameItem, renameCategory, deleteCategory, addCategory, updateItemRenewal, toggleItemShared } = budget
   const [addingCat, setAddingCat] = useState(false)
   const [newCatLabel, setNewCatLabel] = useState('')
   const [newCatOwner, setNewCatOwner] = useState<Owner>('JOINT')
@@ -522,6 +547,7 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
                 onRemoveItem={removeItem} onRenameItem={renameItem}
                 onRenameCategory={renameCategory} onDeleteCategory={deleteCategory}
                 onUpdateRenewal={updateItemRenewal}
+                onToggleShared={toggleItemShared}
               />
             ))}
           </div>

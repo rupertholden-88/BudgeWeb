@@ -1,4 +1,4 @@
-import { BudgetData, Totals, Owner, daysUntil, monthsToClear, upcomingRenewals } from './models'
+import { BudgetData, Totals, Owner, daysUntil, monthsToClear, upcomingRenewals, householdCostSplit } from './models'
 
 /**
  * A numbers-only snapshot of the household's finances for an AI assessment.
@@ -16,7 +16,17 @@ export interface FinancialSummary {
   }
   earners: number
   incomeSplitPct: number[] // e.g. [38, 62] — proportion of household income each earner brings
-  jointCostSplit: { sharedTotal: number; equalSplitPctOfIncome: number[] } | null
+  /**
+   * Household costs and who actually bears them. `jointPot` is split evenly by
+   * convention; `paidAloneForHousehold` is what each person covers by
+   * themselves on the household's behalf (a mortgage one partner pays, say),
+   * which the even split alone would hide.
+   */
+  householdCosts: {
+    jointPot: number
+    total: number
+    perPerson: { paidAloneForHousehold: number; totalContribution: number; pctOfOwnIncome: number; income: number }[]
+  } | null
   assets: {
     liquidTotal: number
     pensionsTotal: number
@@ -73,9 +83,16 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
   const incomeSum = incomes.reduce((a, b) => a + b, 0)
   const incomeSplitPct = incomeSum > 0 ? incomes.map(v => Math.round((v / incomeSum) * 100)) : []
 
-  const jointTotal = totals.expJoint + totals.savJoint + totals.debtJoint
-  const jointCostSplit = jointTotal > 0 && incomeSum > 0
-    ? { sharedTotal: jointTotal, equalSplitPctOfIncome: incomes.map(v => Math.round(((jointTotal / incomes.length) / v) * 1000) / 10) }
+  const split = householdCostSplit(data, totals)
+  const householdCosts = split.householdTotal > 0 && totals.incN > 0 && totals.incR > 0
+    ? {
+        jointPot: Math.round(split.jointPot),
+        total: Math.round(split.householdTotal),
+        perPerson: [
+          { income: totals.incN, paidAloneForHousehold: Math.round(split.sharedByN), totalContribution: Math.round(split.contributionN), pctOfOwnIncome: Math.round((split.contributionN / totals.incN) * 1000) / 10 },
+          { income: totals.incR, paidAloneForHousehold: Math.round(split.sharedByR), totalContribution: Math.round(split.contributionR), pctOfOwnIncome: Math.round((split.contributionR / totals.incR) * 1000) / 10 },
+        ],
+      }
     : null
 
   const renewals = upcomingRenewals(data)
@@ -95,7 +112,7 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
     },
     earners: incomes.length,
     incomeSplitPct,
-    jointCostSplit,
+    householdCosts,
     assets: {
       liquidTotal,
       pensionsTotal,

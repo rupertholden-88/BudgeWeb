@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { fmt, Owner, upcomingRenewals, monthsToClear } from '@/lib/models'
+import { fmt, Owner, upcomingRenewals, monthsToClear, householdCostSplit } from '@/lib/models'
 import { buildFinancialSummary, hashSummary } from '@/lib/financialSummary'
 import { useApiKey } from '@/hooks/useApiKey'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
@@ -383,20 +383,18 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
 
   // ── Fair share ────────────────────────────────────────────────────────────
   const fairShare = useMemo(() => {
-    const jointTotal = totals.expJoint + totals.savJoint + totals.debtJoint
-    if (jointTotal <= 0 || totals.incN <= 0 || totals.incR <= 0) return null
-    const half = jointTotal / 2
+    const split = householdCostSplit(data, totals)
+    if (split.householdTotal <= 0 || totals.incN <= 0 || totals.incR <= 0) return null
     const shareN = totals.incN / (totals.incN + totals.incR)
     return {
-      jointTotal,
-      half,
-      currentPctN: (half / totals.incN) * 100,
-      currentPctR: (half / totals.incR) * 100,
-      fairN: jointTotal * shareN,
-      fairR: jointTotal * (1 - shareN),
+      ...split,
+      currentPctN: (split.contributionN / totals.incN) * 100,
+      currentPctR: (split.contributionR / totals.incR) * 100,
+      fairN: split.householdTotal * shareN,
+      fairR: split.householdTotal * (1 - shareN),
       fairPct: shareN * 100,
     }
-  }, [totals])
+  }, [data, totals])
 
   // ── Trend ─────────────────────────────────────────────────────────────────
   const monthlyData = useMemo(() => {
@@ -672,24 +670,31 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
       {fairShare && (
         <SectionCard
           title="Fair share"
-          sub={`Splitting ${fmt(fairShare.jointTotal)} of joint costs down the middle`}
+          sub={fairShare.sharedByN + fairShare.sharedByR > 0
+            ? `${fmt(fairShare.householdTotal)} of household costs — the joint pot split evenly, plus what each of you covers alone`
+            : `Splitting ${fmt(fairShare.householdTotal)} of joint costs down the middle`}
           icon={<Scale size={14} />}
         >
           <div className="space-y-3">
             {[
-              { name: n1, pct: fairShare.currentPctN, cls: 'bg-niamh' },
-              { name: n2, pct: fairShare.currentPctR, cls: 'bg-rupert' },
+              { name: n1, pct: fairShare.currentPctN, paid: fairShare.contributionN, extra: fairShare.sharedByN, cls: 'bg-niamh' },
+              { name: n2, pct: fairShare.currentPctR, paid: fairShare.contributionR, extra: fairShare.sharedByR, cls: 'bg-rupert' },
             ].map(p => (
               <div key={p.name}>
-                <div className="flex justify-between items-baseline mb-1">
+                <div className="flex justify-between items-baseline mb-1 gap-2">
                   <span className="text-[13px] font-medium text-ink">{p.name}</span>
-                  <span className="text-xs tabular-nums text-muted">
-                    {fmt(fairShare.half)} — <span className="font-semibold text-ink">{p.pct.toFixed(0)}%</span> of income
+                  <span className="text-xs tabular-nums text-muted text-right">
+                    {fmt(p.paid)} — <span className="font-semibold text-ink">{p.pct.toFixed(0)}%</span> of income
                   </span>
                 </div>
                 <div className="h-[6px] bg-surface rounded-full overflow-hidden">
                   <div className={`h-full rounded-full ${p.cls}`} style={{ width: `${Math.min(100, p.pct)}%` }} />
                 </div>
+                {p.extra > 0 && (
+                  <div className="text-[10px] text-muted mt-1">
+                    {fmt(fairShare.jointPot / 2)} of the joint pot + {fmt(p.extra)} paid alone
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -697,22 +702,22 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
           {Math.abs(fairShare.currentPctN - fairShare.currentPctR) > 2 && (
             <div className="mt-3 pt-3 border-t border-border">
               <div className="text-[11px] text-muted mb-2">
-                Split by income instead ({fairShare.fairPct.toFixed(0)}/{(100 - fairShare.fairPct).toFixed(0)}), each would pay:
+                Split by income instead ({fairShare.fairPct.toFixed(0)}/{(100 - fairShare.fairPct).toFixed(0)}), each would cover:
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
                   <div className="text-[10px] text-muted mb-0.5">{n1}</div>
                   <div className="text-sm font-bold tabular-nums text-ink">{fmt(fairShare.fairN)}</div>
-                  <div className={`text-[10px] tabular-nums ${fairShare.fairN < fairShare.half ? 'text-positive' : 'text-negative'}`}>
-                    {fairShare.fairN < fairShare.half ? '−' : '+'}{fmt(Math.abs(fairShare.fairN - fairShare.half))}
+                  <div className={`text-[10px] tabular-nums ${fairShare.fairN < fairShare.contributionN ? 'text-positive' : 'text-negative'}`}>
+                    {fairShare.fairN < fairShare.contributionN ? '−' : '+'}{fmt(Math.abs(fairShare.fairN - fairShare.contributionN))}
                   </div>
                 </div>
                 <div className="hairline-v" />
                 <div className="flex-1">
                   <div className="text-[10px] text-muted mb-0.5">{n2}</div>
                   <div className="text-sm font-bold tabular-nums text-ink">{fmt(fairShare.fairR)}</div>
-                  <div className={`text-[10px] tabular-nums ${fairShare.fairR < fairShare.half ? 'text-positive' : 'text-negative'}`}>
-                    {fairShare.fairR < fairShare.half ? '−' : '+'}{fmt(Math.abs(fairShare.fairR - fairShare.half))}
+                  <div className={`text-[10px] tabular-nums ${fairShare.fairR < fairShare.contributionR ? 'text-positive' : 'text-negative'}`}>
+                    {fairShare.fairR < fairShare.contributionR ? '−' : '+'}{fmt(Math.abs(fairShare.fairR - fairShare.contributionR))}
                   </div>
                 </div>
               </div>
