@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { Category, TabFilter, Owner, EntryType, fmt, calcTotals, daysUntil } from '@/lib/models'
-import { Plus, ChevronDown, ChevronUp, Check, TrendingUp, TrendingDown, CalendarClock } from 'lucide-react'
+import { Plus, ChevronDown, ChevronUp, Check, TrendingUp, TrendingDown, CalendarClock, SlidersHorizontal } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -277,7 +277,9 @@ function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemo
                 onChange={e => setLabelDraft(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') commitLabel() }}
                 onBlur={commitLabel}
-                className="flex-1 text-[13px] border-[1.5px] border-rupert rounded-lg px-2 py-1 outline-none bg-rupert-light"
+                // min-w-0 or the input refuses to shrink below its intrinsic
+                // width and pushes the options button off the row.
+                className="flex-1 min-w-0 text-[13px] border-[1.5px] border-rupert rounded-lg px-2 py-1 outline-none bg-rupert-light"
                 autoFocus
               />
               <button onClick={commitLabel} className="bg-ink text-white border-0 rounded-lg px-2 py-1 cursor-pointer flex items-center">
@@ -313,7 +315,9 @@ function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemo
                   : expanded ? 'bg-surface text-ink' : 'bg-surface text-muted'
               }`}
             >
-              <CalendarClock size={15} />
+              {/* Sliders, not a calendar — this panel also holds the household
+                  flag, which a calendar icon gives no hint of. */}
+              {canMarkShared ? <SlidersHorizontal size={15} /> : <CalendarClock size={15} />}
             </button>
           )}
         </div>
@@ -401,7 +405,7 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
                 onChange={e => setNameDraft(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') commitName() }}
                 onBlur={commitName}
-                className="flex-1 text-sm font-semibold border-[1.5px] border-rupert rounded-lg px-2.5 py-1.5 outline-none bg-rupert-light"
+                className="flex-1 min-w-0 text-sm font-semibold border-[1.5px] border-rupert rounded-lg px-2.5 py-1.5 outline-none bg-rupert-light"
                 autoFocus
               />
               <button onClick={commitName} onMouseDown={e => e.stopPropagation()} className="bg-ink text-white border-0 rounded-lg px-2 py-1.5 cursor-pointer flex">
