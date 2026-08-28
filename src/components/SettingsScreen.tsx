@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Check } from 'lucide-react'
+import { Check, KeyRound } from 'lucide-react'
+import { useApiKey } from '@/hooks/useApiKey'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -40,10 +41,29 @@ function NameRow({ label, value, onSave, colorClass }: { label: string; value: s
 }
 
 export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, updateOwnerName, getJsonString, importFromJson } = budget
+  const { data, user, updateOwnerName, getJsonString, importFromJson } = budget
   const [importText, setImportText] = useState('')
   const [importResult, setImportResult] = useState<string | null>(null)
   const [darkMode, setDarkMode] = useState(false)
+
+  const { hasKey, last4, loading: keyLoading, saveKey, removeKey } = useApiKey(user)
+  const [keyDraft, setKeyDraft] = useState('')
+  const [editingKey, setEditingKey] = useState(false)
+  const [keyMsg, setKeyMsg] = useState<string | null>(null)
+
+  const handleSaveKey = async () => {
+    if (!keyDraft.trim()) return
+    await saveKey(keyDraft.trim())
+    setKeyDraft('')
+    setEditingKey(false)
+    setKeyMsg('Key saved.')
+    setTimeout(() => setKeyMsg(null), 2500)
+  }
+  const handleRemoveKey = async () => {
+    await removeKey()
+    setKeyMsg('Key removed.')
+    setTimeout(() => setKeyMsg(null), 2500)
+  }
 
   useEffect(() => {
     const saved = localStorage.getItem('budge-dark-mode')
@@ -155,6 +175,79 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
           <div className={`mt-2 text-[13px] px-2.5 py-1.5 rounded-md ${importOk ? 'text-positive bg-income-bg' : 'text-negative bg-expense-bg'}`}>
             {importResult}
           </div>
+        )}
+      </div>
+
+      <div className="card px-4 py-3 mb-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted mb-2 flex items-center gap-1.5">
+          <KeyRound size={12} /> AI Financial Health Check
+        </div>
+        {!user ? (
+          <p className="text-[13px] text-muted m-0 leading-relaxed">
+            Sign in to add your own Anthropic API key. It's tied to your Google account — anyone else who opens this
+            app needs to add their own key too, so the check only ever runs (and is only ever billed) against the
+            person who's using it.
+          </p>
+        ) : keyLoading ? (
+          <p className="text-[13px] text-muted m-0">Checking…</p>
+        ) : hasKey && !editingKey ? (
+          <>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium tabular-nums">•••• {last4}</span>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => { setKeyDraft(''); setEditingKey(true) }}
+                  className="text-[12px] bg-transparent border-[1.5px] border-border rounded-md px-2.5 py-1 cursor-pointer"
+                >
+                  Replace
+                </button>
+                <button
+                  onClick={handleRemoveKey}
+                  className="text-[12px] bg-transparent text-negative border-[1.5px] border-negative/40 rounded-md px-2.5 py-1 cursor-pointer"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted mt-2 mb-0 leading-relaxed">
+              Used only for the financial health check on Analysis, and only for your own account.
+            </p>
+          </>
+        ) : (
+          <>
+            <input
+              type="password"
+              value={keyDraft}
+              onChange={e => setKeyDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleSaveKey() }}
+              placeholder="sk-ant-..."
+              className="w-full text-sm border-[1.5px] border-border rounded-lg px-3 py-2 outline-none font-mono"
+            />
+            <div className="flex gap-1.5 mt-2">
+              <button
+                onClick={handleSaveKey}
+                disabled={!keyDraft.trim()}
+                className={`flex-1 border-0 rounded-lg py-2 text-sm font-medium text-white ${keyDraft.trim() ? 'bg-ink cursor-pointer' : 'bg-border cursor-default'}`}
+              >
+                Save key
+              </button>
+              {hasKey && (
+                <button
+                  onClick={() => setEditingKey(false)}
+                  className="px-3 bg-transparent border-[1.5px] border-border rounded-lg py-2 text-sm cursor-pointer"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-muted mt-2 mb-0 leading-relaxed">
+              From <span className="font-mono">console.anthropic.com</span> — stored against your account, never
+              shared with anyone else who signs into this app, and never included in your JSON backup.
+            </p>
+          </>
+        )}
+        {keyMsg && (
+          <div className="mt-2 text-[13px] px-2.5 py-1.5 rounded-md text-positive bg-income-bg">{keyMsg}</div>
         )}
       </div>
 

@@ -3,8 +3,9 @@
 import { useMemo, useState } from 'react'
 import { fmt, Owner, upcomingRenewals, monthsToClear } from '@/lib/models'
 import { buildFinancialSummary, hashSummary } from '@/lib/financialSummary'
+import { useApiKey } from '@/hooks/useApiKey'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown, CalendarClock, Sparkles } from 'lucide-react'
+import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown, CalendarClock, Sparkles, KeyRound } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -80,16 +81,22 @@ function healthLabel(status: string) {
   return status === 'strong' ? 'Strong' : status === 'solid' ? 'Solid' : status === 'at_risk' ? 'At risk' : 'Needs attention'
 }
 
-function fmtUsd(n: number) {
-  return `$${n < 0.01 ? n.toFixed(4) : n.toFixed(2)}`
+// Anthropic bills in USD; the household's own figures are all in GBP, so
+// convert for display. No live FX feed — approximate, update by hand
+// alongside PRICE_PER_MILLION in the API route if it drifts noticeably.
+const USD_TO_GBP = 0.79
+function fmtGbp(usd: number) {
+  const gbp = usd * USD_TO_GBP
+  return `£${gbp < 0.01 ? gbp.toFixed(4) : gbp.toFixed(2)}`
 }
 
-function FinancialHealthCard({ data, totals, recordFinancialHealthRun }: {
-  data: BudgetHook['data']; totals: BudgetHook['totals']
+function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
+  data: BudgetHook['data']; totals: BudgetHook['totals']; user: BudgetHook['user']
   recordFinancialHealthRun: BudgetHook['recordFinancialHealthRun']
 }) {
   const summary = useMemo(() => buildFinancialSummary(data, totals), [data, totals])
   const currentHash = useMemo(() => hashSummary(summary), [summary])
+  const { apiKey, hasKey, last4, loading: keyLoading } = useApiKey(user)
 
   // The result is synced via Firestore alongside the rest of the budget, so
   // it follows the account across devices rather than living per-browser.
@@ -107,13 +114,14 @@ function FinancialHealthCard({ data, totals, recordFinancialHealthRun }: {
   const hasEnoughData = totals.totalInc > 0 || totals.totalExp > 0
 
   const run = async () => {
+    if (!apiKey) return
     setLoading(true)
     setError(null)
     try {
       const res = await fetch('/api/financial-health', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ summary }),
+        body: JSON.stringify({ summary, apiKey }),
       })
       const body = await res.json().catch(() => ({}))
       const costUsd: number = typeof body.costUsd === 'number' ? body.costUsd : 0
@@ -166,7 +174,7 @@ function FinancialHealthCard({ data, totals, recordFinancialHealthRun }: {
                 {generatedAt && (
                   <span className="text-[10px] text-muted">
                     {stale ? 'Based on earlier figures' : `Checked ${new Date(generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
-                    {lastCostUsd != null && ` · ${fmtUsd(lastCostUsd)}`}
+                    {lastCostUsd != null && ` · ${fmtGbp(lastCostUsd)}`}
                   </span>
                 )}
               </div>
@@ -233,27 +241,41 @@ function FinancialHealthCard({ data, totals, recordFinancialHealthRun }: {
 
           {error && (
             error.notConfigured ? (
-              <div className="text-[12px] text-muted bg-surface rounded-lg p-3 mb-3 leading-relaxed">
-                This needs an Anthropic API key set on the server — add <code className="font-mono">ANTHROPIC_API_KEY</code> under
-                your Vercel project's Environment Variables, then redeploy. It can't be entered here, since a key typed into
-                the app would be visible to anyone using this browser.
-              </div>
+              <div className="text-[12px] text-muted bg-surface rounded-lg p-3 mb-3 leading-relaxed">{error.message}</div>
             ) : (
               <div className="text-[12px] text-negative bg-expense-bg rounded-lg p-3 mb-3">{error.message}</div>
             )
           )}
 
-          <button
-            onClick={run}
-            disabled={loading}
-            className={`w-full border-0 rounded-lg py-2.5 text-[13px] font-semibold ${loading ? 'bg-border text-muted cursor-default' : 'bg-ink text-white cursor-pointer'}`}
-          >
-            {loading ? 'Checking…' : result ? 'Refresh check' : 'Run financial health check'}
-          </button>
+          {!user ? (
+            <div className="text-[12px] text-muted bg-surface rounded-lg p-3 leading-relaxed flex items-start gap-2">
+              <KeyRound size={13} className="shrink-0 mt-0.5" />
+              <span>Sign in and add your own Anthropic API key in Settings to run this — it's billed to your own account, never shared with anyone else who opens this app.</span>
+            </div>
+          ) : keyLoading ? (
+            <p className="text-[12px] text-muted text-center m-0">Checking for your API key…</p>
+          ) : !hasKey ? (
+            <div className="text-[12px] text-muted bg-surface rounded-lg p-3 leading-relaxed flex items-start gap-2">
+              <KeyRound size={13} className="shrink-0 mt-0.5" />
+              <span>Add your own Anthropic API key in Settings to run this — it's yours alone, never shared with anyone else who opens this app.</span>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={run}
+                disabled={loading}
+                className={`w-full border-0 rounded-lg py-2.5 text-[13px] font-semibold ${loading ? 'bg-border text-muted cursor-default' : 'bg-ink text-white cursor-pointer'}`}
+              >
+                {loading ? 'Checking…' : result ? 'Refresh check' : 'Run financial health check'}
+              </button>
+              <p className="text-[10px] text-muted mt-2 mb-0.5 text-center">Using your own key, ending •••• {last4}</p>
+            </>
+          )}
+
           <p className="text-[10px] text-muted mt-2 mb-0 text-center leading-relaxed">
             General guidance from typical UK household benchmarks — not regulated financial advice.
             {usage && usage.totalRuns > 0 && (
-              <> Spent {fmtUsd(usage.totalCostUsd)} on {usage.totalRuns} {usage.totalRuns === 1 ? 'check' : 'checks'} so far.</>
+              <> Spent {fmtGbp(usage.totalCostUsd)} on {usage.totalRuns} {usage.totalRuns === 1 ? 'check' : 'checks'} so far.</>
             )}
           </p>
         </>
@@ -263,7 +285,7 @@ function FinancialHealthCard({ data, totals, recordFinancialHealthRun }: {
 }
 
 export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, totals, recordFinancialHealthRun } = budget
+  const { data, totals, user, recordFinancialHealthRun } = budget
   const today = new Date().toISOString().slice(0, 7)
 
   const n1 = data.nameNiamh || 'Person 1'
@@ -418,7 +440,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
         />
       </div>
 
-      <FinancialHealthCard data={data} totals={totals} recordFinancialHealthRun={recordFinancialHealthRun} />
+      <FinancialHealthCard data={data} totals={totals} user={user} recordFinancialHealthRun={recordFinancialHealthRun} />
 
       {/* 0% expiry warnings — time-sensitive, so they lead */}
       {expiries.map(({ debt, days, expiry, balanceAtExpiry, monthlyInterestAfter, rate }) => (

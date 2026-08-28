@@ -60,21 +60,24 @@ function parseAssessment(raw: string): unknown | null {
 }
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'not_configured', message: 'ANTHROPIC_API_KEY is not set on the server.' },
-      { status: 501 }
-    )
-  }
-
   let summary: FinancialSummary
+  let apiKey: string
   try {
     const body = await req.json()
     summary = body.summary
+    apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : ''
     if (!summary || typeof summary !== 'object') throw new Error('missing summary')
   } catch {
     return NextResponse.json({ error: 'bad_request', message: 'Missing or invalid summary payload.' }, { status: 400 })
+  }
+
+  // No server-wide key — each person brings their own, tied to their own
+  // account, so one person's usage is never billed to someone else's key.
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: 'not_configured', message: 'Add your own Anthropic API key in Settings to use this feature.' },
+      { status: 501 }
+    )
   }
 
   const client = new Anthropic({ apiKey })
@@ -93,7 +96,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) {
       return NextResponse.json(
-        { error: 'not_configured', message: 'The ANTHROPIC_API_KEY set on the server was rejected — check it in Vercel.' },
+        { error: 'not_configured', message: 'Your Anthropic API key was rejected — check it in Settings.' },
         { status: 501 }
       )
     }
