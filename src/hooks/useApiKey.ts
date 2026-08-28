@@ -29,16 +29,33 @@ export function useApiKey(user: User | null) {
 
   useEffect(() => { refresh() }, [refresh])
 
-  const saveKey = async (key: string) => {
-    if (!user?.email || !key.trim()) return
-    await setDoc(doc(db, COLLECTION, user.email), { anthropicApiKey: key.trim(), updatedAt: new Date().toISOString() })
-    await refresh()
+  const saveKey = async (key: string): Promise<{ ok: boolean; message?: string }> => {
+    if (!user?.email) return { ok: false, message: 'Sign in first.' }
+    if (!key.trim()) return { ok: false, message: 'Enter a key.' }
+    try {
+      await setDoc(doc(db, COLLECTION, user.email), { anthropicApiKey: key.trim(), updatedAt: new Date().toISOString() })
+      await refresh()
+      return { ok: true }
+    } catch (err: any) {
+      if (err?.code === 'permission-denied') {
+        return { ok: false, message: "Firestore's security rules are blocking this — the apiKeys collection needs a rule allowing a signed-in user to write their own document." }
+      }
+      return { ok: false, message: 'Could not save — check your connection and try again.' }
+    }
   }
 
-  const removeKey = async () => {
-    if (!user?.email) return
-    await deleteDoc(doc(db, COLLECTION, user.email))
-    await refresh()
+  const removeKey = async (): Promise<{ ok: boolean; message?: string }> => {
+    if (!user?.email) return { ok: false, message: 'Sign in first.' }
+    try {
+      await deleteDoc(doc(db, COLLECTION, user.email))
+      await refresh()
+      return { ok: true }
+    } catch (err: any) {
+      if (err?.code === 'permission-denied') {
+        return { ok: false, message: "Firestore's security rules are blocking this." }
+      }
+      return { ok: false, message: 'Could not remove — check your connection and try again.' }
+    }
   }
 
   return {

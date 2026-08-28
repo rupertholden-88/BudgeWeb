@@ -49,20 +49,27 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
   const { hasKey, last4, loading: keyLoading, saveKey, removeKey } = useApiKey(user)
   const [keyDraft, setKeyDraft] = useState('')
   const [editingKey, setEditingKey] = useState(false)
-  const [keyMsg, setKeyMsg] = useState<string | null>(null)
+  const [keyMsg, setKeyMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [savingKey, setSavingKey] = useState(false)
 
   const handleSaveKey = async () => {
     if (!keyDraft.trim()) return
-    await saveKey(keyDraft.trim())
-    setKeyDraft('')
-    setEditingKey(false)
-    setKeyMsg('Key saved.')
-    setTimeout(() => setKeyMsg(null), 2500)
+    setSavingKey(true)
+    const result = await saveKey(keyDraft.trim())
+    setSavingKey(false)
+    if (result.ok) {
+      setKeyDraft('')
+      setEditingKey(false)
+      setKeyMsg({ ok: true, text: 'Key saved.' })
+      setTimeout(() => setKeyMsg(null), 2500)
+    } else {
+      setKeyMsg({ ok: false, text: result.message ?? 'Something went wrong.' })
+    }
   }
   const handleRemoveKey = async () => {
-    await removeKey()
-    setKeyMsg('Key removed.')
-    setTimeout(() => setKeyMsg(null), 2500)
+    const result = await removeKey()
+    setKeyMsg({ ok: result.ok, text: result.ok ? 'Key removed.' : (result.message ?? 'Something went wrong.') })
+    if (result.ok) setTimeout(() => setKeyMsg(null), 2500)
   }
 
   useEffect(() => {
@@ -226,10 +233,10 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
             <div className="flex gap-1.5 mt-2">
               <button
                 onClick={handleSaveKey}
-                disabled={!keyDraft.trim()}
-                className={`flex-1 border-0 rounded-lg py-2 text-sm font-medium text-white ${keyDraft.trim() ? 'bg-ink cursor-pointer' : 'bg-border cursor-default'}`}
+                disabled={!keyDraft.trim() || savingKey}
+                className={`flex-1 border-0 rounded-lg py-2 text-sm font-medium text-white ${keyDraft.trim() && !savingKey ? 'bg-ink cursor-pointer' : 'bg-border cursor-default'}`}
               >
-                Save key
+                {savingKey ? 'Saving…' : 'Save key'}
               </button>
               {hasKey && (
                 <button
@@ -247,7 +254,9 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
           </>
         )}
         {keyMsg && (
-          <div className="mt-2 text-[13px] px-2.5 py-1.5 rounded-md text-positive bg-income-bg">{keyMsg}</div>
+          <div className={`mt-2 text-[13px] px-2.5 py-1.5 rounded-md leading-relaxed ${keyMsg.ok ? 'text-positive bg-income-bg' : 'text-negative bg-expense-bg'}`}>
+            {keyMsg.text}
+          </div>
         )}
       </div>
 
