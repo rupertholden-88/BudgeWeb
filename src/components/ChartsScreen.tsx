@@ -254,7 +254,12 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
 
           {error && (
             error.notConfigured ? (
-              <div className="text-[12px] text-muted bg-surface rounded-lg p-3 mb-3 leading-relaxed">{error.message}</div>
+              <div className="text-[12px] text-muted bg-surface rounded-lg p-3 mb-3 leading-relaxed">
+                <div>{error.message}</div>
+                {error.detail && (
+                  <div className="text-[10px] font-mono opacity-70 mt-1.5 break-words">{error.detail}</div>
+                )}
+              </div>
             ) : (
               <div className="text-[12px] text-negative bg-expense-bg rounded-lg p-3 mb-3">
                 <div>{error.message}{error.httpStatus ? ` (HTTP ${error.httpStatus})` : ''}</div>

@@ -46,7 +46,7 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
   const [importResult, setImportResult] = useState<string | null>(null)
   const [darkMode, setDarkMode] = useState(false)
 
-  const { hasKey, last4, loading: keyLoading, saveKey, removeKey } = useApiKey(user)
+  const { hasKey, last4, keyLength, loading: keyLoading, saveKey, removeKey } = useApiKey(user)
   const [keyDraft, setKeyDraft] = useState('')
   const [editingKey, setEditingKey] = useState(false)
   const [keyMsg, setKeyMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -217,7 +217,10 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
               </div>
             </div>
             <p className="text-[11px] text-muted mt-2 mb-0 leading-relaxed">
-              Used only for the financial health check on Analysis, and only for your own account.
+              {keyLength} characters. Used only for the financial health check on Analysis, and only for your own account.
+              {keyLength != null && keyLength < 90 && (
+                <span className="text-negative"> An Anthropic key is normally ~108 characters, so this one looks truncated — try copying it again.</span>
+              )}
             </p>
           </>
         ) : (
@@ -228,6 +231,12 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
               onChange={e => setKeyDraft(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleSaveKey() }}
               placeholder="sk-ant-..."
+              // Mobile keyboards will happily capitalise or autocorrect a
+              // pasted key and silently break it.
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               className="w-full text-sm border-[1.5px] border-border rounded-lg px-3 py-2 outline-none font-mono"
             />
             <div className="flex gap-1.5 mt-2">

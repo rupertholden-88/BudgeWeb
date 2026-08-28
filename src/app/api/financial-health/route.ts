@@ -104,7 +104,14 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) {
       return NextResponse.json(
-        { error: 'not_configured', message: 'Your Anthropic API key was rejected — check it in Settings.' },
+        {
+          error: 'not_configured',
+          message: 'Your Anthropic API key was rejected — check it in Settings.',
+          // Anthropic's own wording distinguishes a malformed key from a
+          // revoked one or an account problem; worth showing rather than
+          // leaving the user to guess which.
+          detail: err.message,
+        },
         { status: 501 }
       )
     }
