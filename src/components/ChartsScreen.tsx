@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { fmt, Owner, upcomingRenewals } from '@/lib/models'
+import { fmt, Owner, upcomingRenewals, monthsToClear } from '@/lib/models'
 import { buildFinancialSummary, hashSummary } from '@/lib/financialSummary'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown, CalendarClock, Sparkles } from 'lucide-react'
@@ -17,16 +17,6 @@ const MONTH_LABELS: Record<string, string> = {
 function formatMonth(dateStr: string) {
   const parts = dateStr.slice(0, 7).split('-')
   return `${MONTH_LABELS[parts[1]] ?? parts[1]} ${parts[0].slice(2)}`
-}
-
-/** Months to clear a balance at a given APR, or null if the payment never clears it. */
-function monthsToClear(balance: number, payment: number, annualRate: number) {
-  if (balance <= 0) return 0
-  if (payment <= 0) return null
-  const r = annualRate / 100 / 12
-  if (r <= 0) return Math.ceil(balance / payment)
-  if (payment <= balance * r) return null // payment doesn't even cover the interest
-  return Math.ceil(-Math.log(1 - (balance * r) / payment) / Math.log(1 + r))
 }
 
 function addMonths(months: number) {
@@ -140,7 +130,7 @@ function FinancialHealthCard({ data, totals, updateFinancialHealth }: {
   return (
     <SectionCard
       title="Financial health check"
-      sub="An AI read on your numbers against general UK benchmarks"
+      sub="A detailed AI read on your numbers against general UK benchmarks"
       icon={<Sparkles size={14} />}
     >
       {!hasEnoughData ? (
@@ -164,7 +154,22 @@ function FinancialHealthCard({ data, totals, updateFinancialHealth }: {
                 )}
               </div>
               <div className="font-serif text-lg leading-snug mb-1.5">{result.headline}</div>
-              <p className="text-[13px] text-muted leading-relaxed mb-3">{result.summary}</p>
+              <p className="text-[13px] text-muted leading-relaxed mb-3">{result.overview ?? ''}</p>
+
+              {(result.sections ?? []).length > 0 && (
+                <div className="space-y-3 mb-3 pt-3 border-t border-border">
+                  {(result.sections ?? []).map((s, i) => (
+                    <div key={i} className={`pl-2.5 ${
+                      s.status && healthIntent(s.status) === 'positive' ? 'border-l-2 border-l-positive'
+                      : s.status && healthIntent(s.status) === 'negative' ? 'border-l-2 border-l-negative'
+                      : 'border-l-2 border-l-border'
+                    }`}>
+                      <div className="text-[12px] font-semibold text-ink mb-0.5">{s.title}</div>
+                      <p className="text-[12px] text-muted leading-relaxed m-0">{s.body}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {result.benchmarks?.length > 0 && (
                 <div className="space-y-2 mb-3 pt-3 border-t border-border">
@@ -194,12 +199,12 @@ function FinancialHealthCard({ data, totals, updateFinancialHealth }: {
                   </ul>
                 </div>
               )}
-              {result.watchouts?.length > 0 && (
+              {(result.priorityActions ?? []).length > 0 && (
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.06em] text-expense-text mb-1">Worth a look</div>
-                  <ul className="m-0 pl-4 space-y-0.5">
-                    {result.watchouts.map((s, i) => <li key={i} className="text-[12px] text-ink">{s}</li>)}
-                  </ul>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.06em] text-expense-text mb-1">Priority actions</div>
+                  <ol className="m-0 pl-4 space-y-1 list-decimal">
+                    {(result.priorityActions ?? []).map((s, i) => <li key={i} className="text-[12px] text-ink">{s}</li>)}
+                  </ol>
                 </div>
               )}
             </div>

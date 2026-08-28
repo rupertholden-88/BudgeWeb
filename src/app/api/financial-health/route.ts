@@ -8,24 +8,27 @@ export const runtime = 'nodejs'
 const MODEL = 'claude-sonnet-5'
 
 function buildPrompt(summary: FinancialSummary): string {
-  return `You are reviewing the household finances of a UK couple who share a budgeting app. Below is an anonymised numeric summary — no names, no account or provider details, currency is GBP. Assess their financial health compared with general, well-established UK personal-finance guidelines (e.g. typical savings-rate targets, a 3–6 month emergency fund, pension contribution norms, and reasonable debt costs) — not a real individualised peer database, since you don't have access to one. Be specific and reference their actual figures rather than writing generically. Where something is a genuine strength, say so plainly; don't manufacture a concern to seem balanced.
+  return `You are writing a detailed financial health review for a UK couple who share a budgeting app. Below is an anonymised numeric summary — no names, no account or provider details, currency is GBP. Assess their financial health compared with general, well-established UK personal-finance guidelines (e.g. typical savings-rate targets, a 3–6 month emergency fund, pension contribution norms, and reasonable debt costs) — not a real individualised peer database, since you don't have access to one. Be specific and reference their actual figures throughout rather than writing generically. Where something is a genuine strength, say so plainly; don't manufacture a concern to seem balanced, and don't pad a section with filler if there's little to say.
 
-Household summary (monthly figures unless stated):
+Household summary (monthly figures unless stated; debts and renewals include per-item detail):
 ${JSON.stringify(summary, null, 2)}
 
 Reply with ONLY a single JSON object, no markdown fences, no commentary outside it, matching exactly this shape:
 {
   "headline": "a short, specific one-line verdict (max ~8 words), not generic",
   "status": "strong" | "solid" | "attention" | "at_risk",
-  "summary": "2-3 sentences, second person ('you'/'your'), referencing real numbers from the data",
+  "overview": "3-5 sentences setting the overall scene, second person ('you'/'your'), referencing real numbers",
+  "sections": [
+    { "title": "topic name", "body": "2-5 sentences of specific, numbers-grounded analysis for this topic", "status": "strong" | "solid" | "attention" | "at_risk" }
+  ],
   "benchmarks": [
     { "metric": "short metric name", "yours": "their value as a short string e.g. '9%' or '7.1 months'", "typical": "the general guideline range as a short string", "status": "strong" | "solid" | "attention" | "at_risk" }
   ],
   "strengths": ["short specific strength", "..."],
-  "watchouts": ["short specific thing worth addressing, with a concrete suggestion where possible", "..."]
+  "priorityActions": ["a concrete, specific next step with the reasoning built into the sentence, ranked most impactful first", "..."]
 }
 
-Include 3-5 benchmark rows covering whichever of these are answerable from the data: savings rate, emergency runway, debt cost vs savings interest, pension provision, upcoming 0% expiries. Omit strengths or watchouts arrays' entries you can't honestly support from the data — 1-4 items each is fine. Do not recommend specific financial products, providers, or investments; keep suggestions to general actions (e.g. "consider shopping around before the 0% ends", "your emergency fund is below the typical 3-month minimum").`
+For "sections", cover whichever of these topics the data actually supports — typically 4-7 sections, skip a topic entirely rather than stretching thin: Income & cash flow, Emergency fund & runway, Debt (comment on individual debts by name/type where there's more than one, especially any 0% card nearing expiry or any payment too small to clear the interest), Savings & investments (comment on asset mix, not just the total), Pensions & retirement provision, Fairness of the joint-cost split between the two earners, Upcoming renewals (name the specific categories renewing soon and what's at stake). Include 3-6 benchmark rows. 2-5 priority actions, ordered by impact, each specific enough to act on today. Do not recommend specific financial products, providers, or investments; keep suggestions to general actions (e.g. "consider shopping around before the 0% ends", "your emergency fund is below the typical 3-month minimum").`
 }
 
 /** First text block in a response — thinking blocks (on by default) come before it. */
@@ -72,7 +75,9 @@ export async function POST(req: NextRequest) {
       model: MODEL,
       max_tokens: 16000,
       thinking: { type: 'adaptive' },
-      output_config: { effort: 'medium' },
+      // A genuinely detailed, sectioned review needs more synthesis across
+      // more figures than the earlier few-bullet version — worth the step up.
+      output_config: { effort: 'high' },
       messages: [{ role: 'user', content: buildPrompt(summary) }],
     })
   } catch (err) {

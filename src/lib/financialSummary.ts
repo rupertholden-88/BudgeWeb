@@ -1,4 +1,4 @@
-import { BudgetData, Totals, Owner, daysUntil } from './models'
+import { BudgetData, Totals, Owner, daysUntil, monthsToClear, upcomingRenewals } from './models'
 
 /**
  * A numbers-only snapshot of the household's finances for an AI assessment.
@@ -25,10 +25,11 @@ export interface FinancialSummary {
   }
   debts: {
     totalBalance: number
-    items: { type: string; balance: number; monthlyPayment: number; aprPct: number; isZeroPercent: boolean; zeroPercentDaysLeft: number | null }[]
+    items: { type: string; balance: number; monthlyPayment: number; aprPct: number; isZeroPercent: boolean; zeroPercentDaysLeft: number | null; monthsToClear: number | null }[]
   }
   interest: { earnedPerMonth: number; paidPerMonth: number; netPerMonth: number }
-  upcomingRenewalsCount: number
+  /** Category-level, not account-specific — e.g. "Energy", not a supplier name. */
+  upcomingRenewals: { category: string; daysUntil: number; monthlyAmount: number }[]
   history: { monthsOfData: number }
 }
 
@@ -77,11 +78,9 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
     ? { sharedTotal: jointTotal, equalSplitPctOfIncome: incomes.map(v => Math.round(((jointTotal / incomes.length) / v) * 1000) / 10) }
     : null
 
-  const renewalsCount = data.categories
-    .filter(c => c.type === 'EXPENSE')
-    .flatMap(c => c.items)
-    .filter(i => i.renewalDate && daysUntil(i.renewalDate) <= 60 && daysUntil(i.renewalDate) >= 0)
-    .length
+  const renewals = upcomingRenewals(data)
+    .filter(r => r.days <= 120)
+    .map(r => ({ category: r.category, daysUntil: r.days, monthlyAmount: r.amount }))
 
   const monthsOfData = new Set((data.spendHistory || []).map(s => s.date)).size
 
@@ -112,10 +111,11 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
         aprPct: d.isZeroPercent ? 0 : d.interestRate,
         isZeroPercent: d.isZeroPercent,
         zeroPercentDaysLeft: d.isZeroPercent && d.zeroPercentExpiryDate ? daysUntil(d.zeroPercentExpiryDate) : null,
+        monthsToClear: monthsToClear(d.currentBalance, d.monthlyPayment, d.isZeroPercent ? 0 : d.interestRate),
       })),
     },
     interest: { earnedPerMonth: Math.round(earned), paidPerMonth: Math.round(paid), netPerMonth: Math.round(earned - paid) },
-    upcomingRenewalsCount: renewalsCount,
+    upcomingRenewals: renewals,
     history: { monthsOfData },
   }
 }

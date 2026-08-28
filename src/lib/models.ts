@@ -14,10 +14,11 @@ export type FinancialHealthStatus = 'strong' | 'solid' | 'attention' | 'at_risk'
 export interface FinancialHealthResult {
   headline: string
   status: FinancialHealthStatus
-  summary: string
+  overview: string
+  sections: { title: string; body: string; status?: FinancialHealthStatus }[]
   benchmarks: { metric: string; yours: string; typical: string; status: FinancialHealthStatus }[]
   strengths: string[]
-  watchouts: string[]
+  priorityActions: string[]
 }
 /** Cached AI health check — synced like everything else so it follows the account, not just the device. */
 export interface FinancialHealthCache { hash: string; result: FinancialHealthResult | null; rawText: string | null; generatedAt: string }
@@ -103,6 +104,16 @@ export function calcTotals(budget: BudgetData): Totals {
 export const fmt = (n: number) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(n)
 export type TabFilter = 'ALL' | 'NIAMH' | 'RUPERT' | 'JOINT'
+
+/** Months to clear a balance at a given APR, or null if the payment never clears it. */
+export function monthsToClear(balance: number, payment: number, annualRate: number): number | null {
+  if (balance <= 0) return 0
+  if (payment <= 0) return null
+  const r = annualRate / 100 / 12
+  if (r <= 0) return Math.ceil(balance / payment)
+  if (payment <= balance * r) return null // payment doesn't even cover the interest
+  return Math.ceil(-Math.log(1 - (balance * r) / payment) / Math.log(1 + r))
+}
 
 /** Whole days until a renewal date. Negative once the date has passed. */
 export function daysUntil(dateStr: string): number {
