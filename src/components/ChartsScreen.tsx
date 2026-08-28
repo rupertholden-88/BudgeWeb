@@ -202,27 +202,28 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
                       : s.status && healthIntent(s.status) === 'negative' ? 'border-l-2 border-l-negative'
                       : 'border-l-2 border-l-border'
                     }`}>
-                      <div className="text-[12px] font-semibold text-ink mb-0.5">{s.title}</div>
-                      <p className="text-[12px] text-muted leading-relaxed m-0">{s.body}</p>
+                      <div className="text-[12px] font-semibold text-ink mb-0.5 break-words">{s.title}</div>
+                      <p className="text-[12px] text-muted leading-relaxed m-0 break-words">{s.body}</p>
                     </div>
                   ))}
                 </div>
               )}
 
               {result.benchmarks?.length > 0 && (
-                <div className="space-y-2 mb-3 pt-3 border-t border-border">
+                <div className="space-y-2.5 mb-3 pt-3 border-t border-border">
+                  {/* Stacked rather than side-by-side: these values are often
+                      long enough that a single row squeezed the metric name to
+                      nothing and pushed the rest off-screen. */}
                   {result.benchmarks.map((b, i) => (
-                    <div key={i} className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                          healthIntent(b.status) === 'positive' ? 'bg-positive'
-                          : healthIntent(b.status) === 'negative' ? 'bg-negative' : 'bg-border'
-                        }`} />
-                        <span className="text-[12px] text-ink truncate">{b.metric}</span>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className="text-[12px] font-semibold tabular-nums text-ink">{b.yours}</span>
-                        <span className="text-[10px] text-muted ml-1.5">typical {b.typical}</span>
+                    <div key={i} className="flex items-start gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-[5px] ${
+                        healthIntent(b.status) === 'positive' ? 'bg-positive'
+                        : healthIntent(b.status) === 'negative' ? 'bg-negative' : 'bg-border'
+                      }`} />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[11px] text-muted leading-snug">{b.metric}</div>
+                        <div className="text-[12px] font-semibold text-ink leading-snug break-words">{b.yours}</div>
+                        <div className="text-[10px] text-muted leading-snug break-words">typical {b.typical}</div>
                       </div>
                     </div>
                   ))}
@@ -232,16 +233,16 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
               {result.strengths?.length > 0 && (
                 <div className="mb-2.5">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.06em] text-positive mb-1">Working well</div>
-                  <ul className="m-0 pl-4 space-y-0.5">
-                    {result.strengths.map((s, i) => <li key={i} className="text-[12px] text-ink">{s}</li>)}
+                  <ul className="m-0 pl-4 space-y-1 list-disc marker:text-border">
+                    {result.strengths.map((s, i) => <li key={i} className="text-[12px] text-ink break-words leading-snug">{s}</li>)}
                   </ul>
                 </div>
               )}
               {(result.priorityActions ?? []).length > 0 && (
                 <div>
                   <div className="text-[10px] font-semibold uppercase tracking-[0.06em] text-expense-text mb-1">Priority actions</div>
-                  <ol className="m-0 pl-4 space-y-1 list-decimal">
-                    {(result.priorityActions ?? []).map((s, i) => <li key={i} className="text-[12px] text-ink">{s}</li>)}
+                  <ol className="m-0 pl-4 space-y-1 list-decimal marker:text-border">
+                    {(result.priorityActions ?? []).map((s, i) => <li key={i} className="text-[12px] text-ink break-words leading-snug">{s}</li>)}
                   </ol>
                 </div>
               )}
