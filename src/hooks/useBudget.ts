@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore'
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth'
 import { db, auth, provider } from '@/lib/firebase'
-import { BudgetData, Debt, Owner, EntryType, AssetType, DebtType, defaultBudgetData, calcTotals, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
+import { BudgetData, Debt, Owner, EntryType, AssetType, Asset, DebtType, defaultBudgetData, calcTotals, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
 
 function uuid() { return crypto.randomUUID() }
 
@@ -328,6 +328,15 @@ export function useBudget() {
     })
   }
 
+  /** Field-wise update — updateAsset's positional signature is already full. */
+  const updateAssetFields = (owner: Owner, date: string, assetId: string, fields: Partial<Asset>) => {
+    mutate(b => {
+      const snap = getOrCopySnapshot(b, owner, date)
+      const updated = { ...snap, assets: snap.assets.map(a => a.id === assetId ? { ...a, ...fields } : a) }
+      return { ...b, savingsHistory: [...b.savingsHistory.filter(s => !(s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7))), updated].sort((a, z) => a.date.localeCompare(z.date)) }
+    })
+  }
+
   const deleteAsset = (owner: Owner, date: string, assetId: string) => {
     mutate(b => {
       const snap = b.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7))
@@ -380,7 +389,7 @@ export function useBudget() {
     updateOwnerName, updateBirthMonth, addDependant, updateDependant, removeDependant,
     addCategory, renameCategory, deleteCategory,
     updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, toggleItemShared, recordFinancialHealthRun,
-    addAsset, updateAsset, deleteAsset,
+    addAsset, updateAsset, updateAssetFields, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,
   }

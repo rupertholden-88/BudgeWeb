@@ -145,10 +145,11 @@ function DeleteModal({ label, onConfirm, onCancel }: { label: string; onConfirm:
   )
 }
 
-function AssetRow({ asset, owner, today, updateAsset, deleteAsset, lockType }: {
-  asset: { id: string; label: string; amount: number; type: AssetType; interestRate?: number; institution?: string }
+function AssetRow({ asset, owner, today, updateAsset, updateAssetFields, deleteAsset, lockType }: {
+  asset: { id: string; label: string; amount: number; type: AssetType; interestRate?: number; institution?: string; monthlyContribution?: number; employerContribution?: number }
   owner: Owner; today: string
   updateAsset: BudgetHook['updateAsset']
+  updateAssetFields: BudgetHook['updateAssetFields']
   deleteAsset: BudgetHook['deleteAsset']
   lockType?: boolean
 }) {
@@ -238,6 +239,36 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset, lockType }: {
                 className="w-[110px] text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none"
               />
             </div>
+            {asset.type === 'PENSION' && (
+              <>
+                <div className="flex flex-col gap-0.5">
+                  <label className="text-[10px] text-muted uppercase tracking-[0.05em]">You £/mo</label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={asset.monthlyContribution ?? ''}
+                    placeholder="0"
+                    onChange={e => updateAssetFields(owner, today, asset.id, { monthlyContribution: parseFloat(e.target.value) || undefined })}
+                    className="w-[80px] text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <label className="text-[10px] text-muted uppercase tracking-[0.05em]">Employer £/mo</label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={asset.employerContribution ?? ''}
+                    placeholder="0"
+                    onChange={e => updateAssetFields(owner, today, asset.id, { employerContribution: parseFloat(e.target.value) || undefined })}
+                    className="w-[80px] text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none"
+                  />
+                </div>
+                <p className="text-[10px] text-muted w-full m-0 leading-snug">
+                  For the health check only — workplace pensions usually come out before your
+                  take-home pay, so these aren&apos;t added to your budget as outgoings.
+                </p>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -245,10 +276,11 @@ function AssetRow({ asset, owner, today, updateAsset, deleteAsset, lockType }: {
   )
 }
 
-function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset, today }: {
+function OwnerPanel({ owner, name, budget, addAsset, updateAsset, updateAssetFields, deleteAsset, today }: {
   owner: Owner; name: string; budget: BudgetHook['data']; today: string
   addAsset: BudgetHook['addAsset']
   updateAsset: BudgetHook['updateAsset']
+  updateAssetFields: BudgetHook['updateAssetFields']
   deleteAsset: BudgetHook['deleteAsset']
 }) {
   const snap = budget.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
@@ -267,7 +299,7 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset, t
       </div>
       <div className="px-3 pt-1 pb-2">
         {assets.map(asset => (
-          <AssetRow key={asset.id} asset={asset as any} owner={owner} today={today} updateAsset={updateAsset} deleteAsset={deleteAsset} />
+          <AssetRow key={asset.id} asset={asset as any} owner={owner} today={today} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
         ))}
         {adding ? (
           <div className="flex gap-1.5 mt-2 flex-wrap">
@@ -299,10 +331,11 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset, t
   )
 }
 
-function PensionOwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteAsset, today }: {
+function PensionOwnerPanel({ owner, name, budget, addAsset, updateAsset, updateAssetFields, deleteAsset, today }: {
   owner: Owner; name: string; budget: BudgetHook['data']; today: string
   addAsset: BudgetHook['addAsset']
   updateAsset: BudgetHook['updateAsset']
+  updateAssetFields: BudgetHook['updateAssetFields']
   deleteAsset: BudgetHook['deleteAsset']
 }) {
   const snap = budget.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
@@ -320,7 +353,7 @@ function PensionOwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteA
       </div>
       <div className="px-3 pt-1 pb-2">
         {assets.map(asset => (
-          <AssetRow key={asset.id} asset={asset as any} owner={owner} today={today} updateAsset={updateAsset} deleteAsset={deleteAsset} lockType />
+          <AssetRow key={asset.id} asset={asset as any} owner={owner} today={today} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} lockType />
         ))}
         {adding ? (
           <div className="flex gap-1.5 mt-2 flex-wrap">
@@ -346,7 +379,7 @@ function PensionOwnerPanel({ owner, name, budget, addAsset, updateAsset, deleteA
 }
 
 export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, addAsset, updateAsset, deleteAsset, resyncInterest, copyForwardAssets, moveAssetsToLastMonth } = budget
+  const { data, addAsset, updateAsset, updateAssetFields, deleteAsset, resyncInterest, copyForwardAssets, moveAssetsToLastMonth } = budget
   const today = new Date().toISOString().slice(0, 7)
 
   const n1 = data.nameNiamh || 'Person 1'
@@ -362,6 +395,14 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
     return acc + (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type === 'PENSION').reduce((a, i) => a + (i.amount || 0), 0)
   }, 0)
+
+  const pensionContributions = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
+    const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
+    const pensions = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type === 'PENSION')
+    const own = pensions.reduce((a, i: any) => a + (i.monthlyContribution || 0), 0)
+    const employer = pensions.reduce((a, i: any) => a + (i.employerContribution || 0), 0)
+    return { own: acc.own + own, employer: acc.employer + employer, total: acc.total + own + employer }
+  }, { own: 0, employer: 0, total: 0 })
 
   const lastMonth = (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7) })()
   const totalLastMonth = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
@@ -565,9 +606,9 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
       </div>
 
       {/* Owner panels */}
-      <OwnerPanel owner="NIAMH"  name={n1} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
-      <OwnerPanel owner="RUPERT" name={n2} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
-      <OwnerPanel owner="JOINT"  name={n3} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
+      <OwnerPanel owner="NIAMH"  name={n1} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
+      <OwnerPanel owner="RUPERT" name={n2} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
+      <OwnerPanel owner="JOINT"  name={n3} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
 
       {/* Interest income */}
       {byOwner.length > 0 && (
@@ -599,12 +640,20 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
 
       {/* Pensions section */}
       <div className="mt-6 pt-6 border-t-2 border-pension-light">
-        <div className="flex justify-between items-baseline mb-4">
+        <div className="flex justify-between items-baseline mb-1">
           <h2 className="font-serif text-xl m-0 text-pension">Pensions</h2>
           <div className={`text-lg font-bold tabular-nums ${totalPensions > 0 ? 'text-pension' : 'text-muted'}`}>
             {fmt(totalPensions)}
           </div>
         </div>
+        {pensionContributions.total > 0 && (
+          <div className="text-[11px] text-muted mb-4 text-right">
+            {fmt(pensionContributions.total)}/mo going in
+            {pensionContributions.employer > 0 && ` · ${fmt(pensionContributions.employer)} from employers`}
+            {' · '}{fmt(pensionContributions.total * 12)}/yr
+          </div>
+        )}
+        {pensionContributions.total === 0 && <div className="mb-4" />}
 
         {pensionOwnerKeys.length > 0 && (
           <div className="card p-4 mb-4 border-l-[3px] border-l-pension">
@@ -667,9 +716,9 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
           </div>
         )}
 
-        <PensionOwnerPanel owner="NIAMH"  name={n1} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
-        <PensionOwnerPanel owner="RUPERT" name={n2} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
-        <PensionOwnerPanel owner="JOINT"  name={n3} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} deleteAsset={deleteAsset} />
+        <PensionOwnerPanel owner="NIAMH"  name={n1} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
+        <PensionOwnerPanel owner="RUPERT" name={n2} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
+        <PensionOwnerPanel owner="JOINT"  name={n3} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
       </div>
     </div>
   )

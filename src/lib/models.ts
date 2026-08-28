@@ -13,7 +13,13 @@ export type DebtType = 'CREDIT_CARD' | 'PERSONAL_LOAN' | 'CAR_FINANCE' | 'MORTGA
  */
 export interface LineItem { id: string; label: string; amount: number; priority: SpendingPriority; renewalDate?: string; sharedContribution?: boolean }
 export interface Category { key: string; owner: Owner; type: EntryType; label: string; shared?: boolean; note?: string; items: LineItem[] }
-export interface Asset { id: string; type: AssetType; label: string; amount: number; interestRate?: number; institution?: string }
+/**
+ * `monthlyContribution` / `employerContribution` are recorded for analysis
+ * only. Workplace pensions are usually deducted before take-home pay, so
+ * adding them to the budget as outgoings would double-count against income
+ * that never included them.
+ */
+export interface Asset { id: string; type: AssetType; label: string; amount: number; interestRate?: number; institution?: string; monthlyContribution?: number; employerContribution?: number }
 export interface SavingsSnapshot { date: string; owner: Owner; assets: Asset[] }
 export interface Debt { id: string; owner: Owner; type: DebtType; label: string; currentBalance: number; monthlyPayment: number; interestRate: number; isZeroPercent: boolean; zeroPercentExpiryDate?: string; institution?: string; sharedContribution?: boolean }
 export interface SpendSnapshot { date: string; totalInc: number; totalExp: number; totalSav: number }

@@ -41,6 +41,12 @@ export interface FinancialSummary {
     pensionsTotal: number
     /** Individually held pots, same person order as incomeSplitPct. */
     pensionsPerPerson: number[]
+    /**
+     * Monthly amounts going in, same person order. Recorded separately from
+     * the budget because workplace pensions are normally deducted before
+     * take-home pay, so they don't appear as outgoings.
+     */
+    pensionContributionsPerPerson: { own: number; employer: number }[]
     /** Only pensions genuinely held jointly — usually 0. */
     pensionsJoint: number
     byType: { type: string; amount: number }[]
@@ -77,6 +83,15 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
   const pensionR = pensionFor('RUPERT')
   const pensionJoint = pensionFor('JOINT')
   const pensionsTotal = pensionN + pensionR + pensionJoint
+
+  const contributionsFor = (owner: Owner) => {
+    const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
+    const pensions = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type === 'PENSION')
+    return {
+      own: Math.round(pensions.reduce((a: number, i: any) => a + (i.monthlyContribution || 0), 0)),
+      employer: Math.round(pensions.reduce((a: number, i: any) => a + (i.employerContribution || 0), 0)),
+    }
+  }
 
   const byTypeMap = new Map<string, number>()
   ;(['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).forEach(owner => {
@@ -146,6 +161,7 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
       liquidTotal,
       pensionsTotal,
       pensionsPerPerson: [pensionN, pensionR],
+      pensionContributionsPerPerson: [contributionsFor('NIAMH'), contributionsFor('RUPERT')],
       pensionsJoint: pensionJoint,
       byType: Array.from(byTypeMap.entries()).map(([type, amount]) => ({ type, amount })).filter(t => t.amount > 0),
       runwayMonths,
