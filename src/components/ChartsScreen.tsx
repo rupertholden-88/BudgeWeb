@@ -80,9 +80,13 @@ function healthLabel(status: string) {
   return status === 'strong' ? 'Strong' : status === 'solid' ? 'Solid' : status === 'at_risk' ? 'At risk' : 'Needs attention'
 }
 
-function FinancialHealthCard({ data, totals, updateFinancialHealth }: {
+function fmtUsd(n: number) {
+  return `$${n < 0.01 ? n.toFixed(4) : n.toFixed(2)}`
+}
+
+function FinancialHealthCard({ data, totals, recordFinancialHealthRun }: {
   data: BudgetHook['data']; totals: BudgetHook['totals']
-  updateFinancialHealth: BudgetHook['updateFinancialHealth']
+  recordFinancialHealthRun: BudgetHook['recordFinancialHealthRun']
 }) {
   const summary = useMemo(() => buildFinancialSummary(data, totals), [data, totals])
   const currentHash = useMemo(() => hashSummary(summary), [summary])
@@ -93,7 +97,9 @@ function FinancialHealthCard({ data, totals, updateFinancialHealth }: {
   const result = cached?.result ?? null
   const rawText = cached?.rawText ?? null
   const generatedAt = cached?.generatedAt ?? null
+  const lastCostUsd = cached?.costUsd ?? null
   const stale = cached != null && cached.hash !== currentHash
+  const usage = data.financialHealthUsage ?? null
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<{ notConfigured: boolean; message: string } | null>(null)
@@ -110,15 +116,25 @@ function FinancialHealthCard({ data, totals, updateFinancialHealth }: {
         body: JSON.stringify({ summary }),
       })
       const body = await res.json().catch(() => ({}))
+      const costUsd: number = typeof body.costUsd === 'number' ? body.costUsd : 0
       if (!res.ok) {
         setError({ notConfigured: body.error === 'not_configured', message: body.message || 'Something went wrong — try again.' })
+        // A refusal or an unparseable/empty reply still reached Anthropic and was billed —
+        // count it even though there's nothing usable to cache.
+        if (costUsd > 0) recordFinancialHealthRun({ costUsd })
         return
       }
-      updateFinancialHealth({
-        hash: currentHash,
-        result: body.result ?? null,
-        rawText: body.rawText ?? null,
-        generatedAt: new Date().toISOString(),
+      recordFinancialHealthRun({
+        cache: {
+          hash: currentHash,
+          result: body.result ?? null,
+          rawText: body.rawText ?? null,
+          generatedAt: new Date().toISOString(),
+          costUsd,
+          inputTokens: body.inputTokens ?? 0,
+          outputTokens: body.outputTokens ?? 0,
+        },
+        costUsd,
       })
     } catch {
       setError({ notConfigured: false, message: 'Could not reach the assessment service — check your connection and try again.' })
@@ -150,6 +166,7 @@ function FinancialHealthCard({ data, totals, updateFinancialHealth }: {
                 {generatedAt && (
                   <span className="text-[10px] text-muted">
                     {stale ? 'Based on earlier figures' : `Checked ${new Date(generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
+                    {lastCostUsd != null && ` · ${fmtUsd(lastCostUsd)}`}
                   </span>
                 )}
               </div>
@@ -235,6 +252,9 @@ function FinancialHealthCard({ data, totals, updateFinancialHealth }: {
           </button>
           <p className="text-[10px] text-muted mt-2 mb-0 text-center leading-relaxed">
             General guidance from typical UK household benchmarks — not regulated financial advice.
+            {usage && usage.totalRuns > 0 && (
+              <> Spent {fmtUsd(usage.totalCostUsd)} on {usage.totalRuns} {usage.totalRuns === 1 ? 'check' : 'checks'} so far.</>
+            )}
           </p>
         </>
       )}
@@ -243,7 +263,7 @@ function FinancialHealthCard({ data, totals, updateFinancialHealth }: {
 }
 
 export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, totals, updateFinancialHealth } = budget
+  const { data, totals, recordFinancialHealthRun } = budget
   const today = new Date().toISOString().slice(0, 7)
 
   const n1 = data.nameNiamh || 'Person 1'
@@ -398,7 +418,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
         />
       </div>
 
-      <FinancialHealthCard data={data} totals={totals} updateFinancialHealth={updateFinancialHealth} />
+      <FinancialHealthCard data={data} totals={totals} recordFinancialHealthRun={recordFinancialHealthRun} />
 
       {/* 0% expiry warnings — time-sensitive, so they lead */}
       {expiries.map(({ debt, days, expiry, balanceAtExpiry, monthlyInterestAfter, rate }) => (

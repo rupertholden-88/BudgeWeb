@@ -21,8 +21,13 @@ export interface FinancialHealthResult {
   priorityActions: string[]
 }
 /** Cached AI health check — synced like everything else so it follows the account, not just the device. */
-export interface FinancialHealthCache { hash: string; result: FinancialHealthResult | null; rawText: string | null; generatedAt: string }
-export interface BudgetData { categories: Category[]; savingsHistory: SavingsSnapshot[]; spendHistory: SpendSnapshot[]; debts: Debt[]; savedAt: string; nameNiamh: string; nameRupert: string; nameJoint: string; financialHealth?: FinancialHealthCache | null }
+export interface FinancialHealthCache {
+  hash: string; result: FinancialHealthResult | null; rawText: string | null; generatedAt: string
+  costUsd: number; inputTokens: number; outputTokens: number
+}
+/** Running total across every check ever run on this account — the cache above only holds the latest. */
+export interface FinancialHealthUsage { totalRuns: number; totalCostUsd: number }
+export interface BudgetData { categories: Category[]; savingsHistory: SavingsSnapshot[]; spendHistory: SpendSnapshot[]; debts: Debt[]; savedAt: string; nameNiamh: string; nameRupert: string; nameJoint: string; financialHealth?: FinancialHealthCache | null; financialHealthUsage?: FinancialHealthUsage | null }
 export interface Totals { incN: number; incR: number; expN: number; expR: number; savN: number; savR: number; debtN: number; debtR: number; expJoint: number; savJoint: number; debtJoint: number; halfJointExp: number; halfJointSav: number; halfJointDebt: number; netN: number; netR: number; totalInc: number; totalExp: number; totalSav: number; totalDebt: number; net: number }
 
 export function defaultBudgetData(): BudgetData {

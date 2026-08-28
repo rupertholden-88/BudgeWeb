@@ -217,8 +217,17 @@ export function useBudget() {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.map(i => i.id === itemId ? { ...i, renewalDate: renewalDate || undefined } : i) }) }))
   }
 
-  const updateFinancialHealth = (cache: FinancialHealthCache | null) => {
-    mutate(b => ({ ...b, financialHealth: cache }))
+  // cache is set when there's a usable result to show; costUsd is added to the
+  // running total regardless, since a refused or unparseable reply still billed.
+  const recordFinancialHealthRun = (params: { cache?: FinancialHealthCache; costUsd: number }) => {
+    mutate(b => ({
+      ...b,
+      ...(params.cache ? { financialHealth: params.cache } : {}),
+      financialHealthUsage: {
+        totalRuns: (b.financialHealthUsage?.totalRuns ?? 0) + 1,
+        totalCostUsd: (b.financialHealthUsage?.totalCostUsd ?? 0) + params.costUsd,
+      },
+    }))
   }
 
   const removeItem = (catKey: string, itemId: string) => {
@@ -345,7 +354,7 @@ export function useBudget() {
     data, user, authLoading, cloudLoading, localLoading, savedAt, isRefreshing, totals,
     signIn, signOutUser, refreshFromCloud,
     updateOwnerName, addCategory, renameCategory, deleteCategory,
-    updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, updateFinancialHealth,
+    updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, recordFinancialHealthRun,
     addAsset, updateAsset, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,

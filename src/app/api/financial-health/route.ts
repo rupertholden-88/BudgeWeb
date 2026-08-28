@@ -7,6 +7,16 @@ export const runtime = 'nodejs'
 // User's choice — Sonnet 5 for a good cost/quality balance on this task.
 const MODEL = 'claude-sonnet-5'
 
+// $ per 1M tokens, first-party API rates. Update if the model or its
+// pricing changes — there's no live pricing endpoint to read this from.
+const PRICE_PER_MILLION = { input: 2.0, output: 10.0 }
+
+function estimateCostUsd(usage: Anthropic.Usage) {
+  const costUsd = (usage.input_tokens / 1_000_000) * PRICE_PER_MILLION.input
+    + (usage.output_tokens / 1_000_000) * PRICE_PER_MILLION.output
+  return { costUsd, inputTokens: usage.input_tokens, outputTokens: usage.output_tokens }
+}
+
 function buildPrompt(summary: FinancialSummary): string {
   return `You are writing a detailed financial health review for a UK couple who share a budgeting app. Below is an anonymised numeric summary — no names, no account or provider details, currency is GBP. Assess their financial health compared with general, well-established UK personal-finance guidelines (e.g. typical savings-rate targets, a 3–6 month emergency fund, pension contribution norms, and reasonable debt costs) — not a real individualised peer database, since you don't have access to one. Be specific and reference their actual figures throughout rather than writing generically. Where something is a genuine strength, say so plainly; don't manufacture a concern to seem balanced, and don't pad a section with filler if there's little to say.
 
@@ -99,9 +109,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'upstream_unreachable', message: 'Could not reach the assessment service.' }, { status: 502 })
   }
 
+  // From here on the request definitely reached Anthropic and has real usage
+  // to report, even on a refusal or an empty/unparseable reply — include it
+  // on every branch rather than only when there's a result to show.
+  const usage = estimateCostUsd(response.usage)
+
   if (response.stop_reason === 'refusal') {
     return NextResponse.json(
-      { error: 'refused', message: 'The assessment service declined to respond to this request.' },
+      { error: 'refused', message: 'The assessment service declined to respond to this request.', ...usage },
       { status: 502 }
     )
   }
@@ -109,12 +124,13 @@ export async function POST(req: NextRequest) {
   const raw = extractText(response.content)
   const parsed = parseAssessment(raw)
 
-  if (parsed) return NextResponse.json({ result: parsed })
-  if (raw.trim()) return NextResponse.json({ result: null, rawText: raw })
+  if (parsed) return NextResponse.json({ result: parsed, ...usage })
+  if (raw.trim()) return NextResponse.json({ result: null, rawText: raw, ...usage })
 
-  // No text block at all (e.g. stopped mid-thinking) — nothing useful to show.
+  // No text block at all (e.g. stopped mid-thinking) — nothing useful to show,
+  // but it was still a billed request, so still report what it cost.
   return NextResponse.json(
-    { error: 'empty_response', message: "Didn't get a usable response — try again." },
+    { error: 'empty_response', message: "Didn't get a usable response — try again.", ...usage },
     { status: 502 }
   )
 }
