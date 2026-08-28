@@ -94,9 +94,10 @@ export async function POST(req: NextRequest) {
       model: MODEL,
       max_tokens: 16000,
       thinking: { type: 'adaptive' },
-      // A genuinely detailed, sectioned review needs more synthesis across
-      // more figures than the earlier few-bullet version — worth the step up.
-      output_config: { effort: 'high' },
+      // Dialed back from 'high' — repeated failures suggest something is timing
+      // out before the longer, higher-effort generation finishes; medium is
+      // still a meaningful step up in depth from the original terse version.
+      output_config: { effort: 'medium' },
       messages: [{ role: 'user', content: buildPrompt(summary) }],
     })
     response = await stream.finalMessage()

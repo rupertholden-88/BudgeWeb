@@ -109,7 +109,7 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
   const usage = data.financialHealthUsage ?? null
 
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<{ notConfigured: boolean; message: string } | null>(null)
+  const [error, setError] = useState<{ notConfigured: boolean; message: string; detail?: string; httpStatus?: number } | null>(null)
 
   const hasEnoughData = totals.totalInc > 0 || totals.totalExp > 0
 
@@ -123,10 +123,19 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ summary, apiKey }),
       })
-      const body = await res.json().catch(() => ({}))
+      const rawBody = await res.text()
+      const body = (() => { try { return JSON.parse(rawBody) } catch { return {} } })()
       const costUsd: number = typeof body.costUsd === 'number' ? body.costUsd : 0
       if (!res.ok) {
-        setError({ notConfigured: body.error === 'not_configured', message: body.message || 'Something went wrong — try again.' })
+        setError({
+          notConfigured: body.error === 'not_configured',
+          message: body.message || 'Something went wrong — try again.',
+          // Falls back to raw response text when the server didn't return our
+          // own JSON shape at all (a platform-level failure, not our route) —
+          // still worth showing so it can be reported rather than guessed at.
+          detail: body.detail || (!body.message ? rawBody.slice(0, 300) : undefined),
+          httpStatus: res.status,
+        })
         // A refusal or an unparseable/empty reply still reached Anthropic and was billed —
         // count it even though there's nothing usable to cache.
         if (costUsd > 0) recordFinancialHealthRun({ costUsd })
@@ -144,8 +153,12 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
         },
         costUsd,
       })
-    } catch {
-      setError({ notConfigured: false, message: 'Could not reach the assessment service — check your connection and try again.' })
+    } catch (err) {
+      setError({
+        notConfigured: false,
+        message: 'Could not reach the assessment service — check your connection and try again.',
+        detail: err instanceof Error ? err.message : String(err),
+      })
     } finally {
       setLoading(false)
     }
@@ -243,7 +256,12 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
             error.notConfigured ? (
               <div className="text-[12px] text-muted bg-surface rounded-lg p-3 mb-3 leading-relaxed">{error.message}</div>
             ) : (
-              <div className="text-[12px] text-negative bg-expense-bg rounded-lg p-3 mb-3">{error.message}</div>
+              <div className="text-[12px] text-negative bg-expense-bg rounded-lg p-3 mb-3">
+                <div>{error.message}{error.httpStatus ? ` (HTTP ${error.httpStatus})` : ''}</div>
+                {error.detail && (
+                  <div className="text-[10px] font-mono opacity-70 mt-1.5 break-words">{error.detail}</div>
+                )}
+              </div>
             )
           )}
 
