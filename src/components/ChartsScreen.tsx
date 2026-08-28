@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { fmt, Owner, upcomingRenewals } from '@/lib/models'
+import { buildFinancialSummary, hashSummary } from '@/lib/financialSummary'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown, CalendarClock } from 'lucide-react'
+import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown, CalendarClock, Sparkles } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -77,6 +78,185 @@ function ChartTooltip({ active, payload, label }: any) {
         </div>
       ))}
     </div>
+  )
+}
+
+const HEALTH_CACHE_KEY = 'budge-financial-health'
+
+type HealthStatus = 'strong' | 'solid' | 'attention' | 'at_risk'
+interface HealthResult {
+  headline: string
+  status: HealthStatus
+  summary: string
+  benchmarks: { metric: string; yours: string; typical: string; status: HealthStatus }[]
+  strengths: string[]
+  watchouts: string[]
+}
+
+function healthIntent(status: string): 'positive' | 'negative' | 'neutral' {
+  if (status === 'strong' || status === 'solid') return 'positive'
+  if (status === 'at_risk') return 'negative'
+  return 'neutral'
+}
+function healthLabel(status: string) {
+  return status === 'strong' ? 'Strong' : status === 'solid' ? 'Solid' : status === 'at_risk' ? 'At risk' : 'Needs attention'
+}
+
+function FinancialHealthCard({ data, totals }: { data: BudgetHook['data']; totals: BudgetHook['totals'] }) {
+  const summary = useMemo(() => buildFinancialSummary(data, totals), [data, totals])
+  const currentHash = useMemo(() => hashSummary(summary), [summary])
+
+  const [result, setResult] = useState<HealthResult | null>(null)
+  const [rawText, setRawText] = useState<string | null>(null)
+  const [cachedHash, setCachedHash] = useState<string | null>(null)
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<{ notConfigured: boolean; message: string } | null>(null)
+
+  // Restore whatever was last generated on this device — cheap, and avoids
+  // spending an API call just to redisplay an unchanged assessment.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(HEALTH_CACHE_KEY)
+      if (raw) {
+        const cached = JSON.parse(raw)
+        setResult(cached.result ?? null)
+        setRawText(cached.rawText ?? null)
+        setCachedHash(cached.hash ?? null)
+        setGeneratedAt(cached.generatedAt ?? null)
+      }
+    } catch { }
+  }, [])
+
+  const stale = cachedHash != null && cachedHash !== currentHash
+  const hasEnoughData = totals.totalInc > 0 || totals.totalExp > 0
+
+  const run = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/financial-health', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ summary }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError({ notConfigured: body.error === 'not_configured', message: body.message || 'Something went wrong — try again.' })
+        return
+      }
+      const now = new Date().toISOString()
+      setResult(body.result ?? null)
+      setRawText(body.rawText ?? null)
+      setGeneratedAt(now)
+      setCachedHash(currentHash)
+      try {
+        localStorage.setItem(HEALTH_CACHE_KEY, JSON.stringify({ result: body.result ?? null, rawText: body.rawText ?? null, hash: currentHash, generatedAt: now }))
+      } catch { }
+    } catch {
+      setError({ notConfigured: false, message: 'Could not reach the assessment service — check your connection and try again.' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <SectionCard
+      title="Financial health check"
+      sub="An AI read on your numbers against general UK benchmarks"
+      icon={<Sparkles size={14} />}
+    >
+      {!hasEnoughData ? (
+        <p className="text-[13px] text-muted m-0">Add some budget figures first, then run a check.</p>
+      ) : (
+        <>
+          {result && (
+            <div className="mb-3">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className={`text-[10px] font-bold uppercase tracking-[0.06em] px-2 py-0.5 rounded-full ${
+                  healthIntent(result.status) === 'positive' ? 'bg-income-bg text-positive'
+                  : healthIntent(result.status) === 'negative' ? 'bg-expense-bg text-negative'
+                  : 'bg-surface text-muted'
+                }`}>
+                  {healthLabel(result.status)}
+                </span>
+                {generatedAt && (
+                  <span className="text-[10px] text-muted">
+                    {stale ? 'Based on earlier figures' : `Checked ${new Date(generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
+                  </span>
+                )}
+              </div>
+              <div className="font-serif text-lg leading-snug mb-1.5">{result.headline}</div>
+              <p className="text-[13px] text-muted leading-relaxed mb-3">{result.summary}</p>
+
+              {result.benchmarks?.length > 0 && (
+                <div className="space-y-2 mb-3 pt-3 border-t border-border">
+                  {result.benchmarks.map((b, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          healthIntent(b.status) === 'positive' ? 'bg-positive'
+                          : healthIntent(b.status) === 'negative' ? 'bg-negative' : 'bg-border'
+                        }`} />
+                        <span className="text-[12px] text-ink truncate">{b.metric}</span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-[12px] font-semibold tabular-nums text-ink">{b.yours}</span>
+                        <span className="text-[10px] text-muted ml-1.5">typical {b.typical}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {result.strengths?.length > 0 && (
+                <div className="mb-2.5">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.06em] text-positive mb-1">Working well</div>
+                  <ul className="m-0 pl-4 space-y-0.5">
+                    {result.strengths.map((s, i) => <li key={i} className="text-[12px] text-ink">{s}</li>)}
+                  </ul>
+                </div>
+              )}
+              {result.watchouts?.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.06em] text-expense-text mb-1">Worth a look</div>
+                  <ul className="m-0 pl-4 space-y-0.5">
+                    {result.watchouts.map((s, i) => <li key={i} className="text-[12px] text-ink">{s}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!result && rawText && (
+            <p className="text-[13px] text-ink whitespace-pre-wrap mb-3">{rawText}</p>
+          )}
+
+          {error && (
+            error.notConfigured ? (
+              <div className="text-[12px] text-muted bg-surface rounded-lg p-3 mb-3 leading-relaxed">
+                This needs an Anthropic API key set on the server — add <code className="font-mono">ANTHROPIC_API_KEY</code> under
+                your Vercel project's Environment Variables, then redeploy. It can't be entered here, since a key typed into
+                the app would be visible to anyone using this browser.
+              </div>
+            ) : (
+              <div className="text-[12px] text-negative bg-expense-bg rounded-lg p-3 mb-3">{error.message}</div>
+            )
+          )}
+
+          <button
+            onClick={run}
+            disabled={loading}
+            className={`w-full border-0 rounded-lg py-2.5 text-[13px] font-semibold ${loading ? 'bg-border text-muted cursor-default' : 'bg-ink text-white cursor-pointer'}`}
+          >
+            {loading ? 'Checking…' : result ? 'Refresh check' : 'Run financial health check'}
+          </button>
+          <p className="text-[10px] text-muted mt-2 mb-0 text-center leading-relaxed">
+            General guidance from typical UK household benchmarks — not regulated financial advice.
+          </p>
+        </>
+      )}
+    </SectionCard>
   )
 }
 
@@ -235,6 +415,8 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
           intent={savingsRate >= 20 ? 'positive' : 'neutral'}
         />
       </div>
+
+      <FinancialHealthCard data={data} totals={totals} />
 
       {/* 0% expiry warnings — time-sensitive, so they lead */}
       {expiries.map(({ debt, days, expiry, balanceAtExpiry, monthlyInterestAfter, rate }) => (
