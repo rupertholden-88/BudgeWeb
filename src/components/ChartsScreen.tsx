@@ -229,6 +229,13 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
         <p className="text-[13px] text-muted m-0">Add some budget figures first, then run a check.</p>
       ) : (
         <>
+          {result && stale && (
+            <div className="flex items-center gap-2 bg-expense-bg text-expense-text rounded-lg px-3 py-2 mb-3">
+              <Sparkles size={13} className="shrink-0" />
+              <span className="text-[12px] flex-1">Your figures have changed since this check — the report below may be out of date.</span>
+            </div>
+          )}
+
           {result && (
             <div className="mb-3">
               {typeof result.score === 'number' ? (
@@ -249,7 +256,7 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
               )}
               {generatedAt && (
                 <div className="text-[10px] text-muted text-center mb-2">
-                  {stale ? 'Based on earlier figures' : `Checked ${new Date(generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
+                  Checked {new Date(generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                   {lastCostUsd != null && ` · ${fmtGbp(lastCostUsd)}`}
                 </div>
               )}
@@ -350,9 +357,13 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
               <button
                 onClick={run}
                 disabled={loading}
-                className={`w-full border-0 rounded-lg py-2.5 text-[13px] font-semibold ${loading ? 'bg-border text-muted cursor-default' : 'bg-ink text-white cursor-pointer'}`}
+                className={`w-full border-0 rounded-lg py-2.5 text-[13px] font-semibold ${
+                  loading ? 'bg-border text-muted cursor-default'
+                  : stale ? 'bg-expense-text text-white cursor-pointer'
+                  : 'bg-ink text-white cursor-pointer'
+                }`}
               >
-                {loading ? 'Checking…' : result ? 'Refresh check' : 'Run financial health check'}
+                {loading ? 'Checking…' : stale ? 'Refresh with latest figures' : result ? 'Refresh check' : 'Run financial health check'}
               </button>
               <p className="text-[10px] text-muted mt-2 mb-0.5 text-center">Using your own key, ending •••• {last4}</p>
             </>
