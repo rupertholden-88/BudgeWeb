@@ -23,6 +23,10 @@ function estimateCostUsd(usage: Anthropic.Usage) {
 function buildPrompt(summary: FinancialSummary): string {
   return `You are writing a detailed financial health review for a UK couple who share a budgeting app. Below is an anonymised numeric summary — no names, no account or provider details, currency is GBP. Assess their financial health compared with general, well-established UK personal-finance guidelines (e.g. typical savings-rate targets, a 3–6 month emergency fund, pension contribution norms, and reasonable debt costs) — not a real individualised peer database, since you don't have access to one. Be specific and reference their actual figures throughout rather than writing generically. Where something is a genuine strength, say so plainly; don't manufacture a concern to seem balanced, and don't pad a section with filler if there's little to say.
 
+Scoring: "score" is the headline number the reader sees, so calibrate it deliberately rather than defaulting to a comfortable middle. Weigh emergency runway, debt cost and structure, savings rate, pension provision, and monthly cash flow — weighting whichever genuinely dominates this household's picture. Bands: 85-100 exceptional, few meaningful gaps; 70-84 strong, minor gaps; 55-69 reasonable with real gaps worth acting on; 40-54 notable weaknesses; below 40 serious concerns needing prompt attention. The score must be consistent with the sections and benchmarks — don't award 80 while describing several things as at risk, or 45 while everything reads as fine.
+
+On pensions: pots are individually held. assets.pensionsPerPerson gives each person's own pot in the same order as incomeSplitPct, and pensionsJoint is almost always 0. Assess each person's retirement provision separately against their own income and age-agnostic norms — a large pot belonging to one partner is not shared provision, and a partner with little or nothing is a real gap worth naming, not something to average away against the other's balance.
+
 On fairness: judge it on householdCosts.perPerson — totalContribution and pctOfOwnIncome already include anything a person pays alone on the household's behalf (paidAloneForHousehold), not just their half of the joint pot. If one person carries a large paidAloneForHousehold figure, say so explicitly and factor it in; do not describe the split as uneven purely because the joint pot is halved. If householdCosts is null, or both paidAloneForHousehold figures are 0 while you'd expect a major shared cost like rent or a mortgage to exist, note that costs paid individually may not be flagged as household contributions yet, rather than assuming they don't exist.
 
 Household summary (monthly figures unless stated; debts and renewals include per-item detail):
@@ -31,6 +35,7 @@ ${JSON.stringify(summary, null, 2)}
 Reply with ONLY a single JSON object, no markdown fences, no commentary outside it, matching exactly this shape:
 {
   "headline": "a short, specific one-line verdict (max ~8 words), not generic",
+  "score": 0-100 integer, overall financial health,
   "status": "strong" | "solid" | "attention" | "at_risk",
   "overview": "3-5 sentences setting the overall scene, second person ('you'/'your'), referencing real numbers",
   "sections": [

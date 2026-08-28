@@ -20,6 +20,8 @@ export interface SpendSnapshot { date: string; totalInc: number; totalExp: numbe
 export type FinancialHealthStatus = 'strong' | 'solid' | 'attention' | 'at_risk'
 export interface FinancialHealthResult {
   headline: string
+  /** 0-100 overall health score. Optional so older cached results still render. */
+  score?: number
   status: FinancialHealthStatus
   overview: string
   sections: { title: string; body: string; status?: FinancialHealthStatus }[]

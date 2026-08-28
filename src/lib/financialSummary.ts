@@ -30,6 +30,10 @@ export interface FinancialSummary {
   assets: {
     liquidTotal: number
     pensionsTotal: number
+    /** Individually held pots, same person order as incomeSplitPct. */
+    pensionsPerPerson: number[]
+    /** Only pensions genuinely held jointly — usually 0. */
+    pensionsJoint: number
     byType: { type: string; amount: number }[]
     runwayMonths: number | null
   }
@@ -52,11 +56,18 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
     return acc + assets.reduce((a, i) => a + (i.amount || 0), 0)
   }, 0)
 
-  const pensionsTotal = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
+  // Pensions are individually held — a pot belonging to one partner is not
+  // shared retirement provision, so keep them attributed rather than summed.
+  const pensionFor = (owner: Owner) => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
-    const assets = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type === 'PENSION')
-    return acc + assets.reduce((a, i) => a + (i.amount || 0), 0)
-  }, 0)
+    return (Array.isArray(snap?.assets) ? snap!.assets : [])
+      .filter((a: any) => a.type === 'PENSION')
+      .reduce((a: number, i: any) => a + (i.amount || 0), 0)
+  }
+  const pensionN = pensionFor('NIAMH')
+  const pensionR = pensionFor('RUPERT')
+  const pensionJoint = pensionFor('JOINT')
+  const pensionsTotal = pensionN + pensionR + pensionJoint
 
   const byTypeMap = new Map<string, number>()
   ;(['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).forEach(owner => {
@@ -116,6 +127,8 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
     assets: {
       liquidTotal,
       pensionsTotal,
+      pensionsPerPerson: [pensionN, pensionR],
+      pensionsJoint: pensionJoint,
       byType: Array.from(byTypeMap.entries()).map(([type, amount]) => ({ type, amount })).filter(t => t.amount > 0),
       runwayMonths,
     },

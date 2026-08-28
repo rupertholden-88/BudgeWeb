@@ -85,6 +85,61 @@ function healthLabel(status: string) {
 // convert for display. No live FX feed — approximate, update by hand
 // alongside PRICE_PER_MILLION in the API route if it drifts noticeably.
 const USD_TO_GBP = 0.79
+function scoreBand(score: number) {
+  if (score >= 85) return { label: 'Exceptional', colour: 'var(--positive)' }
+  if (score >= 70) return { label: 'Strong', colour: 'var(--positive)' }
+  if (score >= 55) return { label: 'Reasonable', colour: 'var(--savings-text)' }
+  if (score >= 40) return { label: 'Needs work', colour: 'var(--expense-text)' }
+  return { label: 'At risk', colour: 'var(--negative)' }
+}
+
+/** Semicircular 0-100 gauge. Arc drawn once and revealed with a dash offset. */
+function ScoreGauge({ score }: { score: number }) {
+  const value = Math.max(0, Math.min(100, Math.round(score)))
+  const band = scoreBand(value)
+  const r = 52
+  const cx = 60
+  const cy = 60
+  const arc = `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`
+  const len = Math.PI * r
+
+  return (
+    <div className="flex flex-col items-center">
+      <svg
+        viewBox="0 0 120 70"
+        className="w-[168px] h-[98px]"
+        role="img"
+        aria-label={`Financial health score ${value} out of 100 — ${band.label}`}
+      >
+        <path d={arc} fill="none" stroke="var(--surface)" strokeWidth={10} strokeLinecap="round" />
+        <path
+          d={arc}
+          fill="none"
+          stroke={band.colour}
+          strokeWidth={10}
+          strokeLinecap="round"
+          strokeDasharray={len}
+          strokeDashoffset={len * (1 - value / 100)}
+          style={{ transition: 'stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1)' }}
+        />
+        <text
+          x={cx} y={48} textAnchor="middle"
+          fill="var(--ink)"
+          style={{ fontSize: 30, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}
+        >
+          {value}
+        </text>
+        <text x={cx} y={62} textAnchor="middle" fill="var(--muted)" style={{ fontSize: 9 }}>
+          out of 100
+        </text>
+      </svg>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] -mt-1" style={{ color: band.colour }}>
+        {band.label}
+      </div>
+    </div>
+  )
+}
+
 function fmtGbp(usd: number) {
   const gbp = usd * USD_TO_GBP
   return `£${gbp < 0.01 ? gbp.toFixed(4) : gbp.toFixed(2)}`
@@ -176,22 +231,29 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
         <>
           {result && (
             <div className="mb-3">
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <span className={`text-[10px] font-bold uppercase tracking-[0.06em] px-2 py-0.5 rounded-full ${
-                  healthIntent(result.status) === 'positive' ? 'bg-income-bg text-positive'
-                  : healthIntent(result.status) === 'negative' ? 'bg-expense-bg text-negative'
-                  : 'bg-surface text-muted'
-                }`}>
-                  {healthLabel(result.status)}
-                </span>
-                {generatedAt && (
-                  <span className="text-[10px] text-muted">
-                    {stale ? 'Based on earlier figures' : `Checked ${new Date(generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
-                    {lastCostUsd != null && ` · ${fmtGbp(lastCostUsd)}`}
+              {typeof result.score === 'number' ? (
+                <div className="flex flex-col items-center mb-2">
+                  <ScoreGauge score={result.score} />
+                </div>
+              ) : (
+                // Pre-score cached results still have only the coarse label.
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  <span className={`text-[10px] font-bold uppercase tracking-[0.06em] px-2 py-0.5 rounded-full ${
+                    healthIntent(result.status) === 'positive' ? 'bg-income-bg text-positive'
+                    : healthIntent(result.status) === 'negative' ? 'bg-expense-bg text-negative'
+                    : 'bg-surface text-muted'
+                  }`}>
+                    {healthLabel(result.status)}
                   </span>
-                )}
-              </div>
-              <div className="font-serif text-lg leading-snug mb-1.5">{result.headline}</div>
+                </div>
+              )}
+              {generatedAt && (
+                <div className="text-[10px] text-muted text-center mb-2">
+                  {stale ? 'Based on earlier figures' : `Checked ${new Date(generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
+                  {lastCostUsd != null && ` · ${fmtGbp(lastCostUsd)}`}
+                </div>
+              )}
+              <div className="font-serif text-lg leading-snug mb-1.5 text-center">{result.headline}</div>
               <p className="text-[13px] text-muted leading-relaxed mb-3">{result.overview ?? ''}</p>
 
               {(result.sections ?? []).length > 0 && (
