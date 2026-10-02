@@ -8,7 +8,7 @@ import SavingsScreen from '@/components/SavingsScreen'
 import DebtsScreen from '@/components/DebtsScreen'
 import SettingsScreen from '@/components/SettingsScreen'
 import { TabFilter } from '@/lib/models'
-import { LayoutDashboard, BarChart3, PiggyBank, CreditCard, User, RefreshCw, Settings, CheckCircle, AlertCircle } from 'lucide-react'
+import { LayoutDashboard, BarChart3, PiggyBank, CreditCard, User, RefreshCw, Settings, CheckCircle, AlertCircle, Home } from 'lucide-react'
 
 const ChartsScreen = dynamic(() => import('@/components/ChartsScreen'))
 
@@ -40,10 +40,10 @@ function SetupScreen({ onDone, updateOwnerName, signIn, isSignedIn }: {
   return (
     <div className="h-[100dvh] flex flex-col items-center justify-center p-8 bg-surface">
       <h1 className="font-serif text-4xl m-0 mb-2 text-ink">Budge</h1>
-      <p className="text-muted text-[15px] mb-10 text-center">A shared household budget for two.</p>
+      <p className="text-muted text-lead mb-10 text-center">A shared household budget for two.</p>
       <div className="card w-full max-w-[360px] p-6">
-        <div className="text-[13px] font-semibold mb-1">Who's using Budge?</div>
-        <p className="text-[12px] text-muted mb-4 mt-0">
+        <div className="text-body font-semibold mb-1">Who's using Budge?</div>
+        <p className="text-xs text-muted mb-4 mt-0">
           {isSignedIn
             ? "You're all set up — we just need your names to get started."
             : 'You can change these later in Settings.'}
@@ -56,7 +56,7 @@ function SetupScreen({ onDone, updateOwnerName, signIn, isSignedIn }: {
               value={name1}
               onChange={e => setName1(e.target.value)}
               placeholder="First name"
-              className="w-full text-[15px] border-[1.5px] border-border rounded-lg px-3 py-2.5 bg-card"
+              className="w-full text-lead border-[1.5px] border-border rounded-lg px-3 py-2.5 bg-card"
             />
           </div>
           <div>
@@ -67,13 +67,13 @@ function SetupScreen({ onDone, updateOwnerName, signIn, isSignedIn }: {
               onChange={e => setName2(e.target.value)}
               placeholder="First name"
               onKeyDown={e => { if (e.key === 'Enter') submit() }}
-              className="w-full text-[15px] border-[1.5px] border-border rounded-lg px-3 py-2.5 bg-card"
+              className="w-full text-lead border-[1.5px] border-border rounded-lg px-3 py-2.5 bg-card"
             />
           </div>
         </div>
         <button
           onClick={submit}
-          className="w-full bg-ink text-white border-0 rounded-lg py-3 cursor-pointer text-[15px] font-semibold"
+          className="w-full bg-ink text-on-ink border-0 rounded-xl py-3 cursor-pointer text-lead font-semibold"
         >
           Get started
         </button>
@@ -85,7 +85,7 @@ function SetupScreen({ onDone, updateOwnerName, signIn, isSignedIn }: {
             >
               <User size={15} /> Continue with Google
             </button>
-            <p className="text-[11px] text-muted leading-relaxed mt-4 mb-0 text-center">
+            <p className="text-label text-muted leading-relaxed mt-4 mb-0 text-center">
               Your budget saves to this device either way. Signing in backs it up
               and syncs it across your devices — and lets you pick up an existing one.
             </p>
@@ -104,6 +104,8 @@ export default function HomePage() {
   const [toast, setToast] = useState<string | null>(null)
   const swipeRef = useRef<{ x: number; y: number; t: number } | null>(null)
   const { data, user, authLoading, cloudLoading, localLoading, savedAt, isRefreshing, signIn, signOutUser, refreshFromCloud, updateOwnerName } = budget
+  // A property filter outlives its property if that property is deleted.
+  const activeTab: TabFilter = tab.startsWith('property:') && !(data.properties ?? []).some(p => `property:${p.id}` === tab) ? 'ALL' : tab
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -164,7 +166,7 @@ export default function HomePage() {
           aria-live="polite"
           className="fixed bottom-20 inset-x-0 z-[100] flex justify-center pointer-events-none px-4"
         >
-          <div className="bg-ink text-white px-5 py-2.5 rounded-full text-[13px] font-medium flex items-center gap-1.5 shadow-[0_4px_12px_rgba(0,0,0,0.2)] fade-up">
+          <div className="bg-ink text-on-ink px-5 py-2.5 rounded-full text-body font-medium flex items-center gap-1.5 shadow-[0_4px_12px_rgba(0,0,0,0.2)] fade-up">
             <CheckCircle size={14} /> {toast}
           </div>
         </div>
@@ -173,7 +175,7 @@ export default function HomePage() {
       <header className="glass border-b border-border px-4 h-14 flex items-center gap-3 shrink-0 z-10">
         <h1 className="font-serif text-2xl m-0 flex-1">Budge</h1>
         {savedAt && (
-          <span className="text-[11px] text-muted">
+          <span className="text-label text-muted">
             Saved {new Date(savedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
           </span>
         )}
@@ -190,7 +192,7 @@ export default function HomePage() {
               onClick={signOutUser}
               title={`${user.email} — tap to sign out`}
               aria-label={`Signed in as ${user.email}. Tap to sign out.`}
-              className="w-8 h-8 rounded-full bg-rupert text-white flex items-center justify-center text-[13px] font-semibold cursor-pointer border-0 p-0 overflow-hidden ring-2 ring-border"
+              className="w-9 h-9 rounded-full bg-accent text-on-ink flex items-center justify-center text-body font-semibold cursor-pointer border-0 p-0 overflow-hidden ring-2 ring-border"
             >
               {user.photoURL
                 ? <img src={user.photoURL} alt={user.email ?? ''} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -201,7 +203,7 @@ export default function HomePage() {
         ) : (
           <button
             onClick={signIn}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border-[1.5px] border-border bg-card cursor-pointer text-[13px] font-medium"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border-[1.5px] border-border bg-card cursor-pointer text-body font-medium"
           >
             <User size={14} /> Sign in
           </button>
@@ -211,7 +213,7 @@ export default function HomePage() {
       {!user && (
         <button
           onClick={signIn}
-          className="bg-surface text-muted border-0 border-b border-border px-4 py-2 shrink-0 flex items-center justify-center gap-1.5 text-[11px] cursor-pointer w-full text-left"
+          className="bg-surface text-muted border-0 border-b border-border px-4 py-2 shrink-0 flex items-center justify-center gap-1.5 text-label cursor-pointer w-full text-left"
         >
           <AlertCircle size={12} className="shrink-0" />
           <span>Saved on this device only. <span className="font-semibold underline text-ink">Sign in to back up and sync.</span></span>
@@ -219,12 +221,21 @@ export default function HomePage() {
       )}
 
       {screen === 'budget' && (
-        <div className="bg-card border-b border-border px-4 py-2 flex gap-2 shrink-0 overflow-x-auto">
+        <div className="bg-card border-b border-border px-4 py-2 flex gap-2 shrink-0 overflow-x-auto items-center">
           {(['ALL', 'NIAMH', 'RUPERT', 'JOINT'] as TabFilter[]).map(t => {
             const label = t === 'ALL' ? 'All' : t === 'NIAMH' ? (data.nameNiamh || 'Person 1') : t === 'RUPERT' ? (data.nameRupert || 'Person 2') : (data.nameJoint || 'Joint')
             return (
-              <button key={t} onClick={() => setTab(t)} className={tab === t ? `chip chip-${t.toLowerCase()}` : 'chip chip-inactive'}>
+              <button key={t} onClick={() => setTab(t)} aria-pressed={activeTab === t} className={activeTab === t ? `chip chip-${t.toLowerCase()}` : 'chip chip-inactive'}>
                 {label}
+              </button>
+            )
+          })}
+          {(data.properties ?? []).length > 0 && <span className="w-px h-5 bg-border shrink-0" aria-hidden />}
+          {(data.properties ?? []).map(p => {
+            const t = `property:${p.id}` as TabFilter
+            return (
+              <button key={p.id} onClick={() => setTab(t)} aria-pressed={activeTab === t} className={activeTab === t ? 'chip chip-property' : 'chip chip-inactive'}>
+                <Home size={12} /> {p.label}
               </button>
             )
           })}
@@ -237,7 +248,7 @@ export default function HomePage() {
         onTouchEnd={handleTouchEnd}
       >
         <div key={screen} className="h-full screen-enter">
-          {screen === 'budget'   && <BudgetScreen   budget={budget} tab={tab} onNavigateToDebts={() => setScreen('debts')} />}
+          {screen === 'budget'   && <BudgetScreen   budget={budget} tab={activeTab} onNavigateToDebts={() => setScreen('debts')} />}
           {screen === 'charts'   && <ChartsScreen   budget={budget} />}
           {screen === 'savings'  && <SavingsScreen  budget={budget} />}
           {screen === 'debts'    && <DebtsScreen    budget={budget} />}
@@ -251,7 +262,7 @@ export default function HomePage() {
             key={id}
             onClick={() => setScreen(id)}
             aria-current={screen === id ? 'page' : undefined}
-            className={`flex-1 flex flex-col items-center justify-center gap-[3px] py-2 bg-transparent border-0 cursor-pointer text-[10px] ${screen === id ? 'text-ink font-semibold' : 'text-muted font-normal'}`}
+            className={`flex-1 flex flex-col items-center justify-center gap-[3px] py-2 min-h-[52px] bg-transparent border-0 cursor-pointer text-caption ${screen === id ? 'text-ink font-semibold' : 'text-muted font-normal'}`}
           >
             <span className={`nav-pill flex ${screen === id ? 'nav-pill-active' : ''}`}>
               <Icon size={20} strokeWidth={screen === id ? 2.4 : 1.8} />

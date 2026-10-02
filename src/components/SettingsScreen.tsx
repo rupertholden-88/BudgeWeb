@@ -22,10 +22,10 @@ function NameRow({ label, value, onSave, colorClass }: { label: string; value: s
             onChange={e => setDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') commit() }}
             onBlur={commit}
-            className="flex-1 text-sm border-[1.5px] border-rupert rounded-md px-2 py-1 outline-none"
+            className="flex-1 min-w-0 text-sm border-[1.5px] border-accent bg-accent-light rounded-lg px-2 py-1.5 outline-none"
             autoFocus
           />
-          <button onClick={commit} className="bg-ink text-white border-0 rounded-md px-2 py-1 cursor-pointer flex">
+          <button onClick={commit} aria-label="Save name" className="bg-ink text-on-ink border-0 rounded-lg w-9 h-9 cursor-pointer flex items-center justify-center shrink-0">
             <Check size={14} />
           </button>
         </>
@@ -42,9 +42,9 @@ function NameRow({ label, value, onSave, colorClass }: { label: string; value: s
 }
 
 export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, user, updateOwnerName, getJsonString, importFromJson, updateBirthMonth, addDependant, updateDependant, removeDependant } = budget
+  const { data, user, updateOwnerName, getJsonString, importFromJson, updateBirthMonth, addDependant, updateDependant, removeDependant, updateGrossIncome } = budget
   const [importText, setImportText] = useState('')
-  const [importResult, setImportResult] = useState<string | null>(null)
+  const [importResult, setImportResult] = useState<{ ok: boolean; text: string } | null>(null)
   const [darkMode, setDarkMode] = useState(false)
 
   const { hasKey, last4, keyLength, loading: keyLoading, saveKey, removeKey } = useApiKey(user)
@@ -86,9 +86,9 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
   }
 
   const handleImport = () => {
-    const ok = importFromJson(importText)
-    setImportResult(ok ? 'Imported successfully!' : 'Invalid JSON — check the format')
-    if (ok) setImportText('')
+    const result = importFromJson(importText)
+    setImportResult({ ok: result.ok, text: result.message })
+    if (result.ok) setImportText('')
   }
 
   const handleExport = () => {
@@ -100,7 +100,7 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
     a.download = `budge-backup-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
-    setImportResult('Downloaded!')
+    setImportResult({ ok: true, text: 'Backup downloaded.' })
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,21 +109,19 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
     const reader = new FileReader()
     reader.onload = (ev) => {
       const text = ev.target?.result as string
-      const ok = importFromJson(text)
-      setImportResult(ok ? 'Imported successfully!' : 'Invalid file — check the format')
+      const result = importFromJson(text)
+      setImportResult({ ok: result.ok, text: result.message })
     }
     reader.readAsText(file)
     e.target.value = ''
   }
-
-  const importOk = importResult?.includes('success') || importResult?.includes('copied') || importResult?.includes('Downloaded')
 
   return (
     <div className="h-full overflow-y-auto p-4">
       <h2 className="font-serif text-xl mb-4 mt-0">Settings</h2>
 
       <div className="card py-1 px-4 mb-3">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted py-2.5 pb-1">Person Names</div>
+        <div className="text-label font-semibold uppercase tracking-label text-muted py-2.5 pb-1">Person Names</div>
         <NameRow label="Person 1" value={data.nameNiamh} colorClass="bg-niamh" onSave={v => updateOwnerName('NIAMH', v)} />
         <NameRow label="Person 2" value={data.nameRupert} colorClass="bg-rupert" onSave={v => updateOwnerName('RUPERT', v)} />
         <NameRow label="Joint"    value={data.nameJoint}  colorClass="bg-joint"  onSave={v => updateOwnerName('JOINT', v)} />
@@ -133,7 +131,7 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
       </div>
 
       <div className="card py-1 px-4 mb-3">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted py-2.5 pb-1">Household</div>
+        <div className="text-label font-semibold uppercase tracking-label text-muted py-2.5 pb-1">Household</div>
 
         {([
           { owner: 'NIAMH' as const, label: data.nameNiamh || 'Person 1', value: data.bornNiamh, colour: 'bg-niamh' },
@@ -147,11 +145,31 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
               value={p.value ?? ''}
               onChange={e => updateBirthMonth(p.owner, e.target.value)}
               aria-label={`${p.label} born`}
-              className="text-xs border-[1.5px] border-border rounded-md px-2 py-1 outline-none bg-card shrink-0"
+              className="text-xs border-[1.5px] border-border rounded-lg px-2 py-1 outline-none bg-card shrink-0"
             />
             {p.value && (
-              <span className="text-[11px] text-muted tabular-nums shrink-0 w-8 text-right">{ageInYears(p.value)}y</span>
+              <span className="text-label text-muted tabular-nums shrink-0 w-8 text-right">{ageInYears(p.value)}y</span>
             )}
+          </div>
+        ))}
+
+        {([
+          { owner: 'NIAMH' as const, label: data.nameNiamh || 'Person 1', value: data.grossNiamh, colour: 'bg-niamh' },
+          { owner: 'RUPERT' as const, label: data.nameRupert || 'Person 2', value: data.grossRupert, colour: 'bg-rupert' },
+        ]).map(p => (
+          <div key={`gross-${p.owner}`} className="flex items-center gap-2 py-2.5 border-b border-border">
+            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${p.colour}`} />
+            <span className="text-sm flex-1 min-w-0 truncate">{p.label}&apos;s gross salary</span>
+            <span className="text-xs text-muted">£</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={p.value ?? ''}
+              placeholder="per year"
+              onChange={e => updateGrossIncome(p.owner, parseFloat(e.target.value) || undefined)}
+              aria-label={`${p.label} gross annual salary`}
+              className="w-[110px] text-sm border-[1.5px] border-border rounded-lg px-2 py-1.5 outline-none bg-card shrink-0 text-right"
+            />
           </div>
         ))}
 
@@ -166,15 +184,15 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
                 value={d.born}
                 onChange={e => updateDependant(d.id, e.target.value)}
                 aria-label={`Child ${i + 1} born`}
-                className="text-xs border-[1.5px] border-border rounded-md px-2 py-1 outline-none bg-card shrink-0"
+                className="text-xs border-[1.5px] border-border rounded-lg px-2 py-1 outline-none bg-card shrink-0"
               />
-              <span className="text-[11px] text-muted tabular-nums shrink-0 w-8 text-right">
+              <span className="text-label text-muted tabular-nums shrink-0 w-8 text-right">
                 {months == null ? '' : months < 24 ? `${months}m` : `${Math.floor(months / 12)}y`}
               </span>
               <button
                 onClick={() => removeDependant(d.id)}
                 aria-label={`Remove child ${i + 1}`}
-                className="bg-transparent border-0 cursor-pointer text-muted text-sm shrink-0 px-1"
+                className="bg-transparent border-0 cursor-pointer text-muted text-sm shrink-0 w-11 h-11 -my-2 -mr-2 flex items-center justify-center"
               >
                 ✕
               </button>
@@ -184,7 +202,7 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
 
         <button
           onClick={addDependant}
-          className="flex items-center gap-1 mt-2 bg-transparent border-0 cursor-pointer text-muted text-xs"
+          className="flex items-center gap-1 mt-1 bg-transparent border-0 cursor-pointer text-muted text-xs min-h-[40px] px-0"
         >
           <Plus size={12} /> Add a child
         </button>
@@ -192,15 +210,20 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
         <p className="text-xs text-muted my-2 leading-relaxed">
           Used only by the financial health check, so it can compare you against households at
           the same stage rather than generic guidance. Birth months are stored, so ages stay current.
+          Gross salary is optional — it lets pension contributions be measured against the 8%
+          minimum properly, and flags the child benefit tax charge, which take-home pay alone can&apos;t.
         </p>
       </div>
 
       <div className="card py-1 px-4 mb-3">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted py-2.5 pb-1">Appearance</div>
+        <div className="text-label font-semibold uppercase tracking-label text-muted py-2.5 pb-1">Appearance</div>
         <div className="flex justify-between items-center py-2.5">
           <span className="text-sm">Dark mode</span>
           <button
             onClick={toggleDarkMode}
+            role="switch"
+            aria-checked={darkMode}
+            aria-label="Dark mode"
             className="w-12 h-[26px] rounded-full border-0 cursor-pointer relative transition-colors duration-200"
             style={{ background: darkMode ? 'var(--ink)' : 'var(--border)' }}
           >
@@ -213,15 +236,15 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
       </div>
 
       <div className="card py-1 px-4 mb-3">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted py-2.5 pb-1">Export / Import</div>
+        <div className="text-label font-semibold uppercase tracking-label text-muted py-2.5 pb-1">Export / Import</div>
         <button
           onClick={handleExport}
-          className="w-full mt-2 bg-ink text-white border-0 rounded-lg py-2.5 px-4 cursor-pointer text-sm font-medium"
+          className="w-full mt-2 bg-ink text-on-ink border-0 rounded-lg py-2.5 px-4 cursor-pointer text-sm font-medium"
         >
           Download backup (.json)
         </button>
         <div className="mt-2.5">
-          <label className="block w-full bg-rupert text-white border-0 rounded-lg py-2.5 px-4 cursor-pointer text-sm font-medium text-center">
+          <label className="block w-full bg-transparent text-ink border-[1.5px] border-border rounded-xl py-2.5 px-4 cursor-pointer text-sm font-medium text-center">
             Upload backup (.json)
             <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
           </label>
@@ -237,30 +260,30 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
           <button
             onClick={handleImport}
             disabled={!importText.trim()}
-            className={`w-full mt-1.5 border-0 rounded-lg py-2.5 px-4 text-sm font-medium text-white ${importText.trim() ? 'bg-rupert cursor-pointer' : 'bg-border cursor-default'}`}
+            className={`w-full mt-1.5 border-0 rounded-lg py-2.5 px-4 text-sm font-medium text-on-ink ${importText.trim() ? 'bg-ink text-on-ink cursor-pointer' : 'bg-border cursor-default'}`}
           >
             Import from text
           </button>
         </div>
         {importResult && (
-          <div className={`mt-2 text-[13px] px-2.5 py-1.5 rounded-md ${importOk ? 'text-positive bg-income-bg' : 'text-negative bg-expense-bg'}`}>
-            {importResult}
+          <div role="status" className={`mt-2 text-body px-2.5 py-1.5 rounded-lg ${importResult.ok ? 'text-positive bg-income-bg' : 'text-negative bg-expense-bg'}`}>
+            {importResult.text}
           </div>
         )}
       </div>
 
       <div className="card px-4 py-3 mb-3">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted mb-2 flex items-center gap-1.5">
+        <div className="text-label font-semibold uppercase tracking-label text-muted mb-2 flex items-center gap-1.5">
           <KeyRound size={12} /> AI Financial Health Check
         </div>
         {!user ? (
-          <p className="text-[13px] text-muted m-0 leading-relaxed">
+          <p className="text-body text-muted m-0 leading-relaxed">
             Sign in to add your own Anthropic API key. It's tied to your Google account — anyone else who opens this
             app needs to add their own key too, so the check only ever runs (and is only ever billed) against the
             person who's using it.
           </p>
         ) : keyLoading ? (
-          <p className="text-[13px] text-muted m-0">Checking…</p>
+          <p className="text-body text-muted m-0">Checking…</p>
         ) : hasKey && !editingKey ? (
           <>
             <div className="flex items-center justify-between">
@@ -268,19 +291,19 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
               <div className="flex gap-1.5">
                 <button
                   onClick={() => { setKeyDraft(''); setEditingKey(true) }}
-                  className="text-[12px] bg-transparent border-[1.5px] border-border rounded-md px-2.5 py-1 cursor-pointer"
+                  className="text-xs bg-transparent border-[1.5px] border-border rounded-lg px-2.5 py-1 cursor-pointer"
                 >
                   Replace
                 </button>
                 <button
                   onClick={handleRemoveKey}
-                  className="text-[12px] bg-transparent text-negative border-[1.5px] border-negative/40 rounded-md px-2.5 py-1 cursor-pointer"
+                  className="text-xs bg-transparent text-negative border-[1.5px] border-negative rounded-lg px-2.5 py-1 cursor-pointer"
                 >
                   Remove
                 </button>
               </div>
             </div>
-            <p className="text-[11px] text-muted mt-2 mb-0 leading-relaxed">
+            <p className="text-label text-muted mt-2 mb-0 leading-relaxed">
               {keyLength} characters. Used only for the financial health check on Analysis, and only for your own account.
               {keyLength != null && keyLength < 90 && (
                 <span className="text-negative"> An Anthropic key is normally ~108 characters, so this one looks truncated — try copying it again.</span>
@@ -307,7 +330,7 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
               <button
                 onClick={handleSaveKey}
                 disabled={!keyDraft.trim() || savingKey}
-                className={`flex-1 border-0 rounded-lg py-2 text-sm font-medium text-white ${keyDraft.trim() && !savingKey ? 'bg-ink cursor-pointer' : 'bg-border cursor-default'}`}
+                className={`flex-1 border-0 rounded-lg py-2 text-sm font-medium text-on-ink ${keyDraft.trim() && !savingKey ? 'bg-ink cursor-pointer' : 'bg-border cursor-default'}`}
               >
                 {savingKey ? 'Saving…' : 'Save key'}
               </button>
@@ -320,22 +343,22 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
                 </button>
               )}
             </div>
-            <p className="text-[11px] text-muted mt-2 mb-0 leading-relaxed">
+            <p className="text-label text-muted mt-2 mb-0 leading-relaxed">
               From <span className="font-mono">console.anthropic.com</span> — stored against your account, never
               shared with anyone else who signs into this app, and never included in your JSON backup.
             </p>
           </>
         )}
         {keyMsg && (
-          <div className={`mt-2 text-[13px] px-2.5 py-1.5 rounded-md leading-relaxed ${keyMsg.ok ? 'text-positive bg-income-bg' : 'text-negative bg-expense-bg'}`}>
+          <div className={`mt-2 text-body px-2.5 py-1.5 rounded-lg leading-relaxed ${keyMsg.ok ? 'text-positive bg-income-bg' : 'text-negative bg-expense-bg'}`}>
             {keyMsg.text}
           </div>
         )}
       </div>
 
       <div className="card px-4 py-3 mb-3">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted mb-2">About</div>
-        <p className="text-[13px] text-muted m-0 leading-relaxed">
+        <div className="text-label font-semibold uppercase tracking-label text-muted mb-2">About</div>
+        <p className="text-body text-muted m-0 leading-relaxed">
           Budge syncs your household budget across devices in real time via Firebase. Sign in with Google to enable sync.
         </p>
       </div>

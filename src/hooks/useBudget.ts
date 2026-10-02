@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore'
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth'
 import { db, auth, provider } from '@/lib/firebase'
-import { BudgetData, Debt, Owner, EntryType, AssetType, Asset, DebtType, defaultBudgetData, calcTotals, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
+import { BudgetData, Debt, Owner, EntryType, AssetType, Asset, DebtType, Property, defaultBudgetData, calcTotals, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
 
 function uuid() { return crypto.randomUUID() }
 
@@ -249,6 +249,47 @@ export function useBudget() {
     }) }) }))
   }
 
+  const updateItemProperty = (catKey: string, itemId: string, propertyId: string) => {
+    mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.map(i => i.id === itemId ? { ...i, propertyId: propertyId || undefined } : i) }) }))
+  }
+
+  const updateGrossIncome = (owner: Owner, gross: number | undefined) => {
+    mutate(b => ({
+      ...b,
+      grossNiamh: owner === 'NIAMH' ? gross : b.grossNiamh,
+      grossRupert: owner === 'RUPERT' ? gross : b.grossRupert,
+    }))
+  }
+
+  const addProperty = (label: string, owner: Owner) => {
+    if (!label.trim()) return
+    mutate(b => {
+      const existing = b.properties ?? []
+      // The first home added is almost always the one lived in.
+      return { ...b, properties: [...existing, { id: uuid(), label: label.trim(), owner, estimatedValue: 0, isMainResidence: existing.length === 0 || undefined }] }
+    })
+  }
+
+  const updateProperty = (id: string, fields: Partial<Property>) => {
+    mutate(b => ({
+      ...b,
+      properties: (b.properties ?? []).map(p => {
+        // Only one main residence at a time — it's a single tax election.
+        if (fields.isMainResidence && p.id !== id) return { ...p, isMainResidence: undefined }
+        return p.id === id ? { ...p, ...fields } : p
+      }),
+    }))
+  }
+
+  const deleteProperty = (id: string) => {
+    mutate(b => ({
+      ...b,
+      properties: (b.properties ?? []).filter(p => p.id !== id),
+      debts: b.debts.map(d => d.propertyId === id ? { ...d, propertyId: undefined } : d),
+      categories: b.categories.map(c => ({ ...c, items: c.items.map(i => i.propertyId === id ? { ...i, propertyId: undefined } : i) })),
+    }))
+  }
+
   const toggleItemAutoRenew = (catKey: string, itemId: string) => {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.map(i => i.id === itemId ? { ...i, autoRenews: !i.autoRenews } : i) }) }))
   }
@@ -372,13 +413,21 @@ export function useBudget() {
   }
 
   const getJsonString = () => JSON.stringify(data, null, 2)
-  const importFromJson = (json: string): boolean => {
+  const importFromJson = (json: string): { ok: boolean; message: string } => {
+    let parsed: any
     try {
-      const parsed = JSON.parse(json)
-      const merged = mergeBudgets(parsed, currentData.current)
-      setData(merged)
-      return true
-    } catch { return false }
+      parsed = JSON.parse(json)
+    } catch (err) {
+      const where = err instanceof Error ? err.message : ''
+      return { ok: false, message: `That isn't valid JSON${where ? ` (${where})` : ''} — it may have been cut off when copying.` }
+    }
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.categories)) {
+      return { ok: false, message: "That's valid JSON, but not a Budge backup — it has no budget categories in it." }
+    }
+    const merged = mergeBudgets({ ...defaultBudgetData(), ...parsed, savingsHistory: parsed.savingsHistory ?? [], debts: parsed.debts ?? [] }, currentData.current)
+    // Go through mutate so an import is saved and synced like any other change.
+    mutate(() => merged)
+    return { ok: true, message: `Imported ${parsed.categories.length} categories.` }
   }
 
   const totals: Totals = calcTotals(data)
@@ -400,7 +449,8 @@ export function useBudget() {
     signIn, signOutUser, refreshFromCloud,
     updateOwnerName, updateBirthMonth, addDependant, updateDependant, removeDependant,
     addCategory, renameCategory, deleteCategory,
-    updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, toggleItemAutoRenew, updateItemInsurance, toggleItemShared, recordFinancialHealthRun,
+    updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, toggleItemAutoRenew, updateItemInsurance, toggleItemShared, updateItemProperty, recordFinancialHealthRun,
+    updateGrossIncome, addProperty, updateProperty, deleteProperty,
     addAsset, updateAsset, updateAssetFields, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,

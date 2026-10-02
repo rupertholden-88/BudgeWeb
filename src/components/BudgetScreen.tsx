@@ -1,44 +1,16 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { Category, TabFilter, Owner, EntryType, fmt, calcTotals, daysUntil, isInsuranceItem } from '@/lib/models'
-import { Plus, ChevronDown, ChevronUp, Check, TrendingUp, TrendingDown, CalendarClock, SlidersHorizontal } from 'lucide-react'
+import { useState } from 'react'
+import { Category, LineItem, TabFilter, Owner, EntryType, Property, fmt, calcTotals, daysUntil, isInsuranceItem, monthsToClear, effectiveRate, propertySummaries } from '@/lib/models'
+import { Plus, Check, TrendingUp, TrendingDown, SlidersHorizontal, Home } from 'lucide-react'
+import { AmountCell, ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, inputClass, useLongPress, ownerBorderClass, ownerTextClass } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
-// ─── helpers ────────────────────────────────────────────────────────────────
-
-function ownerBorderClass(owner: Owner) {
-  if (owner === 'NIAMH') return 'border-l-[3px] border-l-niamh'
-  if (owner === 'RUPERT') return 'border-l-[3px] border-l-rupert'
-  return 'border-l-[3px] border-l-joint'
-}
-function ownerTextClass(owner: Owner) {
-  if (owner === 'NIAMH') return 'text-niamh'
-  if (owner === 'RUPERT') return 'text-rupert'
-  return 'text-joint'
-}
 function typeSectionClass(type: EntryType) {
   if (type === 'INCOME') return 'text-income-text'
   if (type === 'EXPENSE') return 'text-expense-text'
   return 'text-savings-text'
-}
-
-// ─── delete modal ────────────────────────────────────────────────────────────
-
-function DeleteModal({ label, onConfirm, onCancel }: { label: string; onConfirm: () => void; onCancel: () => void }) {
-  return (
-    <div className="fixed inset-0 bg-black/50 z-[1000] flex items-end justify-center p-4">
-      <div className="card w-full max-w-sm p-6 mb-2">
-        <div className="text-base font-semibold mb-1">Delete?</div>
-        <div className="text-sm text-muted mb-5">Remove <strong>{label}</strong>?</div>
-        <div className="flex gap-2">
-          <button onClick={onCancel} className="flex-1 bg-transparent border-[1.5px] border-border rounded-xl py-3 cursor-pointer text-sm font-medium">Cancel</button>
-          <button onClick={onConfirm} className="flex-1 bg-negative text-white border-0 rounded-xl py-3 cursor-pointer text-sm font-semibold">Delete</button>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 // ─── allocation bar ───────────────────────────────────────────────────────────
@@ -52,36 +24,26 @@ function AllocationBar({ inc, exp, sav }: { inc: number; exp: number; sav: numbe
   return (
     <div className="my-3">
       <div className="flex h-2 rounded-full overflow-hidden gap-[2px]">
-        {expPct > 0 && (
-          <div className="h-full bg-expense-text transition-[width] duration-700" style={{ width: `${expPct}%` }} />
-        )}
-        {savPct > 0 && (
-          <div className="h-full bg-savings-text transition-[width] duration-700" style={{ width: `${savPct}%` }} />
-        )}
+        {expPct > 0 && <div className="h-full bg-expense-text transition-[width] duration-700" style={{ width: `${expPct}%` }} />}
+        {savPct > 0 && <div className="h-full bg-savings-text transition-[width] duration-700" style={{ width: `${savPct}%` }} />}
         {leftPct > 0 && (
-          <div
-            className={`h-full transition-[width] duration-700 ${left >= 0 ? 'bg-positive' : 'bg-negative'}`}
-            style={{ width: `${leftPct}%` }}
-          />
+          <div className={`h-full transition-[width] duration-700 ${left >= 0 ? 'bg-positive' : 'bg-negative'}`} style={{ width: `${leftPct}%` }} />
         )}
       </div>
       <div className="flex gap-3 mt-1.5 flex-wrap">
         {expPct > 0 && (
-          <span className="text-[10px] text-expense-text font-medium flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-expense-text inline-block" />
-            Expenses {expPct.toFixed(0)}%
+          <span className="text-caption text-expense-text font-medium flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-expense-text inline-block" /> Expenses {expPct.toFixed(0)}%
           </span>
         )}
         {savPct > 0 && (
-          <span className="text-[10px] text-savings-text font-medium flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-savings-text inline-block" />
-            Savings {savPct.toFixed(0)}%
+          <span className="text-caption text-savings-text font-medium flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-savings-text inline-block" /> Savings {savPct.toFixed(0)}%
           </span>
         )}
         {leftPct > 0 && (
-          <span className={`text-[10px] font-medium flex items-center gap-1 ${left >= 0 ? 'text-positive' : 'text-negative'}`}>
-            <span className={`w-1.5 h-1.5 rounded-full inline-block ${left >= 0 ? 'bg-positive' : 'bg-negative'}`} />
-            Left {leftPct.toFixed(0)}%
+          <span className={`text-caption font-medium flex items-center gap-1 ${left >= 0 ? 'text-positive' : 'text-negative'}`}>
+            <span className={`w-1.5 h-1.5 rounded-full inline-block ${left >= 0 ? 'bg-positive' : 'bg-negative'}`} /> Left {leftPct.toFixed(0)}%
           </span>
         )}
       </div>
@@ -94,33 +56,26 @@ function AllocationBar({ inc, exp, sav }: { inc: number; exp: number; sav: numbe
 function BudgetOverview({ totals }: { totals: ReturnType<typeof calcTotals> }) {
   const { totalInc, totalExp, totalSav, net } = totals
   const isHealthy = net >= 0
-
   if (totalInc === 0 && totalExp === 0) return null
 
   return (
     <div className="card mb-4 overflow-hidden">
-      {/* top strip */}
       <div className={`h-1 w-full ${isHealthy ? 'bg-positive' : 'bg-negative'}`} />
       <div className="p-4">
-        <div className="text-[10px] font-semibold text-muted uppercase tracking-[0.1em] mb-1">
+        <div className="section-label text-caption mb-1">
           {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
         </div>
-
-        <div className="flex items-end justify-between">
+        <div className="flex items-end justify-between gap-2">
           <div>
-            <div className="text-[11px] text-muted mb-0.5">Total income</div>
-            <div className="font-serif text-3xl font-bold text-ink tabular-nums leading-none">
-              {fmt(totalInc)}
-            </div>
+            <div className="text-label text-muted mb-0.5">Total income</div>
+            <div className="font-serif text-3xl font-bold text-ink tabular-nums leading-none">{fmt(totalInc)}</div>
           </div>
           <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-bold tabular-nums ${isHealthy ? 'bg-income-bg text-positive' : 'bg-expense-bg text-negative'}`}>
             {isHealthy ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
             {isHealthy ? '+' : ''}{fmt(net)} left
           </div>
         </div>
-
         <AllocationBar inc={totalInc} exp={totalExp} sav={totalSav} />
-
         <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-border">
           {[
             { label: 'Expenses', value: totalExp, cls: 'text-expense-text' },
@@ -128,7 +83,7 @@ function BudgetOverview({ totals }: { totals: ReturnType<typeof calcTotals> }) {
             { label: 'Leftover', value: net,       cls: isHealthy ? 'text-positive' : 'text-negative' },
           ].map(({ label, value, cls }) => (
             <div key={label} className="text-center">
-              <div className="text-[10px] text-muted mb-0.5">{label}</div>
+              <div className="text-caption text-muted mb-0.5">{label}</div>
               <div className={`text-sm font-bold tabular-nums ${cls}`}>{fmt(value)}</div>
             </div>
           ))}
@@ -147,26 +102,61 @@ function PersonCard({ name, net, inc, exp, sav, debt, hjExp, hjSav, hjDebt, colo
 }) {
   const jointContrib = hjExp + hjSav + hjDebt
   const rows = [
-    { label: 'Income',           value: inc,          cls: 'text-income-text' },
-    { label: 'Personal expenses', value: exp + debt,  cls: 'text-expense-text' },
-    { label: 'Joint account',    value: jointContrib, cls: 'text-expense-text' },
-    { label: 'Savings',          value: sav,          cls: 'text-savings-text' },
+    { label: 'Income',            value: inc,          cls: 'text-income-text' },
+    { label: 'Personal expenses', value: exp + debt,   cls: 'text-expense-text' },
+    { label: 'Joint account',     value: jointContrib, cls: 'text-expense-text' },
+    { label: 'Savings',           value: sav,          cls: 'text-savings-text' },
   ].filter(r => r.value > 0)
   return (
     <div className={`card p-3.5 ${borderClass}`}>
-      <div className={`text-[11px] font-bold uppercase tracking-[0.08em] mb-1 ${colorClass}`}>{name}</div>
+      <div className={`text-label font-bold uppercase tracking-label mb-1 ${colorClass}`}>{name}</div>
       <div className={`font-serif text-2xl font-bold tabular-nums leading-none ${net >= 0 ? 'text-ink' : 'text-negative'}`}>
         {net >= 0 ? '+' : ''}{fmt(net)}
       </div>
-      <div className="text-[10px] text-muted mt-0.5 mb-3">left this month</div>
+      <div className="text-caption text-muted mt-0.5 mb-3">left this month</div>
       <div className="space-y-1 pt-2.5 border-t border-border">
         {rows.map(r => (
-          <div key={r.label} className="flex justify-between items-center">
-            <span className="text-[11px] text-muted">{r.label}</span>
-            <span className={`text-[11px] font-semibold tabular-nums ${r.cls}`}>{fmt(r.value)}</span>
+          <div key={r.label} className="flex justify-between items-center gap-1">
+            <span className="text-label text-muted">{r.label}</span>
+            <span className={`text-label font-semibold tabular-nums ${r.cls}`}>{fmt(r.value)}</span>
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+// ─── property rollup (property filter) ────────────────────────────────────────
+
+function PropertyRollup({ summary }: { summary: ReturnType<typeof propertySummaries>[number] }) {
+  const { property, monthlyTotal, mortgagePayment, runningCosts, equity, ltvPct, mortgageBalance } = summary
+  return (
+    <div className="card mb-4 p-4">
+      <div className="flex items-center gap-1.5 section-label text-caption mb-1">
+        <Home size={12} /> {property.isMainResidence ? 'Main residence' : property.isLet ? 'Let property' : 'Second property'}
+      </div>
+      <div className="flex items-end justify-between gap-2">
+        <div>
+          <div className="text-label text-muted mb-0.5">{property.label} costs</div>
+          <div className="font-serif text-3xl font-bold tabular-nums leading-none">{fmt(monthlyTotal)}<span className="text-sm text-muted font-sans font-normal">/mo</span></div>
+        </div>
+        {property.estimatedValue > 0 && (
+          <div className="text-right">
+            <div className="text-label text-muted mb-0.5">Equity</div>
+            <div className={`font-serif text-xl font-bold tabular-nums leading-none ${equity >= 0 ? 'text-positive' : 'text-negative'}`}>{fmt(equity)}</div>
+          </div>
+        )}
+      </div>
+      <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-border text-center">
+        <div><div className="text-caption text-muted mb-0.5">Mortgage</div><div className="text-sm font-bold tabular-nums">{fmt(mortgagePayment)}</div></div>
+        <div><div className="text-caption text-muted mb-0.5">Running costs</div><div className="text-sm font-bold tabular-nums">{fmt(runningCosts)}</div></div>
+        <div><div className="text-caption text-muted mb-0.5">LTV</div><div className="text-sm font-bold tabular-nums">{ltvPct != null && mortgageBalance > 0 ? `${ltvPct.toFixed(0)}%` : '—'}</div></div>
+      </div>
+      {summary.items.length === 0 && summary.debts.length === 0 && (
+        <p className="text-label text-muted mt-3 mb-0 leading-snug">
+          Nothing linked yet. Open any expense&apos;s options (<SlidersHorizontal size={10} className="inline" />) and pick this property, and link its mortgage on the Debts tab.
+        </p>
+      )}
     </div>
   )
 }
@@ -178,101 +168,53 @@ function SectionDivider({ type, total }: { type: EntryType; total: number }) {
   const cls = typeSectionClass(type)
   return (
     <div className="flex items-center gap-2 mb-2 mt-5 first:mt-0">
-      <span className={`text-[11px] font-bold uppercase tracking-[0.1em] shrink-0 ${cls}`}>
-        {labels[type]}
-      </span>
+      <span className={`text-label font-bold uppercase tracking-label shrink-0 ${cls}`}>{labels[type]}</span>
       <div className="flex-1 h-px bg-border" />
-      <span className={`text-[11px] font-bold tabular-nums shrink-0 ${cls}`}>
-        {total > 0 ? fmt(total) : '—'}
-      </span>
+      <span className={`text-label font-bold tabular-nums shrink-0 ${cls}`}>{total > 0 ? fmt(total) : '—'}</span>
     </div>
-  )
-}
-
-// ─── amount cell ──────────────────────────────────────────────────────────────
-
-function AmountCell({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const [editing, setEditing] = useState(false)
-  const [raw, setRaw] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-  const start = () => { setRaw(value === 0 ? '' : String(value)); setEditing(true); setTimeout(() => inputRef.current?.select(), 0) }
-  const commit = () => { const n = parseFloat(raw.replace(/[£,]/g, '')); onChange(isNaN(n) ? 0 : n); setEditing(false) }
-  if (editing) return (
-    <input
-      ref={inputRef}
-      value={raw}
-      onChange={e => setRaw(e.target.value)}
-      onBlur={commit}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Tab') commit() }}
-      className="w-20 text-right text-sm border-[1.5px] border-rupert rounded-lg px-2 py-1 outline-none bg-rupert-light font-semibold"
-      inputMode="decimal"
-      autoFocus
-    />
-  )
-  return (
-    <span
-      onClick={start}
-      className={`cursor-text tabular-nums text-sm font-semibold px-2 py-1 rounded-lg min-w-[64px] inline-block text-right transition-colors ${value > 0 ? 'text-ink' : 'text-muted/50'}`}
-    >
-      {value > 0 ? fmt(value) : '—'}
-    </span>
   )
 }
 
 // ─── item row ────────────────────────────────────────────────────────────────
 
-function RenewalBadge({ days }: { days: number }) {
-  const urgent = days <= 30
+function RenewalPill({ days }: { days: number }) {
   const passed = days < 0
-  const text = passed
-    ? 'Renewal date passed'
+  const text = passed ? 'Renewal date passed'
     : days === 0 ? 'Renews today'
     : days === 1 ? 'Renews tomorrow'
     : days <= 60 ? `Renews in ${days} days`
     : null
   if (!text) return null
-  return (
-    <span className={`text-[10px] font-medium ${passed || urgent ? 'text-expense-text' : 'text-muted'}`}>
-      {text}
-    </span>
-  )
+  return <span className={`pill ${passed ? 'pill-bad' : days <= 30 ? 'pill-warn' : ''}`}>{text}</span>
 }
 
-function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemoveItem, onRenameItem, onUpdateRenewal, onToggleAutoRenew, onToggleShared, onUpdateInsurance }: {
-  catKey: string
-  item: { id: string; label: string; amount: number; renewalDate?: string; autoRenews?: boolean; sharedContribution?: boolean; insuranceProvider?: string; insuranceCoverAmount?: number }
-  canRenew: boolean
-  canMarkShared: boolean
-  onUpdateAmount: (catKey: string, itemId: string, v: number) => void
-  onRemoveItem: (catKey: string, itemId: string) => void
-  onRenameItem: (catKey: string, itemId: string, label: string) => void
-  onUpdateRenewal: (catKey: string, itemId: string, date: string) => void
-  onToggleAutoRenew: (catKey: string, itemId: string) => void
-  onToggleShared: (catKey: string, itemId: string) => void
-  onUpdateInsurance: (catKey: string, itemId: string, fields: { provider?: string; coverAmount?: number }) => void
+function ItemRow({ cat, item, properties, budget }: {
+  cat: Category; item: LineItem; properties: Property[]; budget: BudgetHook
 }) {
+  const { updateItemAmount, removeItem, renameItem, updateItemRenewal, toggleItemAutoRenew, toggleItemShared, updateItemInsurance, updateItemProperty } = budget
   const [editingLabel, setEditingLabel] = useState(false)
   const [labelDraft, setLabelDraft] = useState(item.label)
-  const [deleteModal, setDeleteModal] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [expanded, setExpanded] = useState(false)
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const commitLabel = () => { onRenameItem(catKey, item.id, labelDraft); setEditingLabel(false) }
-  const startLongPress = () => {
-    longPressTimer.current = setTimeout(() => { if (navigator.vibrate) navigator.vibrate(50); setDeleteModal(true) }, 600)
-  }
-  const cancelLongPress = () => { if (longPressTimer.current) clearTimeout(longPressTimer.current) }
+  const longPress = useLongPress(() => setConfirmDelete(true), editingLabel)
+  const commitLabel = () => { renameItem(cat.key, item.id, labelDraft); setEditingLabel(false) }
+
+  const isExpense = cat.type === 'EXPENSE'
+  // Joint costs are already shared, so the household flag only applies to an
+  // expense sitting in one person's own column.
+  const canMarkShared = isExpense && cat.owner !== 'JOINT'
+  const isInsurance = isExpense && isInsuranceItem(item.label)
   const days = item.renewalDate ? daysUntil(item.renewalDate) : null
-  const isInsurance = canRenew && isInsuranceItem(item.label)
+  const property = properties.find(p => p.id === item.propertyId)
+  const hasFlags = !!(item.renewalDate || item.sharedContribution || property)
 
   return (
     <>
-      {deleteModal && <DeleteModal label={item.label} onConfirm={() => { onRemoveItem(catKey, item.id); setDeleteModal(false) }} onCancel={() => setDeleteModal(false)} />}
+      {confirmDelete && (
+        <ConfirmDelete label={item.label} onConfirm={() => { removeItem(cat.key, item.id); setConfirmDelete(false) }} onCancel={() => setConfirmDelete(false)} />
+      )}
       <div className="border-b border-border last:border-0">
-        <div
-          className="flex items-center gap-2 py-2"
-          onMouseDown={startLongPress} onMouseUp={cancelLongPress} onMouseLeave={cancelLongPress}
-          onTouchStart={startLongPress} onTouchEnd={cancelLongPress} onTouchCancel={cancelLongPress}
-        >
+        <div className="flex items-center gap-2 py-1.5 min-h-[44px]" {...longPress}>
           {editingLabel ? (
             <>
               <input
@@ -282,128 +224,129 @@ function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemo
                 onBlur={commitLabel}
                 // min-w-0 or the input refuses to shrink below its intrinsic
                 // width and pushes the options button off the row.
-                className="flex-1 min-w-0 text-[13px] border-[1.5px] border-rupert rounded-lg px-2 py-1 outline-none bg-rupert-light"
+                className="flex-1 min-w-0 text-body border-[1.5px] border-accent rounded-lg px-2 py-1.5 outline-none bg-accent-light"
                 autoFocus
               />
-              <button onClick={commitLabel} className="bg-ink text-white border-0 rounded-lg px-2 py-1 cursor-pointer flex items-center">
-                <Check size={12} />
+              <button onClick={commitLabel} aria-label="Save name" className="bg-ink text-on-ink border-0 rounded-lg w-9 h-9 cursor-pointer flex items-center justify-center shrink-0">
+                <Check size={14} />
               </button>
             </>
           ) : (
             <div className="flex-1 min-w-0">
-              <span
-                onClick={() => { setLabelDraft(item.label); setEditingLabel(true) }}
-                className="text-[13px] text-muted cursor-text select-none block"
-              >
+              <span onClick={() => { setLabelDraft(item.label); setEditingLabel(true) }} className="text-body text-ink cursor-text select-none block break-words">
                 {item.label}
               </span>
-              <span className="flex items-center gap-2 flex-wrap">
-                {days != null && <RenewalBadge days={days} />}
-                {item.renewalDate && item.autoRenews && (
-                  <span className="text-[10px] text-muted">Auto-renews</span>
-                )}
-                {item.sharedContribution && (
-                  <span className="text-[10px] font-medium text-joint">Counts as household</span>
-                )}
-                {item.insuranceProvider && (
-                  <span className="text-[10px] text-muted">{item.insuranceProvider}</span>
-                )}
-              </span>
+              {(hasFlags || item.insuranceProvider) && (
+                <span className="flex items-center gap-1 flex-wrap mt-0.5">
+                  {days != null && <RenewalPill days={days} />}
+                  {item.renewalDate && item.autoRenews && <span className="pill">Auto-renews</span>}
+                  {item.sharedContribution && <span className="pill pill-joint">Household cost</span>}
+                  {property && <span className="pill pill-accent"><Home size={9} /> {property.label}</span>}
+                  {item.insuranceProvider && <span className="pill">{item.insuranceProvider}</span>}
+                </span>
+              )}
             </div>
           )}
-          <AmountCell value={item.amount} onChange={v => onUpdateAmount(catKey, item.id, v)} />
-          {(canRenew || canMarkShared) && (
-            <button
-              onClick={() => setExpanded(e => !e)}
-              onMouseDown={e => e.stopPropagation()}
-              aria-label={`Options for ${item.label}`}
-              aria-expanded={expanded}
-              className={`border-0 cursor-pointer flex items-center justify-center shrink-0 w-8 h-8 rounded-lg ${
-                item.renewalDate || item.sharedContribution
-                  ? 'bg-expense-bg text-expense-text'
-                  : expanded ? 'bg-surface text-ink' : 'bg-surface text-muted'
-              }`}
-            >
-              {/* Sliders, not a calendar — this panel also holds the household
-                  flag, which a calendar icon gives no hint of. */}
-              {canMarkShared ? <SlidersHorizontal size={15} /> : <CalendarClock size={15} />}
-            </button>
-          )}
+          <AmountCell value={item.amount} onChange={v => updateItemAmount(cat.key, item.id, v)} />
+          <ExpandButton
+            expanded={expanded}
+            onClick={() => setExpanded(e => !e)}
+            label={`Options for ${item.label}`}
+            active={hasFlags && !expanded}
+            icon={<SlidersHorizontal size={15} />}
+          />
         </div>
-        {expanded && canRenew && (
-          <div className="flex items-center gap-2 pb-2 -mt-0.5 flex-wrap">
-            <label className="text-[10px] text-muted shrink-0">
-              {isInsurance ? 'Renews / policy ends' : 'Renews / contract ends'}
-            </label>
-            <input
-              type="date"
-              value={item.renewalDate ?? ''}
-              onChange={e => onUpdateRenewal(catKey, item.id, e.target.value)}
-              className="text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none bg-card"
-            />
-            {item.renewalDate && (
-              <button
-                onClick={() => onUpdateRenewal(catKey, item.id, '')}
-                className="text-[10px] text-muted bg-transparent border-0 cursor-pointer underline"
-              >
-                Clear
-              </button>
+
+        {expanded && (
+          <div className="pb-2 pl-0.5">
+            {canMarkShared && (
+              <PanelSection title="Who it's for">
+                <label className="flex items-start gap-2 cursor-pointer min-h-[32px]">
+                  <input type="checkbox" checked={!!item.sharedContribution} onChange={() => toggleItemShared(cat.key, item.id)} className="mt-0.5 shrink-0 w-4 h-4" />
+                  <span className="text-xs text-ink leading-snug">
+                    I pay this, but it&apos;s for the household
+                    <span className="block text-caption text-muted mt-0.5">Counts towards your share of household costs on Fair Share — e.g. a mortgage only you pay.</span>
+                  </span>
+                </label>
+              </PanelSection>
             )}
-          </div>
-        )}
-        {expanded && canRenew && item.renewalDate && (
-          <label className="flex items-start gap-2 pb-2.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={!!item.autoRenews}
-              onChange={() => onToggleAutoRenew(catKey, item.id)}
-              className="mt-0.5 shrink-0"
-            />
-            <span className="text-[10px] text-muted leading-snug">
-              {item.autoRenews
-                ? "Auto-renews — this date is when the price may jump, not when cover ends"
-                : isInsurance
-                  ? "Doesn't auto-renew — cover lapses on this date unless you renew it yourself"
-                  : "Doesn't auto-renew — it ends on this date unless you renew it yourself"}
-            </span>
-          </label>
-        )}
-        {expanded && isInsurance && (
-          <div className="flex gap-2 pb-2.5 flex-wrap">
-            <div className="flex flex-col gap-0.5">
-              <label className="text-[10px] text-muted uppercase tracking-[0.05em]">Provider</label>
-              <input
-                value={item.insuranceProvider ?? ''}
-                placeholder="e.g. Aviva"
-                onChange={e => onUpdateInsurance(catKey, item.id, { provider: e.target.value })}
-                className="w-[110px] text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none"
-              />
+
+            {isExpense && properties.length > 0 && (
+              <PanelSection title="Property">
+                <select
+                  value={item.propertyId ?? ''}
+                  onChange={e => updateItemProperty(cat.key, item.id, e.target.value)}
+                  className={`${inputClass} w-full`}
+                >
+                  <option value="">Not tied to a property</option>
+                  {properties.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+                </select>
+              </PanelSection>
+            )}
+
+            {isExpense && (
+              <PanelSection title={isInsurance ? 'Renewal / policy end' : 'Renewal / contract end'}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    type="date"
+                    value={item.renewalDate ?? ''}
+                    onChange={e => updateItemRenewal(cat.key, item.id, e.target.value)}
+                    aria-label="Renewal date"
+                    className={inputClass}
+                  />
+                  {item.renewalDate && (
+                    <button onClick={() => updateItemRenewal(cat.key, item.id, '')} className="text-xs text-muted bg-transparent border-0 cursor-pointer underline min-h-[36px] px-1">
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {item.renewalDate && (
+                  <label className="flex items-start gap-2 mt-2 cursor-pointer">
+                    <input type="checkbox" checked={!!item.autoRenews} onChange={() => toggleItemAutoRenew(cat.key, item.id)} className="mt-0.5 shrink-0 w-4 h-4" />
+                    <span className="text-xs text-ink leading-snug">
+                      Auto-renews
+                      <span className="block text-caption text-muted mt-0.5">
+                        {item.autoRenews
+                          ? 'This date is when the price may jump, not when cover ends.'
+                          : isInsurance
+                            ? "Unticked: cover lapses on this date unless you renew it yourself."
+                            : "Unticked: it ends on this date unless you renew it yourself."}
+                      </span>
+                    </span>
+                  </label>
+                )}
+              </PanelSection>
+            )}
+
+            {isInsurance && (
+              <PanelSection title="Policy">
+                <div className="flex gap-2 flex-wrap">
+                  <Field label="Provider">
+                    <input
+                      value={item.insuranceProvider ?? ''}
+                      placeholder="e.g. Aviva"
+                      onChange={e => updateItemInsurance(cat.key, item.id, { provider: e.target.value })}
+                      className={`${inputClass} w-[130px]`}
+                    />
+                  </Field>
+                  <Field label="Cover £">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={item.insuranceCoverAmount ?? ''}
+                      placeholder="0"
+                      onChange={e => updateItemInsurance(cat.key, item.id, { coverAmount: parseFloat(e.target.value) || undefined })}
+                      className={`${inputClass} w-[110px]`}
+                    />
+                  </Field>
+                </div>
+              </PanelSection>
+            )}
+
+            <div className="pt-1 border-t border-border">
+              <DeleteAction label="Delete item" onClick={() => setConfirmDelete(true)} />
             </div>
-            <div className="flex flex-col gap-0.5">
-              <label className="text-[10px] text-muted uppercase tracking-[0.05em]">Cover £</label>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={item.insuranceCoverAmount ?? ''}
-                placeholder="0"
-                onChange={e => onUpdateInsurance(catKey, item.id, { coverAmount: parseFloat(e.target.value) || undefined })}
-                className="w-[90px] text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none"
-              />
-            </div>
           </div>
-        )}
-        {expanded && canMarkShared && (
-          <label className="flex items-start gap-2 pb-2.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={!!item.sharedContribution}
-              onChange={() => onToggleShared(catKey, item.id)}
-              className="mt-0.5 shrink-0"
-            />
-            <span className="text-[10px] text-muted leading-snug">
-              I pay this, but it&apos;s for the household — count it towards my share of joint costs
-            </span>
-          </label>
         )}
       </div>
     </>
@@ -412,46 +355,33 @@ function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemo
 
 // ─── category card ────────────────────────────────────────────────────────────
 
-function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem, onRenameItem, onRenameCategory, onDeleteCategory, onUpdateRenewal, onToggleAutoRenew, onToggleShared, onUpdateInsurance }: {
-  cat: Category; ownerName: string
-  onUpdateAmount: (catKey: string, itemId: string, v: number) => void
-  onAddItem: (catKey: string, label: string) => void
-  onRemoveItem: (catKey: string, itemId: string) => void
-  onRenameItem: (catKey: string, itemId: string, label: string) => void
-  onRenameCategory: (catKey: string, label: string) => void
-  onDeleteCategory: (catKey: string) => void
-  onUpdateRenewal: (catKey: string, itemId: string, date: string) => void
-  onToggleAutoRenew: (catKey: string, itemId: string) => void
-  onToggleShared: (catKey: string, itemId: string) => void
-  onUpdateInsurance: (catKey: string, itemId: string, fields: { provider?: string; coverAmount?: number }) => void
+function CategoryCard({ cat, items, ownerName, properties, budget, allowAdd }: {
+  cat: Category; items: LineItem[]; ownerName: string; properties: Property[]; budget: BudgetHook; allowAdd: boolean
 }) {
+  const { addItem, renameCategory, deleteCategory } = budget
   const [open, setOpen] = useState(true)
   const [addingItem, setAddingItem] = useState(false)
   const [newItemLabel, setNewItemLabel] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState(cat.label)
-  const [deleteModal, setDeleteModal] = useState(false)
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const total = cat.items.reduce((a, i) => a + i.amount, 0)
-  const submitItem = () => { if (newItemLabel.trim()) { onAddItem(cat.key, newItemLabel.trim()); setNewItemLabel(''); setAddingItem(false) } }
-  const commitName = () => { onRenameCategory(cat.key, nameDraft); setEditingName(false) }
-  const startLongPress = () => {
-    if (editingName) return
-    longPressTimer.current = setTimeout(() => { if (navigator.vibrate) navigator.vibrate(50); setDeleteModal(true) }, 600)
-  }
-  const cancelLongPress = () => { if (longPressTimer.current) clearTimeout(longPressTimer.current) }
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const longPress = useLongPress(() => setConfirmDelete(true), editingName)
+  const total = items.reduce((a, i) => a + i.amount, 0)
+  const submitItem = () => { if (newItemLabel.trim()) { addItem(cat.key, newItemLabel.trim()); setNewItemLabel(''); setAddingItem(false) } }
+  const commitName = () => { renameCategory(cat.key, nameDraft); setEditingName(false) }
 
   return (
     <>
-      {deleteModal && <DeleteModal label={cat.label} onConfirm={() => { onDeleteCategory(cat.key); setDeleteModal(false) }} onCancel={() => setDeleteModal(false)} />}
+      {confirmDelete && (
+        <ConfirmDelete
+          label={cat.label}
+          detail={cat.items.length > 0 ? `This also deletes its ${cat.items.length} ${cat.items.length === 1 ? 'item' : 'items'}. It can't be undone.` : undefined}
+          onConfirm={() => { deleteCategory(cat.key); setConfirmDelete(false) }}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
       <div className={`card mb-2 overflow-hidden fade-up ${ownerBorderClass(cat.owner)}`}>
-
-        {/* header */}
-        <div
-          className={`flex items-center gap-2 px-3.5 py-3 ${open ? 'bg-card' : 'bg-surface'}`}
-          onMouseDown={startLongPress} onMouseUp={cancelLongPress} onMouseLeave={cancelLongPress}
-          onTouchStart={startLongPress} onTouchEnd={cancelLongPress} onTouchCancel={cancelLongPress}
-        >
+        <div className={`flex items-center gap-2 px-3.5 py-2.5 ${open ? 'bg-card' : 'bg-surface'}`} {...longPress}>
           {editingName ? (
             <>
               <input
@@ -459,56 +389,34 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
                 onChange={e => setNameDraft(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') commitName() }}
                 onBlur={commitName}
-                className="flex-1 min-w-0 text-sm font-semibold border-[1.5px] border-rupert rounded-lg px-2.5 py-1.5 outline-none bg-rupert-light"
+                className="flex-1 min-w-0 text-sm font-semibold border-[1.5px] border-accent rounded-lg px-2.5 py-1.5 outline-none bg-accent-light"
                 autoFocus
               />
-              <button onClick={commitName} onMouseDown={e => e.stopPropagation()} className="bg-ink text-white border-0 rounded-lg px-2 py-1.5 cursor-pointer flex">
+              <button onClick={commitName} onMouseDown={e => e.stopPropagation()} aria-label="Save name" className="bg-ink text-on-ink border-0 rounded-lg w-9 h-9 cursor-pointer flex items-center justify-center shrink-0">
                 <Check size={14} />
               </button>
             </>
           ) : (
-            <div
-              className="flex-1 min-w-0"
-              onClick={() => { setNameDraft(cat.label); setEditingName(true) }}
-              onMouseDown={e => e.stopPropagation()}
-            >
+            <div className="flex-1 min-w-0" onClick={() => { setNameDraft(cat.label); setEditingName(true) }} onMouseDown={e => e.stopPropagation()}>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold cursor-text leading-tight">{cat.label}</span>
-                {cat.note && <span className="text-[10px] text-muted hidden sm:inline">{cat.note}</span>}
+                {cat.note && <span className="text-caption text-muted hidden sm:inline">{cat.note}</span>}
               </div>
-              <div className={`text-[11px] font-medium mt-0.5 ${ownerTextClass(cat.owner)}`}>{ownerName}</div>
+              <div className={`text-label font-medium mt-0.5 ${ownerTextClass(cat.owner)}`}>{ownerName}</div>
             </div>
           )}
-
-          <span className={`font-bold text-sm tabular-nums shrink-0 min-w-[60px] text-right ${total > 0 ? 'text-ink' : 'text-muted/40'}`}>
+          <span className={`font-bold text-sm tabular-nums shrink-0 min-w-[60px] text-right ${total > 0 ? 'text-ink' : 'text-muted opacity-60'}`}>
             {total > 0 ? fmt(total) : '—'}
           </span>
-
-          <button
-            onClick={() => setOpen(o => !o)}
-            className="bg-transparent border-0 cursor-pointer text-muted flex p-0.5 shrink-0"
-          >
-            {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-          </button>
+          <ExpandButton expanded={open} onClick={() => setOpen(o => !o)} label={open ? `Collapse ${cat.label}` : `Expand ${cat.label}`} />
         </div>
 
-        {/* items */}
         {open && (
-          <div className="px-3.5 pb-2 pt-0.5">
-            {cat.items.map(item => (
-              <ItemRow
-                key={item.id} catKey={cat.key} item={item}
-                canRenew={cat.type === 'EXPENSE'}
-                // Joint costs are already shared, so the flag only applies to
-                // an expense sitting in one person's own column.
-                canMarkShared={cat.type === 'EXPENSE' && cat.owner !== 'JOINT'}
-                onUpdateAmount={onUpdateAmount} onRemoveItem={onRemoveItem}
-                onRenameItem={onRenameItem} onUpdateRenewal={onUpdateRenewal}
-                onToggleAutoRenew={onToggleAutoRenew}
-                onToggleShared={onToggleShared} onUpdateInsurance={onUpdateInsurance}
-              />
+          <div className="px-3.5 pb-1.5">
+            {items.map(item => (
+              <ItemRow key={item.id} cat={cat} item={item} properties={properties} budget={budget} />
             ))}
-            {addingItem ? (
+            {allowAdd && (addingItem ? (
               <div className="flex gap-1.5 mt-2 pt-2 border-t border-border">
                 <input
                   value={newItemLabel}
@@ -516,19 +424,21 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
                   onKeyDown={e => { if (e.key === 'Enter') submitItem(); if (e.key === 'Escape') setAddingItem(false) }}
                   placeholder="Item name…"
                   autoFocus
-                  className="flex-1 text-[13px] border-[1.5px] border-border rounded-lg px-2.5 py-1.5 outline-none"
+                  className={`${inputClass} flex-1 min-w-0`}
                 />
-                <button onClick={submitItem} className="bg-ink text-white border-0 rounded-lg px-3 py-1.5 cursor-pointer text-xs font-medium">Add</button>
-                <button onClick={() => setAddingItem(false)} className="bg-transparent border-[1.5px] border-border rounded-lg px-3 py-1.5 cursor-pointer text-xs">✕</button>
+                <button onClick={submitItem} className="bg-ink text-on-ink border-0 rounded-lg px-3 cursor-pointer text-xs font-medium min-h-[36px]">Add</button>
+                <button onClick={() => setAddingItem(false)} aria-label="Cancel" className="bg-transparent border-[1.5px] border-border rounded-lg px-3 cursor-pointer text-xs min-h-[36px]">✕</button>
               </div>
             ) : (
-              <button
-                onClick={() => setAddingItem(true)}
-                className="flex items-center gap-1.5 mt-1.5 pt-1.5 bg-transparent border-0 cursor-pointer text-muted/70 text-xs w-full hover:text-muted transition-colors"
-              >
-                <Plus size={11} /> Add item
-              </button>
-            )}
+              <div className="flex items-center justify-between mt-0.5">
+                <button onClick={() => setAddingItem(true)} className="flex items-center gap-1.5 bg-transparent border-0 cursor-pointer text-muted text-xs min-h-[40px] px-0">
+                  <Plus size={12} /> Add item
+                </button>
+                <button onClick={() => setConfirmDelete(true)} className="bg-transparent border-0 cursor-pointer text-muted text-caption min-h-[40px] px-0">
+                  Delete category
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -541,30 +451,32 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
 const OWNER_ORDER: Owner[] = ['NIAMH', 'RUPERT', 'JOINT']
 
 export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budget: BudgetHook; tab: TabFilter; onNavigateToDebts: () => void }) {
-  const { data, totals, updateItemAmount, addItem, removeItem, renameItem, renameCategory, deleteCategory, addCategory, updateItemRenewal, toggleItemAutoRenew, toggleItemShared, updateItemInsurance } = budget
+  const { data, totals, addCategory } = budget
   const [addingCat, setAddingCat] = useState(false)
   const [newCatLabel, setNewCatLabel] = useState('')
   const [newCatOwner, setNewCatOwner] = useState<Owner>('JOINT')
   const [newCatType, setNewCatType] = useState<EntryType>('EXPENSE')
 
+  const properties = data.properties ?? []
+  const propertyId = tab.startsWith('property:') ? tab.slice('property:'.length) : null
+  const propertySummary = propertyId ? propertySummaries(data).find(s => s.property.id === propertyId) ?? null : null
+
   const ownerName = (o: Owner) => o === 'NIAMH' ? data.nameNiamh || 'Person 1' : o === 'RUPERT' ? data.nameRupert || 'Person 2' : data.nameJoint || 'Joint'
 
-  const filtered = data.categories
-    .filter(c => tab === 'ALL' || c.owner === tab)
+  const visible = data.categories
+    .filter(c => propertyId ? true : tab === 'ALL' || c.owner === tab)
+    .map(c => ({ cat: c, items: propertyId ? c.items.filter(i => i.propertyId === propertyId) : c.items }))
+    .filter(v => !propertyId || v.items.length > 0)
     .sort((a, b) => {
-      const od = OWNER_ORDER.indexOf(a.owner) - OWNER_ORDER.indexOf(b.owner)
+      const od = OWNER_ORDER.indexOf(a.cat.owner) - OWNER_ORDER.indexOf(b.cat.owner)
       if (od !== 0) return od
-      return ['INCOME', 'EXPENSE', 'SAVINGS'].indexOf(a.type) - ['INCOME', 'EXPENSE', 'SAVINGS'].indexOf(b.type)
+      return ['INCOME', 'EXPENSE', 'SAVINGS'].indexOf(a.cat.type) - ['INCOME', 'EXPENSE', 'SAVINGS'].indexOf(b.cat.type)
     })
 
-  const grouped = {
-    INCOME:  filtered.filter(c => c.type === 'INCOME'),
-    EXPENSE: filtered.filter(c => c.type === 'EXPENSE'),
-    SAVINGS: filtered.filter(c => c.type === 'SAVINGS'),
-  }
-
   const groupTotal = (type: EntryType) =>
-    filtered.filter(c => c.type === type).reduce((a, c) => a + c.items.reduce((b, i) => b + i.amount, 0), 0)
+    visible.filter(v => v.cat.type === type).reduce((a, v) => a + v.items.reduce((b, i) => b + i.amount, 0), 0)
+
+  const visibleDebts = data.debts.filter(d => propertyId ? d.propertyId === propertyId : tab === 'ALL' || d.owner === tab)
 
   const submitCat = () => {
     if (newCatLabel.trim()) { addCategory(newCatOwner, newCatType, newCatLabel.trim()); setNewCatLabel(''); setAddingCat(false) }
@@ -572,11 +484,8 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
 
   return (
     <div className="h-full overflow-y-auto p-4">
+      {propertySummary ? <PropertyRollup summary={propertySummary} /> : <BudgetOverview totals={totals} />}
 
-      {/* overview — always visible */}
-      <BudgetOverview totals={totals} />
-
-      {/* person cards — only on ALL tab */}
       {tab === 'ALL' && (totals.incN > 0 || totals.incR > 0) && (
         <div className="grid grid-cols-2 gap-2 mb-1">
           <PersonCard
@@ -594,104 +503,98 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
         </div>
       )}
 
-      {/* categories grouped by type */}
-      {(['INCOME', 'EXPENSE', 'SAVINGS'] as EntryType[]).map(type =>
-        grouped[type].length === 0 ? null : (
+      {(['INCOME', 'EXPENSE', 'SAVINGS'] as EntryType[]).map(type => {
+        const group = visible.filter(v => v.cat.type === type)
+        if (group.length === 0) return null
+        return (
           <div key={type}>
             <SectionDivider type={type} total={groupTotal(type)} />
-            {grouped[type].map(cat => (
+            {group.map(({ cat, items }) => (
               <CategoryCard
-                key={cat.key} cat={cat} ownerName={ownerName(cat.owner)}
-                onUpdateAmount={updateItemAmount} onAddItem={addItem}
-                onRemoveItem={removeItem} onRenameItem={renameItem}
-                onRenameCategory={renameCategory} onDeleteCategory={deleteCategory}
-                onUpdateRenewal={updateItemRenewal}
-                onToggleAutoRenew={toggleItemAutoRenew}
-                onToggleShared={toggleItemShared}
-                onUpdateInsurance={updateItemInsurance}
+                key={cat.key} cat={cat} items={items} ownerName={ownerName(cat.owner)}
+                properties={properties} budget={budget}
+                // Adding under a property filter would create an untagged item
+                // that then vanishes from view — confusing, so don't offer it.
+                allowAdd={!propertyId}
               />
             ))}
           </div>
         )
-      )}
+      })}
 
-      {/* debt payments in budget view */}
-      {totals.totalDebt > 0 && (() => {
-        const visibleDebts = data.debts.filter(d => tab === 'ALL' || d.owner === tab)
-        if (visibleDebts.length === 0) return null
-        return (
-          <div>
-            <div className="flex items-center gap-2 mb-2 mt-5">
-              <span className="text-[11px] font-bold uppercase tracking-[0.1em] shrink-0 text-expense-text">Debt payments</span>
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-[11px] font-bold tabular-nums shrink-0 text-expense-text">
-                {fmt(visibleDebts.reduce((a, d) => a + d.monthlyPayment, 0))}
-              </span>
-            </div>
-            {visibleDebts.map(d => (
+      {visibleDebts.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2 mt-5">
+            <span className="text-label font-bold uppercase tracking-label shrink-0 text-expense-text">Debt payments</span>
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-label font-bold tabular-nums shrink-0 text-expense-text">
+              {fmt(visibleDebts.reduce((a, d) => a + d.monthlyPayment, 0))}
+            </span>
+          </div>
+          {visibleDebts.map(d => {
+            const months = d.currentBalance > 0 ? monthsToClear(d.currentBalance, d.monthlyPayment, effectiveRate(d)) : null
+            const property = properties.find(p => p.id === d.propertyId)
+            return (
               <div key={d.id} className={`card mb-2 ${ownerBorderClass(d.owner)} fade-up`}>
                 <div className="flex items-center gap-3 px-3.5 py-3">
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold truncate">{d.label}</div>
-                    <div className="text-[11px] text-muted mt-0.5">
+                    <div className="text-label text-muted mt-0.5">
                       {ownerName(d.owner)}
                       {d.isZeroPercent ? ' · 0%' : d.interestRate > 0 ? ` · ${d.interestRate}%` : ''}
                       {d.currentBalance > 0 ? ` · ${fmt(d.currentBalance)} remaining` : ''}
                     </div>
+                    {(property || d.sharedContribution) && (
+                      <span className="flex gap-1 flex-wrap mt-1">
+                        {d.sharedContribution && <span className="pill pill-joint">Household cost</span>}
+                        {property && <span className="pill pill-accent"><Home size={9} /> {property.label}</span>}
+                      </span>
+                    )}
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="font-bold text-sm tabular-nums text-expense-text">{fmt(d.monthlyPayment)}<span className="text-[10px] text-muted font-normal">/mo</span></div>
+                    <div className="font-bold text-sm tabular-nums text-expense-text">{fmt(d.monthlyPayment)}<span className="text-caption text-muted font-normal">/mo</span></div>
                     {d.currentBalance > 0 && d.monthlyPayment > 0 && (
-                      <div className="text-[10px] text-muted">~{Math.ceil(d.currentBalance / d.monthlyPayment)} months</div>
+                      <div className={`text-caption ${months == null ? 'text-negative font-semibold' : 'text-muted'}`}>
+                        {months == null ? "Doesn't cover interest" : `~${months} months`}
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
-            ))}
-            <button onClick={onNavigateToDebts} className="text-[11px] text-muted bg-transparent border-0 cursor-pointer mb-2 flex items-center gap-1">
-              Manage debts →
-            </button>
-          </div>
-        )
-      })()}
+            )
+          })}
+          <button onClick={onNavigateToDebts} className="text-label text-muted bg-transparent border-0 cursor-pointer mb-2 flex items-center gap-1 min-h-[36px] px-0">
+            Manage debts →
+          </button>
+        </div>
+      )}
 
-      {/* add category */}
-      {addingCat ? (
+      {!propertyId && (addingCat ? (
         <div className="card p-4 mt-4">
-          <div className="text-xs font-semibold text-muted uppercase tracking-[0.06em] mb-3">New category</div>
+          <div className="section-label mb-3">New category</div>
+          <input
+            value={newCatLabel}
+            onChange={e => setNewCatLabel(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') submitCat() }}
+            placeholder="Category name…"
+            autoFocus
+            className={`${inputClass} w-full mb-3`}
+          />
           <div className="flex gap-2 flex-wrap mb-3">
-            <input
-              value={newCatLabel}
-              onChange={e => setNewCatLabel(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') submitCat() }}
-              placeholder="Category name…"
-              autoFocus
-              className="flex-1 min-w-[150px] text-sm border-[1.5px] border-border rounded-xl px-3 py-2.5 outline-none"
-            />
-          </div>
-          <div className="flex gap-2 flex-wrap mb-3">
-            <select
-              value={newCatOwner}
-              onChange={e => setNewCatOwner(e.target.value as Owner)}
-              className="flex-1 text-sm border-[1.5px] border-border rounded-xl px-3 py-2.5 bg-card cursor-pointer"
-            >
+            <select value={newCatOwner} onChange={e => setNewCatOwner(e.target.value as Owner)} aria-label="Owner" className={`${inputClass} flex-1 cursor-pointer`}>
               <option value="NIAMH">{data.nameNiamh || 'Person 1'}</option>
               <option value="RUPERT">{data.nameRupert || 'Person 2'}</option>
               <option value="JOINT">{data.nameJoint || 'Joint'}</option>
             </select>
-            <select
-              value={newCatType}
-              onChange={e => setNewCatType(e.target.value as EntryType)}
-              className="flex-1 text-sm border-[1.5px] border-border rounded-xl px-3 py-2.5 bg-card cursor-pointer"
-            >
+            <select value={newCatType} onChange={e => setNewCatType(e.target.value as EntryType)} aria-label="Type" className={`${inputClass} flex-1 cursor-pointer`}>
               <option value="INCOME">Income</option>
               <option value="EXPENSE">Expense</option>
               <option value="SAVINGS">Savings</option>
             </select>
           </div>
           <div className="flex gap-2">
-            <button onClick={submitCat} className="flex-1 bg-ink text-white border-0 rounded-xl py-2.5 cursor-pointer text-sm font-semibold">Add category</button>
-            <button onClick={() => setAddingCat(false)} className="px-4 bg-transparent border-[1.5px] border-border rounded-xl py-2.5 cursor-pointer text-sm">Cancel</button>
+            <button onClick={submitCat} className="flex-1 bg-ink text-on-ink border-0 rounded-xl py-3 cursor-pointer text-sm font-semibold">Add category</button>
+            <button onClick={() => setAddingCat(false)} className="px-4 bg-transparent border-[1.5px] border-border rounded-xl py-3 cursor-pointer text-sm">Cancel</button>
           </div>
         </div>
       ) : (
@@ -701,12 +604,11 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
         >
           <Plus size={14} /> Add category
         </button>
-      )}
+      ))}
 
-      <p className="text-[10px] text-muted/60 text-center mt-5 mb-1 select-none">
-        Tap any name or amount to edit · Long press to delete
+      <p className="text-caption text-muted text-center mt-5 mb-1 select-none">
+        Tap a name or amount to edit · <SlidersHorizontal size={9} className="inline -mt-px" /> for options and delete
       </p>
-
     </div>
   )
 }

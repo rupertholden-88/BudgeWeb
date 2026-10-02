@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { Owner, AssetType, fmt } from '@/lib/models'
+import { useState, useEffect } from 'react'
+import { Owner, AssetType, fmt, netWorth } from '@/lib/models'
 import { Plus, TrendingUp, TrendingDown } from 'lucide-react'
+import { StatCard, ConfirmDelete, AmountCell, TapToEdit, ExpandButton, DeleteAction, Field, inputClass, useLongPress, ownerBorderClass } from './ui'
+import PropertiesSection from './PropertiesSection'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
@@ -35,26 +37,6 @@ function fmtK(n: number) {
   return fmt(n)
 }
 
-function ownerBorderClass(owner: Owner) {
-  if (owner === 'NIAMH') return 'border-l-[3px] border-l-niamh'
-  if (owner === 'RUPERT') return 'border-l-[3px] border-l-rupert'
-  return 'border-l-[3px] border-l-joint'
-}
-
-function StatCard({ label, value, sub, intent }: {
-  label: string; value: string; sub?: string
-  intent?: 'positive' | 'negative' | 'neutral'
-}) {
-  const valueClass = intent === 'positive' ? 'text-positive' : intent === 'negative' ? 'text-negative' : 'text-ink'
-  return (
-    <div className="card p-3 flex-1 min-w-0">
-      <div className="text-[10px] font-semibold text-muted uppercase tracking-[0.06em] mb-1 truncate">{label}</div>
-      <div className={`text-lg font-bold tabular-nums leading-none ${valueClass}`}>{value}</div>
-      {sub && <div className="text-[10px] text-muted mt-1 leading-tight">{sub}</div>}
-    </div>
-  )
-}
-
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   const filtered = payload.filter((p: any) => (p.value ?? 0) > 0)
@@ -82,69 +64,6 @@ function AllocationBar({ segments }: { segments: { color: string; pct: number }[
   )
 }
 
-function TapToEdit({ value, onSave, className }: { value: string; onSave: (v: string) => void; className?: string }) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(value)
-  const commit = () => { onSave(draft); setEditing(false) }
-  if (editing) return (
-    <input
-      value={draft}
-      onChange={e => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={e => { if (e.key === 'Enter') commit() }}
-      className={`text-[inherit] font-[inherit] border-[1.5px] border-rupert rounded-md px-1.5 py-0.5 outline-none bg-rupert-light ${className ?? ''}`}
-      autoFocus
-    />
-  )
-  return (
-    <span onClick={() => { setDraft(value); setEditing(true) }} className={`cursor-text ${className ?? ''}`}>
-      {value}
-    </span>
-  )
-}
-
-function TapToEditAmount({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const [editing, setEditing] = useState(false)
-  const [raw, setRaw] = useState('')
-  const commit = () => { onChange(parseFloat(raw.replace(/[£,]/g, '')) || 0); setEditing(false) }
-  if (editing) return (
-    <input
-      value={raw}
-      onChange={e => setRaw(e.target.value)}
-      onBlur={commit}
-      onKeyDown={e => { if (e.key === 'Enter') commit() }}
-      className="w-[90px] text-right text-sm border-[1.5px] border-rupert rounded-md px-1.5 py-0.5 outline-none bg-rupert-light"
-      inputMode="decimal"
-      autoFocus
-    />
-  )
-  return (
-    <span
-      onClick={() => { setRaw(value === 0 ? '' : String(value)); setEditing(true) }}
-      className={`cursor-text tabular-nums text-sm min-w-[80px] text-right inline-block px-1 py-0.5 rounded ${value > 0 ? 'text-ink' : 'text-muted'}`}
-    >
-      {value > 0 ? fmt(value) : '—'}
-    </span>
-  )
-}
-
-function DeleteModal({ label, onConfirm, onCancel }: { label: string; onConfirm: () => void; onCancel: () => void }) {
-  return (
-    <div className="fixed inset-0 bg-black/40 z-[1000] flex items-center justify-center p-6">
-      <div className="card w-full max-w-[320px] p-6">
-        <div className="text-base font-semibold mb-2">Delete asset?</div>
-        <div className="text-sm text-muted mb-6">
-          Remove <strong>{label}</strong> from this month's snapshot?
-        </div>
-        <div className="flex gap-2">
-          <button onClick={onCancel} className="flex-1 bg-transparent border-[1.5px] border-border rounded-lg py-2.5 cursor-pointer text-sm">Cancel</button>
-          <button onClick={onConfirm} className="flex-1 bg-negative text-white border-0 rounded-lg py-2.5 cursor-pointer text-sm font-semibold">Delete</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function AssetRow({ asset, owner, today, updateAsset, updateAssetFields, deleteAsset, lockType }: {
   asset: { id: string; label: string; amount: number; type: AssetType; interestRate?: number; institution?: string; monthlyContribution?: number; employerContribution?: number }
   owner: Owner; today: string
@@ -155,40 +74,27 @@ function AssetRow({ asset, owner, today, updateAsset, updateAssetFields, deleteA
 }) {
   const [expanded, setExpanded] = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const startLongPress = () => {
-    longPressTimer.current = setTimeout(() => {
-      if (navigator.vibrate) navigator.vibrate(50)
-      setDeleteModal(true)
-    }, 600)
-  }
-  const cancelLongPress = () => {
-    if (longPressTimer.current) clearTimeout(longPressTimer.current)
-  }
+  const longPress = useLongPress(() => setDeleteModal(true))
 
   return (
     <>
       {deleteModal && (
-        <DeleteModal
+        <ConfirmDelete
           label={asset.label}
+          detail="Removes it from this month's snapshot. Earlier months keep their figures."
           onConfirm={() => { deleteAsset(owner, today, asset.id); setDeleteModal(false) }}
           onCancel={() => setDeleteModal(false)}
         />
       )}
-      <div
-        className="border-b border-border"
-        onMouseDown={startLongPress} onMouseUp={cancelLongPress} onMouseLeave={cancelLongPress}
-        onTouchStart={startLongPress} onTouchEnd={cancelLongPress} onTouchCancel={cancelLongPress}
-      >
-        <div className="flex items-center gap-1.5 py-2">
+      <div className="border-b border-border last:border-0" {...longPress}>
+        <div className="flex items-center gap-1.5 py-1.5 min-h-[44px]">
           <div className="flex-1 min-w-0">
             <TapToEdit
               value={asset.label}
               onSave={v => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution, v)}
-              className="text-[13px] font-medium block"
+              className="text-body font-medium block"
             />
-            <div className="text-[10px] text-muted mt-px">
+            <div className="text-caption text-muted mt-px">
               {ASSET_LABELS[asset.type] ?? asset.type}
               {asset.institution ? ` · ${asset.institution}` : ''}
               {asset.interestRate && asset.amount > 0 ? (
@@ -198,77 +104,75 @@ function AssetRow({ asset, owner, today, updateAsset, updateAssetFields, deleteA
               ) : asset.interestRate ? <span>{` · ${asset.interestRate}%`}</span> : null}
             </div>
           </div>
-          <TapToEditAmount value={asset.amount || 0} onChange={v => updateAsset(owner, today, asset.id, v, asset.interestRate, asset.institution)} />
-          <button
-            onClick={() => setExpanded(e => !e)}
-            className="bg-transparent border-0 cursor-pointer text-muted text-[10px] px-1 py-0.5"
-          >
-            {expanded ? '▲' : '▼'}
-          </button>
+          <AmountCell value={asset.amount || 0} onChange={v => updateAsset(owner, today, asset.id, v, asset.interestRate, asset.institution)} />
+          <ExpandButton expanded={expanded} onClick={() => setExpanded(e => !e)} label={expanded ? `Collapse ${asset.label}` : `Details for ${asset.label}`} />
         </div>
         {expanded && (
           <div className="pb-2 flex flex-wrap gap-2">
             {!lockType && (
               <div className="flex flex-col gap-0.5">
-                <label className="text-[10px] text-muted uppercase tracking-[0.05em]">Type</label>
+                <label className="text-caption text-muted uppercase tracking-label">Type</label>
                 <select
                   value={asset.type}
                   onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution, undefined, e.target.value as AssetType)}
-                  className="text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 bg-card"
+                  className="text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 bg-card"
                 >
                   {Object.entries(ASSET_LABELS).filter(([k]) => k !== 'PENSION').map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
               </div>
             )}
             <div className="flex flex-col gap-0.5">
-              <label className="text-[10px] text-muted uppercase tracking-[0.05em]">Rate %</label>
+              <label className="text-caption text-muted uppercase tracking-label">Rate %</label>
               <input
                 type="number"
                 value={asset.interestRate || ''}
                 placeholder="0"
                 onChange={e => updateAsset(owner, today, asset.id, asset.amount, parseFloat(e.target.value) || undefined, asset.institution)}
-                className="w-[70px] text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none"
+                className="w-[70px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <label className="text-[10px] text-muted uppercase tracking-[0.05em]">Institution</label>
+              <label className="text-caption text-muted uppercase tracking-label">Institution</label>
               <input
                 value={asset.institution || ''}
                 placeholder="e.g. Monzo"
                 onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, e.target.value)}
-                className="w-[110px] text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none"
+                className="w-[110px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none"
               />
             </div>
             {asset.type === 'PENSION' && (
               <>
                 <div className="flex flex-col gap-0.5">
-                  <label className="text-[10px] text-muted uppercase tracking-[0.05em]">You £/mo</label>
+                  <label className="text-caption text-muted uppercase tracking-label">You £/mo</label>
                   <input
                     type="number"
                     inputMode="decimal"
                     value={asset.monthlyContribution ?? ''}
                     placeholder="0"
                     onChange={e => updateAssetFields(owner, today, asset.id, { monthlyContribution: parseFloat(e.target.value) || undefined })}
-                    className="w-[80px] text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none"
+                    className="w-[80px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-0.5">
-                  <label className="text-[10px] text-muted uppercase tracking-[0.05em]">Employer £/mo</label>
+                  <label className="text-caption text-muted uppercase tracking-label">Employer £/mo</label>
                   <input
                     type="number"
                     inputMode="decimal"
                     value={asset.employerContribution ?? ''}
                     placeholder="0"
                     onChange={e => updateAssetFields(owner, today, asset.id, { employerContribution: parseFloat(e.target.value) || undefined })}
-                    className="w-[80px] text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none"
+                    className="w-[80px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none"
                   />
                 </div>
-                <p className="text-[10px] text-muted w-full m-0 leading-snug">
+                <p className="text-caption text-muted w-full m-0 leading-snug">
                   For the health check only — workplace pensions usually come out before your
                   take-home pay, so these aren&apos;t added to your budget as outgoings.
                 </p>
               </>
             )}
+            <div className="w-full pt-1 border-t border-border">
+              <DeleteAction label={asset.type === 'PENSION' ? 'Delete pension' : 'Delete asset'} onClick={() => setDeleteModal(true)} />
+            </div>
           </div>
         )}
       </div>
@@ -309,17 +213,17 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, updateAssetFie
               onKeyDown={e => { if (e.key === 'Enter') submit() }}
               placeholder="Account name..."
               autoFocus
-              className="flex-1 min-w-[120px] text-[13px] border-[1.5px] border-border rounded-md px-2 py-1 outline-none"
+              className="flex-1 min-w-[120px] text-body border-[1.5px] border-border rounded-lg px-2 py-1 outline-none"
             />
             <select
               value={newType}
               onChange={e => setNewType(e.target.value as AssetType)}
-              className="text-[13px] border-[1.5px] border-border rounded-md px-2 py-1 bg-card cursor-pointer"
+              className="text-body border-[1.5px] border-border rounded-lg px-2 py-1 bg-card cursor-pointer"
             >
               {REGULAR_ASSET_TYPES.map(t => <option key={t} value={t}>{ASSET_LABELS[t]}</option>)}
             </select>
-            <button onClick={submit} className="bg-ink text-white border-0 rounded-md px-3 py-1 cursor-pointer text-[13px]">Add</button>
-            <button onClick={() => setAdding(false)} className="bg-transparent border-[1.5px] border-border rounded-md px-3 py-1 cursor-pointer text-[13px]">Cancel</button>
+            <button onClick={submit} className="bg-ink text-on-ink border-0 rounded-lg px-3 py-1 cursor-pointer text-body">Add</button>
+            <button onClick={() => setAdding(false)} className="bg-transparent border-[1.5px] border-border rounded-lg px-3 py-1 cursor-pointer text-body">Cancel</button>
           </div>
         ) : (
           <button onClick={() => setAdding(true)} className="flex items-center gap-1 mt-2 bg-transparent border-0 cursor-pointer text-muted text-xs">
@@ -363,10 +267,10 @@ function PensionOwnerPanel({ owner, name, budget, addAsset, updateAsset, updateA
               onKeyDown={e => { if (e.key === 'Enter') submit() }}
               placeholder="e.g. Workplace Pension"
               autoFocus
-              className="flex-1 min-w-[120px] text-[13px] border-[1.5px] border-border rounded-md px-2 py-1 outline-none"
+              className="flex-1 min-w-[120px] text-body border-[1.5px] border-border rounded-lg px-2 py-1 outline-none"
             />
-            <button onClick={submit} className="bg-pension text-white border-0 rounded-md px-3 py-1 cursor-pointer text-[13px]">Add</button>
-            <button onClick={() => setAdding(false)} className="bg-transparent border-[1.5px] border-border rounded-md px-3 py-1 cursor-pointer text-[13px]">Cancel</button>
+            <button onClick={submit} className="bg-pension text-on-ink border-0 rounded-lg px-3 py-1 cursor-pointer text-body">Add</button>
+            <button onClick={() => setAdding(false)} className="bg-transparent border-[1.5px] border-border rounded-lg px-3 py-1 cursor-pointer text-body">Cancel</button>
           </div>
         ) : (
           <button onClick={() => setAdding(true)} className="flex items-center gap-1 mt-2 bg-transparent border-0 cursor-pointer text-muted text-xs">
@@ -409,16 +313,10 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === lastMonth)
     return acc + (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type !== 'PENSION').reduce((a, i) => a + (i.amount || 0), 0)
   }, 0)
-  const totalPensionsLastMonth = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
-    const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === lastMonth)
-    return acc + (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type === 'PENSION').reduce((a, i) => a + (i.amount || 0), 0)
-  }, 0)
 
+  // Everything owned minus everything owed — property values in, all debt out.
+  const worth = netWorth(data, today)
   const monthDiff = totalLastMonth > 0 ? totalAll - totalLastMonth : null
-  const netWorthDiff = (totalLastMonth > 0 || totalPensionsLastMonth > 0)
-    ? (totalAll + totalPensions) - (totalLastMonth + totalPensionsLastMonth)
-    : null
-
   const currentMonthHasData = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).some(owner => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
     return Array.isArray(snap?.assets) && snap!.assets.length > 0
@@ -489,23 +387,25 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
     <div className="h-full overflow-y-auto p-4">
 
       {/* Summary stat cards */}
-      <div className="flex gap-2 mb-4">
+      <div className="grid grid-cols-2 gap-2 mb-4">
         <StatCard
-          label="Assets"
+          label="Savings"
           value={fmtK(totalAll)}
           sub={monthDiff !== null ? `${monthDiff >= 0 ? '+' : ''}${fmtK(monthDiff)} vs last mo` : undefined}
           intent={totalAll > 0 ? 'positive' : 'neutral'}
         />
+        <StatCard label="Pensions" value={fmtK(totalPensions)} intent={totalPensions > 0 ? 'positive' : 'neutral'} />
         <StatCard
-          label="Pensions"
-          value={fmtK(totalPensions)}
-          intent={totalPensions > 0 ? 'positive' : 'neutral'}
+          label="Property"
+          value={worth.property > 0 ? fmtK(worth.property) : '—'}
+          sub={worth.property > 0 ? 'estimated value' : 'add below'}
+          intent="neutral"
         />
         <StatCard
-          label="Net Worth"
-          value={fmtK(totalAll + totalPensions)}
-          sub={netWorthDiff !== null ? `${netWorthDiff >= 0 ? '+' : ''}${fmtK(netWorthDiff)} vs last mo` : undefined}
-          intent={totalAll + totalPensions > 0 ? 'positive' : 'neutral'}
+          label="Net worth"
+          value={fmtK(worth.total)}
+          sub={worth.debts > 0 ? `after ${fmtK(worth.debts)} owed` : undefined}
+          intent={worth.total > 0 ? 'positive' : worth.total < 0 ? 'negative' : 'neutral'}
         />
       </div>
 
@@ -513,11 +413,11 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
       {(totalAll > 0 || activeTypes.length > 0) && (
         <div className="card p-4 mb-4">
           <div className="flex justify-between items-baseline mb-3">
-            <div className="text-xs font-semibold text-muted uppercase tracking-[0.06em]">Portfolio</div>
-            {netWorthDiff !== null && (
-              <div className={`flex items-center gap-1 text-[11px] font-semibold tabular-nums ${netWorthDiff >= 0 ? 'text-positive' : 'text-negative'}`}>
-                {netWorthDiff >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                {netWorthDiff >= 0 ? '+' : ''}{fmtK(netWorthDiff)}
+            <div className="text-xs font-semibold text-muted uppercase tracking-label">Portfolio</div>
+            {monthDiff !== null && (
+              <div className={`flex items-center gap-1 text-label font-semibold tabular-nums ${monthDiff >= 0 ? 'text-positive' : 'text-negative'}`}>
+                {monthDiff >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                {monthDiff >= 0 ? '+' : ''}{fmtK(monthDiff)}
               </div>
             )}
           </div>
@@ -556,12 +456,12 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
               return (
                 <div key={type}>
                   <div className="flex justify-between items-baseline mb-1">
-                    <span className="text-[12px] font-medium text-ink flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-ink flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-sm shrink-0 inline-block" style={{ background: ASSET_COLORS[type] }} />
                       {ASSET_LABELS[type]}
                     </span>
                     <span className="text-xs tabular-nums text-muted">
-                      {fmt(value)} <span className="text-[10px]">{pct.toFixed(0)}%</span>
+                      {fmt(value)} <span className="text-caption">{pct.toFixed(0)}%</span>
                     </span>
                   </div>
                   <div className="h-[6px] bg-surface rounded-full overflow-hidden">
@@ -580,8 +480,8 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
 
       {/* Edit controls */}
       <div className="flex justify-between items-center mb-3 gap-2 flex-wrap">
-        <div className="text-[11px] text-muted">
-          {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })} · tap to edit · long press to delete
+        <div className="text-label text-muted">
+          {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })} · tap to edit · open a row to delete
         </div>
         <div className="flex gap-1.5">
           <button
@@ -590,14 +490,14 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
               const label = prev.toLocaleDateString('en-GB', { month: 'long' })
               if (confirm(`Save current figures as ${label} and clear this month?`)) moveAssetsToLastMonth()
             }}
-            className="text-[11px] bg-transparent text-negative border-[1.5px] border-negative/40 rounded-md px-2 py-[3px] cursor-pointer"
+            className="text-label bg-transparent text-negative border-[1.5px] border-negative rounded-lg px-2 py-[3px] cursor-pointer"
           >
             These are last month's figures
           </button>
           {hasPreviousData && (
             <button
               onClick={copyForwardAssets}
-              className="text-[11px] bg-transparent text-muted border-[1.5px] border-border rounded-md px-2 py-[3px] cursor-pointer"
+              className="text-label bg-transparent text-muted border-[1.5px] border-border rounded-lg px-2 py-[3px] cursor-pointer"
             >
               Reset to last month
             </button>
@@ -613,9 +513,9 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
       {/* Interest income */}
       {byOwner.length > 0 && (
         <div className="card p-4 mt-1">
-          <div className="text-xs font-semibold text-muted uppercase tracking-[0.06em] mb-3">Interest Income</div>
+          <div className="text-xs font-semibold text-muted uppercase tracking-label mb-3">Interest Income</div>
           {byOwner.map(({ owner, monthly }) => (
-            <div key={owner} className="flex justify-between text-[13px] py-1 border-b border-border">
+            <div key={owner} className="flex justify-between text-body py-1 border-b border-border">
               <span className="text-muted">{owner === 'NIAMH' ? n1 : owner === 'RUPERT' ? n2 : n3}</span>
               <span className="tabular-nums font-semibold text-positive">
                 {fmt(monthly)}/mo · {fmt(monthly * 12)}/yr
@@ -628,15 +528,17 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
           </div>
           <button
             onClick={() => resyncInterest(byOwner.map(({ owner, assets }) => ({ owner, assets })))}
-            className="w-full bg-positive text-white border-0 rounded-lg px-4 py-2.5 cursor-pointer text-[13px] font-semibold"
+            className="w-full bg-positive text-on-ink border-0 rounded-lg px-4 py-2.5 cursor-pointer text-body font-semibold"
           >
             Re-sync interest to budget income
           </button>
-          <p className="text-[11px] text-muted mt-2 mb-0 text-center">
+          <p className="text-label text-muted mt-2 mb-0 text-center">
             Automatically removes old interest items and recreates with current values
           </p>
         </div>
       )}
+
+      <PropertiesSection budget={budget} />
 
       {/* Pensions section */}
       <div className="mt-6 pt-6 border-t-2 border-pension-light">
@@ -647,7 +549,7 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
           </div>
         </div>
         {pensionContributions.total > 0 && (
-          <div className="text-[11px] text-muted mb-4 text-right">
+          <div className="text-label text-muted mb-4 text-right">
             {fmt(pensionContributions.total)}/mo going in
             {pensionContributions.employer > 0 && ` · ${fmt(pensionContributions.employer)} from employers`}
             {' · '}{fmt(pensionContributions.total * 12)}/yr
@@ -657,7 +559,7 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
 
         {pensionOwnerKeys.length > 0 && (
           <div className="card p-4 mb-4 border-l-[3px] border-l-pension">
-            <div className="text-xs font-semibold text-muted uppercase tracking-[0.06em] mb-3">Pension Growth Over Time</div>
+            <div className="text-xs font-semibold text-muted uppercase tracking-label mb-3">Pension Growth Over Time</div>
 
             <AllocationBar segments={pensionAllocationSegments} />
 
@@ -694,12 +596,12 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
                 return (
                   <div key={key}>
                     <div className="flex justify-between items-baseline mb-1">
-                      <span className="text-[12px] font-medium text-ink flex items-center gap-1.5">
+                      <span className="text-xs font-medium text-ink flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full shrink-0 inline-block" style={{ background: color }} />
                         {key}
                       </span>
                       <span className="text-xs tabular-nums text-muted">
-                        {fmt(value)} <span className="text-[10px]">{pct.toFixed(0)}%</span>
+                        {fmt(value)} <span className="text-caption">{pct.toFixed(0)}%</span>
                       </span>
                     </div>
                     <div className="h-[6px] bg-surface rounded-full overflow-hidden">

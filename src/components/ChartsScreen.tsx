@@ -6,6 +6,7 @@ import { buildFinancialSummary, hashSummary } from '@/lib/financialSummary'
 import { useApiKey } from '@/hooks/useApiKey'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown, CalendarClock, Sparkles, KeyRound } from 'lucide-react'
+import { StatCard } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -26,20 +27,6 @@ function addMonths(months: number) {
   return d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
 }
 
-function StatCard({ label, value, sub, intent }: {
-  label: string; value: string; sub?: string
-  intent?: 'positive' | 'negative' | 'neutral'
-}) {
-  const valueClass = intent === 'positive' ? 'text-positive' : intent === 'negative' ? 'text-negative' : 'text-ink'
-  return (
-    <div className="card p-3 flex-1 min-w-0">
-      <div className="text-[10px] font-semibold text-muted uppercase tracking-[0.06em] mb-1 truncate">{label}</div>
-      <div className={`text-lg font-bold tabular-nums leading-none ${valueClass}`}>{value}</div>
-      {sub && <div className="text-[10px] text-muted mt-1 leading-tight">{sub}</div>}
-    </div>
-  )
-}
-
 function SectionCard({ title, sub, icon, children }: {
   title: string; sub?: string; icon?: React.ReactNode; children: React.ReactNode
 }) {
@@ -48,8 +35,8 @@ function SectionCard({ title, sub, icon, children }: {
       <div className="mb-3 flex items-start gap-2">
         {icon && <span className="text-muted mt-px shrink-0">{icon}</span>}
         <div className="min-w-0">
-          <div className="text-xs font-semibold text-muted uppercase tracking-[0.06em]">{title}</div>
-          {sub && <div className="text-[11px] text-muted mt-0.5">{sub}</div>}
+          <div className="section-label">{title}</div>
+          {sub && <div className="text-label text-muted mt-0.5">{sub}</div>}
         </div>
       </div>
       {children}
@@ -86,11 +73,11 @@ function healthLabel(status: string) {
 // alongside PRICE_PER_MILLION in the API route if it drifts noticeably.
 const USD_TO_GBP = 0.79
 function scoreBand(score: number) {
-  if (score >= 85) return { label: 'Exceptional', colour: 'var(--positive)' }
-  if (score >= 70) return { label: 'Strong', colour: 'var(--positive)' }
-  if (score >= 55) return { label: 'Reasonable', colour: 'var(--savings-text)' }
-  if (score >= 40) return { label: 'Needs work', colour: 'var(--expense-text)' }
-  return { label: 'At risk', colour: 'var(--negative)' }
+  if (score >= 85) return { label: 'Exceptional', colour: 'var(--score-1)' }
+  if (score >= 70) return { label: 'Strong', colour: 'var(--score-2)' }
+  if (score >= 55) return { label: 'Reasonable', colour: 'var(--score-3)' }
+  if (score >= 40) return { label: 'Needs work', colour: 'var(--score-4)' }
+  return { label: 'At risk', colour: 'var(--score-5)' }
 }
 
 /** Semicircular 0-100 gauge. Arc drawn once and revealed with a dash offset. */
@@ -125,7 +112,7 @@ function ScoreGauge({ score }: { score: number }) {
         <text
           x={cx} y={48} textAnchor="middle"
           fill="var(--ink)"
-          style={{ fontSize: 30, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}
+          style={{ fontSize: 32, fontFamily: "'DM Serif Display', serif", fontVariantNumeric: 'tabular-nums' }}
         >
           {value}
         </text>
@@ -133,7 +120,7 @@ function ScoreGauge({ score }: { score: number }) {
           out of 100
         </text>
       </svg>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] -mt-1" style={{ color: band.colour }}>
+      <div className="text-label font-bold uppercase tracking-label -mt-1 px-2.5 py-0.5 rounded-full" style={{ color: band.colour, background: `color-mix(in srgb, ${band.colour} 12%, transparent)` }}>
         {band.label}
       </div>
     </div>
@@ -226,13 +213,13 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
       icon={<Sparkles size={14} />}
     >
       {!hasEnoughData ? (
-        <p className="text-[13px] text-muted m-0">Add some budget figures first, then run a check.</p>
+        <p className="text-body text-muted m-0">Add some budget figures first, then run a check.</p>
       ) : (
         <>
           {result && stale && (
             <div className="flex items-center gap-2 bg-expense-bg text-expense-text rounded-lg px-3 py-2 mb-3">
               <Sparkles size={13} className="shrink-0" />
-              <span className="text-[12px] flex-1">Your figures have changed since this check — the report below may be out of date.</span>
+              <span className="text-xs flex-1">Your figures have changed since this check — the report below may be out of date.</span>
             </div>
           )}
 
@@ -245,7 +232,7 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
               ) : (
                 // Pre-score cached results still have only the coarse label.
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <span className={`text-[10px] font-bold uppercase tracking-[0.06em] px-2 py-0.5 rounded-full ${
+                  <span className={`text-caption font-bold uppercase tracking-label px-2 py-0.5 rounded-full ${
                     healthIntent(result.status) === 'positive' ? 'bg-income-bg text-positive'
                     : healthIntent(result.status) === 'negative' ? 'bg-expense-bg text-negative'
                     : 'bg-surface text-muted'
@@ -255,13 +242,13 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
                 </div>
               )}
               {generatedAt && (
-                <div className="text-[10px] text-muted text-center mb-2">
+                <div className="text-caption text-muted text-center mb-2">
                   Checked {new Date(generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                   {lastCostUsd != null && ` · ${fmtGbp(lastCostUsd)}`}
                 </div>
               )}
               <div className="font-serif text-lg leading-snug mb-1.5 text-center">{result.headline}</div>
-              <p className="text-[13px] text-muted leading-relaxed mb-3">{result.overview ?? ''}</p>
+              <p className="text-body text-muted leading-relaxed mb-3">{result.overview ?? ''}</p>
 
               {(result.sections ?? []).length > 0 && (
                 <div className="space-y-3 mb-3 pt-3 border-t border-border">
@@ -271,8 +258,8 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
                       : s.status && healthIntent(s.status) === 'negative' ? 'border-l-2 border-l-negative'
                       : 'border-l-2 border-l-border'
                     }`}>
-                      <div className="text-[12px] font-semibold text-ink mb-0.5 break-words">{s.title}</div>
-                      <p className="text-[12px] text-muted leading-relaxed m-0 break-words">{s.body}</p>
+                      <div className="text-xs font-semibold text-ink mb-0.5 break-words">{s.title}</div>
+                      <p className="text-xs text-muted leading-relaxed m-0 break-words">{s.body}</p>
                     </div>
                   ))}
                 </div>
@@ -290,9 +277,9 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
                         : healthIntent(b.status) === 'negative' ? 'bg-negative' : 'bg-border'
                       }`} />
                       <div className="min-w-0 flex-1">
-                        <div className="text-[11px] text-muted leading-snug">{b.metric}</div>
-                        <div className="text-[12px] font-semibold text-ink leading-snug break-words">{b.yours}</div>
-                        <div className="text-[10px] text-muted leading-snug break-words">typical {b.typical}</div>
+                        <div className="text-label text-muted leading-snug">{b.metric}</div>
+                        <div className="text-xs font-semibold text-ink leading-snug break-words">{b.yours}</div>
+                        <div className="text-caption text-muted leading-snug break-words">typical {b.typical}</div>
                       </div>
                     </div>
                   ))}
@@ -301,17 +288,17 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
 
               {result.strengths?.length > 0 && (
                 <div className="mb-2.5">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.06em] text-positive mb-1">Working well</div>
+                  <div className="text-caption font-semibold uppercase tracking-label text-positive mb-1">Working well</div>
                   <ul className="m-0 pl-4 space-y-1 list-disc marker:text-border">
-                    {result.strengths.map((s, i) => <li key={i} className="text-[12px] text-ink break-words leading-snug">{s}</li>)}
+                    {result.strengths.map((s, i) => <li key={i} className="text-xs text-ink break-words leading-snug">{s}</li>)}
                   </ul>
                 </div>
               )}
               {(result.priorityActions ?? []).length > 0 && (
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.06em] text-expense-text mb-1">Priority actions</div>
+                  <div className="text-caption font-semibold uppercase tracking-label text-expense-text mb-1">Priority actions</div>
                   <ol className="m-0 pl-4 space-y-1 list-decimal marker:text-border">
-                    {(result.priorityActions ?? []).map((s, i) => <li key={i} className="text-[12px] text-ink break-words leading-snug">{s}</li>)}
+                    {(result.priorityActions ?? []).map((s, i) => <li key={i} className="text-xs text-ink break-words leading-snug">{s}</li>)}
                   </ol>
                 </div>
               )}
@@ -319,36 +306,36 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
           )}
 
           {!result && rawText && (
-            <p className="text-[13px] text-ink whitespace-pre-wrap mb-3">{rawText}</p>
+            <p className="text-body text-ink whitespace-pre-wrap mb-3">{rawText}</p>
           )}
 
           {error && (
             error.notConfigured ? (
-              <div className="text-[12px] text-muted bg-surface rounded-lg p-3 mb-3 leading-relaxed">
+              <div className="text-xs text-muted bg-surface rounded-lg p-3 mb-3 leading-relaxed">
                 <div>{error.message}</div>
                 {error.detail && (
-                  <div className="text-[10px] font-mono opacity-70 mt-1.5 break-words">{error.detail}</div>
+                  <div className="text-caption font-mono opacity-70 mt-1.5 break-words">{error.detail}</div>
                 )}
               </div>
             ) : (
-              <div className="text-[12px] text-negative bg-expense-bg rounded-lg p-3 mb-3">
+              <div className="text-xs text-negative bg-expense-bg rounded-lg p-3 mb-3">
                 <div>{error.message}{error.httpStatus ? ` (HTTP ${error.httpStatus})` : ''}</div>
                 {error.detail && (
-                  <div className="text-[10px] font-mono opacity-70 mt-1.5 break-words">{error.detail}</div>
+                  <div className="text-caption font-mono opacity-70 mt-1.5 break-words">{error.detail}</div>
                 )}
               </div>
             )
           )}
 
           {!user ? (
-            <div className="text-[12px] text-muted bg-surface rounded-lg p-3 leading-relaxed flex items-start gap-2">
+            <div className="text-xs text-muted bg-surface rounded-lg p-3 leading-relaxed flex items-start gap-2">
               <KeyRound size={13} className="shrink-0 mt-0.5" />
               <span>Sign in and add your own Anthropic API key in Settings to run this — it's billed to your own account, never shared with anyone else who opens this app.</span>
             </div>
           ) : keyLoading ? (
-            <p className="text-[12px] text-muted text-center m-0">Checking for your API key…</p>
+            <p className="text-xs text-muted text-center m-0">Checking for your API key…</p>
           ) : !hasKey ? (
-            <div className="text-[12px] text-muted bg-surface rounded-lg p-3 leading-relaxed flex items-start gap-2">
+            <div className="text-xs text-muted bg-surface rounded-lg p-3 leading-relaxed flex items-start gap-2">
               <KeyRound size={13} className="shrink-0 mt-0.5" />
               <span>Add your own Anthropic API key in Settings to run this — it's yours alone, never shared with anyone else who opens this app.</span>
             </div>
@@ -357,19 +344,19 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
               <button
                 onClick={run}
                 disabled={loading}
-                className={`w-full border-0 rounded-lg py-2.5 text-[13px] font-semibold ${
+                className={`w-full border-0 rounded-lg py-2.5 text-body font-semibold ${
                   loading ? 'bg-border text-muted cursor-default'
-                  : stale ? 'bg-expense-text text-white cursor-pointer'
-                  : 'bg-ink text-white cursor-pointer'
+                  : stale ? 'bg-expense-text text-on-ink cursor-pointer'
+                  : 'bg-ink text-on-ink cursor-pointer'
                 }`}
               >
                 {loading ? 'Checking…' : stale ? 'Refresh with latest figures' : result ? 'Refresh check' : 'Run financial health check'}
               </button>
-              <p className="text-[10px] text-muted mt-2 mb-0.5 text-center">Using your own key, ending •••• {last4}</p>
+              <p className="text-caption text-muted mt-2 mb-0.5 text-center">Using your own key, ending •••• {last4}</p>
             </>
           )}
 
-          <p className="text-[10px] text-muted mt-2 mb-0 text-center leading-relaxed">
+          <p className="text-caption text-muted mt-2 mb-0 text-center leading-relaxed">
             General guidance from typical UK household benchmarks — not regulated financial advice.
             {usage && usage.totalRuns > 0 && (
               <> Spent {fmtGbp(usage.totalCostUsd)} on {usage.totalRuns} {usage.totalRuns === 1 ? 'check' : 'checks'} so far.</>
@@ -535,9 +522,8 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
         />
       </div>
 
-      <FinancialHealthCard data={data} totals={totals} user={user} recordFinancialHealthRun={recordFinancialHealthRun} />
-
-      {/* 0% expiry warnings — time-sensitive, so they lead */}
+      {/* Time-sensitive first: 0% expiries, then renewals; then Fair Share,
+          the thing most often opened this screen for; the optional AI check after. */}
       {expiries.map(({ debt, days, expiry, balanceAtExpiry, monthlyInterestAfter, rate }) => (
         <div
           key={debt.id}
@@ -546,10 +532,10 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
           <div className="flex items-start gap-2 mb-2">
             <AlertTriangle size={14} className={`mt-0.5 shrink-0 ${days <= 90 ? 'text-negative' : 'text-expense-text'}`} />
             <div className="min-w-0">
-              <div className="text-[13px] font-semibold text-ink">
+              <div className="text-body font-semibold text-ink">
                 {debt.label} leaves 0% {days > 0 ? `in ${days} days` : '— already expired'}
               </div>
-              <div className="text-[11px] text-muted mt-0.5">
+              <div className="text-label text-muted mt-0.5">
                 {expiry.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
                 {rate > 0 ? ` · then ${rate}% APR` : ' · rate after 0% not set'}
               </div>
@@ -557,11 +543,11 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
           </div>
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
             <div>
-              <div className="text-[10px] text-muted mb-0.5">Balance at expiry</div>
+              <div className="text-caption text-muted mb-0.5">Balance at expiry</div>
               <div className="text-sm font-bold tabular-nums text-ink">{fmt(balanceAtExpiry)}</div>
             </div>
             <div>
-              <div className="text-[10px] text-muted mb-0.5">Interest starts costing</div>
+              <div className="text-caption text-muted mb-0.5">Interest starts costing</div>
               {rate > 0
                 ? <div className="text-sm font-bold tabular-nums text-negative">{fmt(monthlyInterestAfter)}/mo</div>
                 : <div className="text-sm font-medium text-muted">Add the rate on Debts</div>
@@ -569,7 +555,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
             </div>
           </div>
           {balanceAtExpiry > 0 && days > 0 && (
-            <div className="text-[11px] text-muted mt-2.5 pt-2.5 border-t border-border">
+            <div className="text-label text-muted mt-2.5 pt-2.5 border-t border-border">
               Clearing it in time needs{' '}
               <span className="font-semibold text-ink tabular-nums">
                 {fmt(debt.currentBalance / Math.max(1, days / 30.44))}/mo
@@ -598,34 +584,106 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
                 <div key={r.id} className="flex items-center gap-3">
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${passed || urgent ? 'bg-negative' : soon ? 'bg-expense-text' : 'bg-border'}`} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-medium text-ink truncate">{r.label}</div>
-                    <div className="text-[10px] text-muted">
+                    <div className="text-body font-medium text-ink truncate">{r.label}</div>
+                    <div className="text-caption text-muted">
                       {r.category}{r.provider && ` · ${r.provider}`} · {new Date(r.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                       {r.coverAmount ? ` · ${fmt(r.coverAmount)} cover` : ''}
                     </div>
+                    {r.autoRenews
+                      ? <span className="pill mt-0.5">Auto-renews — check the new price</span>
+                      : r.isInsurance && r.days <= 60
+                        ? <span className="pill pill-warn mt-0.5">Not set to auto-renew — check cover continues</span>
+                        : null}
                   </div>
                   <div className="text-right shrink-0">
-                    <div className={`text-[11px] font-semibold tabular-nums ${passed || urgent ? 'text-negative' : soon ? 'text-expense-text' : 'text-muted'}`}>
+                    <div className={`text-label font-semibold tabular-nums ${passed || urgent ? 'text-negative' : soon ? 'text-expense-text' : 'text-muted'}`}>
                       {passed ? 'Date passed'
                         : r.days === 0 ? 'Today'
                         : r.days === 1 ? 'Tomorrow'
                         : `${r.days} days`}
                     </div>
                     {r.amount > 0 && (
-                      <div className="text-[10px] text-muted tabular-nums">{fmt(r.amount)}/mo</div>
+                      <div className="text-caption text-muted tabular-nums">{fmt(r.amount)}/mo</div>
                     )}
                   </div>
                 </div>
               )
             })}
           </div>
-          <p className="text-[10px] text-muted mt-3 pt-3 border-t border-border mb-0">
+          <p className="text-caption text-muted mt-3 pt-3 border-t border-border mb-0">
             {renewals.some(r => r.days < 0)
               ? 'Dates in the past need updating to next year’s renewal.'
               : 'Insurers and energy suppliers rarely offer their best price on renewal — worth comparing about a month out.'}
           </p>
         </SectionCard>
       )}
+
+      {/* Fair share */}
+      {fairShare && (
+        <SectionCard
+          title="Fair share"
+          sub={fairShare.sharedByN + fairShare.sharedByR > 0
+            ? `${fmt(fairShare.householdTotal)} of household costs — the joint pot split evenly, plus what each of you covers alone`
+            : `Splitting ${fmt(fairShare.householdTotal)} of joint costs down the middle`}
+          icon={<Scale size={14} />}
+        >
+          <ul className="m-0 mb-3 pl-0 list-none space-y-1 text-label text-muted leading-snug">
+            <li><span className="pill pill-joint mr-1">Joint</span> costs in the joint column are split 50/50.</li>
+            <li><span className="pill pill-joint mr-1">Household cost</span> bills one of you pays alone for both of you (like a mortgage) count fully to whoever pays them.</li>
+            <li>Everything else in your own column is personal spending and isn&apos;t counted here.</li>
+          </ul>
+          <div className="space-y-3">
+            {[
+              { name: n1, pct: fairShare.currentPctN, paid: fairShare.contributionN, extra: fairShare.sharedByN, cls: 'bg-niamh' },
+              { name: n2, pct: fairShare.currentPctR, paid: fairShare.contributionR, extra: fairShare.sharedByR, cls: 'bg-rupert' },
+            ].map(p => (
+              <div key={p.name}>
+                <div className="flex justify-between items-baseline mb-1 gap-2">
+                  <span className="text-body font-medium text-ink">{p.name}</span>
+                  <span className="text-xs tabular-nums text-muted text-right">
+                    {fmt(p.paid)} — <span className="font-semibold text-ink">{p.pct.toFixed(0)}%</span> of income
+                  </span>
+                </div>
+                <div className="h-[6px] bg-surface rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${p.cls}`} style={{ width: `${Math.min(100, p.pct)}%` }} />
+                </div>
+                {p.extra > 0 && (
+                  <div className="text-caption text-muted mt-1">
+                    {fmt(fairShare.jointPot / 2)} of the joint pot + {fmt(p.extra)} paid alone
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {Math.abs(fairShare.currentPctN - fairShare.currentPctR) > 2 && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <div className="text-label text-muted mb-2">
+                Split by income instead ({fairShare.fairPct.toFixed(0)}/{(100 - fairShare.fairPct).toFixed(0)}), each would cover:
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <div className="text-caption text-muted mb-0.5">{n1}</div>
+                  <div className="text-sm font-bold tabular-nums text-ink">{fmt(fairShare.fairN)}</div>
+                  <div className={`text-caption tabular-nums ${fairShare.fairN < fairShare.contributionN ? 'text-positive' : 'text-negative'}`}>
+                    {fairShare.fairN < fairShare.contributionN ? '−' : '+'}{fmt(Math.abs(fairShare.fairN - fairShare.contributionN))}
+                  </div>
+                </div>
+                <div className="hairline-v" />
+                <div className="flex-1">
+                  <div className="text-caption text-muted mb-0.5">{n2}</div>
+                  <div className="text-sm font-bold tabular-nums text-ink">{fmt(fairShare.fairR)}</div>
+                  <div className={`text-caption tabular-nums ${fairShare.fairR < fairShare.contributionR ? 'text-positive' : 'text-negative'}`}>
+                    {fairShare.fairR < fairShare.contributionR ? '−' : '+'}{fmt(Math.abs(fairShare.fairR - fairShare.contributionR))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </SectionCard>
+      )}
+
+      <FinancialHealthCard data={data} totals={totals} user={user} recordFinancialHealthRun={recordFinancialHealthRun} />
 
       {/* Runway detail */}
       {runway != null && liquidAssets > 0 && (
@@ -647,7 +705,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
               style={{ width: `${Math.min(100, (runway / 6) * 100)}%` }}
             />
           </div>
-          <div className="flex justify-between text-[10px] text-muted mb-3">
+          <div className="flex justify-between text-caption text-muted mb-3">
             <span>0</span><span>3 months</span><span>6 months</span>
           </div>
 
@@ -659,7 +717,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
             <span className="text-muted">Monthly outgoings</span>
             <span className="tabular-nums font-semibold text-expense-text">{fmt(monthlyOutgoings)}</span>
           </div>
-          <p className="text-[10px] text-muted mt-2 mb-0">Pensions excluded — not accessible in an emergency.</p>
+          <p className="text-caption text-muted mt-2 mb-0">Pensions excluded — not accessible in an emergency.</p>
         </SectionCard>
       )}
 
@@ -672,23 +730,23 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
         >
           <div className="flex items-center gap-3">
             <div className="flex-1">
-              <div className="text-[10px] text-muted mb-0.5">Earning</div>
+              <div className="text-caption text-muted mb-0.5">Earning</div>
               <div className="text-base font-bold tabular-nums text-positive">{fmt(interestPosition.earned)}</div>
             </div>
             <div className="hairline-v" />
             <div className="flex-1">
-              <div className="text-[10px] text-muted mb-0.5">Paying</div>
+              <div className="text-caption text-muted mb-0.5">Paying</div>
               <div className="text-base font-bold tabular-nums text-negative">{fmt(interestPosition.paid)}</div>
             </div>
             <div className="hairline-v" />
             <div className="flex-1">
-              <div className="text-[10px] text-muted mb-0.5">Net</div>
+              <div className="text-caption text-muted mb-0.5">Net</div>
               <div className={`text-base font-bold tabular-nums ${interestPosition.net >= 0 ? 'text-positive' : 'text-negative'}`}>
                 {interestPosition.net >= 0 ? '+' : ''}{fmt(interestPosition.net)}
               </div>
             </div>
           </div>
-          <p className="text-[11px] text-muted mt-3 pt-3 border-t border-border mb-0">
+          <p className="text-label text-muted mt-3 pt-3 border-t border-border mb-0">
             {interestPosition.paid > interestPosition.earned
               ? `Your debts cost more than your savings earn — overpaying debt beats holding cash by ${fmt(interestPosition.paid - interestPosition.earned)}/mo.`
               : `Your savings out-earn your debt costs by ${fmt(interestPosition.net)}/mo — ${fmt(interestPosition.net * 12)} a year.`}
@@ -708,7 +766,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
             {debtAnalysis.rows.map(({ debt, months, interest, naive }) => (
               <div key={debt.id}>
                 <div className="flex justify-between items-baseline mb-1">
-                  <span className="text-[13px] font-medium text-ink truncate pr-2">{debt.label}</span>
+                  <span className="text-body font-medium text-ink truncate pr-2">{debt.label}</span>
                   <span className="text-xs tabular-nums text-muted shrink-0">
                     {months == null
                       ? <span className="text-negative font-semibold">never at this rate</span>
@@ -722,7 +780,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
                     style={{ width: `${months == null ? 100 : Math.min(100, (months / Math.max(1, debtAnalysis.longest)) * 100)}%` }}
                   />
                 </div>
-                <div className="text-[10px] text-muted mt-1">
+                <div className="text-caption text-muted mt-1">
                   {fmt(debt.currentBalance)} at {debt.isZeroPercent ? '0%' : `${debt.interestRate}%`}
                   {interest != null && interest > 0 && ` · ${fmt(interest)} interest to come`}
                   {naive != null && months != null && months > naive &&
@@ -735,66 +793,6 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
             <div className="flex justify-between text-xs pt-3 mt-3 border-t border-border">
               <span className="text-muted font-medium">Interest still to pay</span>
               <span className="tabular-nums font-bold text-negative">{fmt(debtAnalysis.totalInterest)}</span>
-            </div>
-          )}
-        </SectionCard>
-      )}
-
-      {/* Fair share */}
-      {fairShare && (
-        <SectionCard
-          title="Fair share"
-          sub={fairShare.sharedByN + fairShare.sharedByR > 0
-            ? `${fmt(fairShare.householdTotal)} of household costs — the joint pot split evenly, plus what each of you covers alone`
-            : `Splitting ${fmt(fairShare.householdTotal)} of joint costs down the middle`}
-          icon={<Scale size={14} />}
-        >
-          <div className="space-y-3">
-            {[
-              { name: n1, pct: fairShare.currentPctN, paid: fairShare.contributionN, extra: fairShare.sharedByN, cls: 'bg-niamh' },
-              { name: n2, pct: fairShare.currentPctR, paid: fairShare.contributionR, extra: fairShare.sharedByR, cls: 'bg-rupert' },
-            ].map(p => (
-              <div key={p.name}>
-                <div className="flex justify-between items-baseline mb-1 gap-2">
-                  <span className="text-[13px] font-medium text-ink">{p.name}</span>
-                  <span className="text-xs tabular-nums text-muted text-right">
-                    {fmt(p.paid)} — <span className="font-semibold text-ink">{p.pct.toFixed(0)}%</span> of income
-                  </span>
-                </div>
-                <div className="h-[6px] bg-surface rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full ${p.cls}`} style={{ width: `${Math.min(100, p.pct)}%` }} />
-                </div>
-                {p.extra > 0 && (
-                  <div className="text-[10px] text-muted mt-1">
-                    {fmt(fairShare.jointPot / 2)} of the joint pot + {fmt(p.extra)} paid alone
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {Math.abs(fairShare.currentPctN - fairShare.currentPctR) > 2 && (
-            <div className="mt-3 pt-3 border-t border-border">
-              <div className="text-[11px] text-muted mb-2">
-                Split by income instead ({fairShare.fairPct.toFixed(0)}/{(100 - fairShare.fairPct).toFixed(0)}), each would cover:
-              </div>
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <div className="text-[10px] text-muted mb-0.5">{n1}</div>
-                  <div className="text-sm font-bold tabular-nums text-ink">{fmt(fairShare.fairN)}</div>
-                  <div className={`text-[10px] tabular-nums ${fairShare.fairN < fairShare.contributionN ? 'text-positive' : 'text-negative'}`}>
-                    {fairShare.fairN < fairShare.contributionN ? '−' : '+'}{fmt(Math.abs(fairShare.fairN - fairShare.contributionN))}
-                  </div>
-                </div>
-                <div className="hairline-v" />
-                <div className="flex-1">
-                  <div className="text-[10px] text-muted mb-0.5">{n2}</div>
-                  <div className="text-sm font-bold tabular-nums text-ink">{fmt(fairShare.fairR)}</div>
-                  <div className={`text-[10px] tabular-nums ${fairShare.fairR < fairShare.contributionR ? 'text-positive' : 'text-negative'}`}>
-                    {fairShare.fairR < fairShare.contributionR ? '−' : '+'}{fmt(Math.abs(fairShare.fairR - fairShare.contributionR))}
-                  </div>
-                </div>
-              </div>
             </div>
           )}
         </SectionCard>
@@ -825,10 +823,10 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
             </AreaChart>
           </ResponsiveContainer>
           <div className="flex gap-5 justify-center mt-2">
-            <span className="flex items-center gap-1.5 text-[11px] text-muted">
+            <span className="flex items-center gap-1.5 text-label text-muted">
               <span className="w-4 h-0.5 rounded-full bg-positive inline-block" /> Income
             </span>
-            <span className="flex items-center gap-1.5 text-[11px] text-muted">
+            <span className="flex items-center gap-1.5 text-label text-muted">
               <span className="w-4 h-0.5 rounded-full bg-expense-text inline-block" /> Outgoings
             </span>
           </div>
@@ -845,9 +843,9 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
               return (
                 <div key={i}>
                   <div className="flex justify-between items-baseline mb-1">
-                    <span className="text-[13px] font-medium text-ink">{cat.name}</span>
+                    <span className="text-body font-medium text-ink">{cat.name}</span>
                     <span className="text-xs tabular-nums text-muted">
-                      {fmt(cat.amount)} <span className="text-[10px]">{pct.toFixed(0)}%</span>
+                      {fmt(cat.amount)} <span className="text-caption">{pct.toFixed(0)}%</span>
                     </span>
                   </div>
                   <div className="h-[6px] bg-surface rounded-full overflow-hidden">

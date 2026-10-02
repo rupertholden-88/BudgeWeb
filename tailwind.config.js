@@ -25,6 +25,19 @@ module.exports = {
         'savings-text': 'var(--savings-text)',
         pension: 'var(--pension)',
         'pension-light': 'var(--pension-light)',
+        accent: 'var(--accent)',
+        'accent-light': 'var(--accent-light)',
+        'on-ink': 'var(--on-ink)',
+      },
+      // Named steps instead of one-off pixel sizes.
+      fontSize: {
+        caption: ['10px', '14px'],
+        label: ['11px', '15px'],
+        body: ['13px', '18px'],
+        lead: ['15px', '20px'],
+      },
+      letterSpacing: {
+        label: '0.08em',
       },
     },
   },

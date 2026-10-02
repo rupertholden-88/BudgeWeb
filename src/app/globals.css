@@ -18,14 +18,27 @@
   --muted: #7B7B8F;
   --income-bg: #E9F0EC;
   --income-text: #44705D;
-  --expense-bg: #F7ECE8;
-  --expense-text: #B25B4C;
+  /* Amber, not terracotta: expenses are a neutral outflow, and the old hue sat
+     too close to Person 1's pink. Red is reserved for genuinely bad news. */
+  --expense-bg: #F6EEE0;
+  --expense-text: #9A6420;
   --savings-bg: #ECEFF5;
   --savings-text: #5B6CA8;
   --positive: #44705D;
-  --negative: #B25B4C;
+  --negative: #B3403A;
   --pension: #7B5EA7;
   --pension-light: #EDE9F6;
+  /* Owner colours are identity only; editing and focus use this neutral. */
+  --accent: #4A4A68;
+  --accent-light: #EFEFF4;
+  /* Text on an --ink background — ink flips to near-white in dark mode. */
+  --on-ink: #FFFFFF;
+  /* Health-score bands, one hue each: exceptional → at risk. */
+  --score-1: #2F7A5B;
+  --score-2: #6A9A3A;
+  --score-3: #B88A1E;
+  --score-4: #C8642A;
+  --score-5: #B3403A;
 }
 
 * { box-sizing: border-box; }
@@ -40,12 +53,20 @@
   --muted: #8888A0;
   --income-bg: #1B2823;
   --income-text: #7BAC97;
-  --expense-bg: #2B1F1B;
-  --expense-text: #D98A77;
+  --expense-bg: #2A2216;
+  --expense-text: #D9A25E;
   --savings-bg: #1D2130;
   --savings-text: #93A2D4;
   --positive: #7BAC97;
-  --negative: #D98A77;
+  --negative: #E07468;
+  --accent: #B8B8D0;
+  --accent-light: #262634;
+  --on-ink: #111118;
+  --score-1: #6CC49A;
+  --score-2: #A5C76A;
+  --score-3: #E0B84F;
+  --score-4: #E8915A;
+  --score-5: #E07468;
   --niamh-light: #2E1E1A;
   --rupert-light: #1A2030;
   --joint-light: #1A2E1A;
@@ -60,7 +81,7 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 h1, h2, h3 { font-family: 'DM Serif Display', serif; letter-spacing: -0.01em; }
-::selection { background: color-mix(in srgb, var(--rupert) 35%, transparent); }
+::selection { background: color-mix(in srgb, var(--accent) 25%, transparent); }
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
@@ -89,12 +110,26 @@ button {
 }
 button:active { transform: scale(0.96); }
 
-.chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1.5px solid transparent; }
-.chip-all { background: var(--ink); color: white; box-shadow: 0 2px 8px -2px rgba(var(--shadow-tint), 0.35); }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 0 14px; min-height: 36px; white-space: nowrap; border-radius: 999px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1.5px solid transparent; }
+.chip-all { background: var(--ink); color: var(--on-ink); box-shadow: 0 2px 8px -2px rgba(var(--shadow-tint), 0.35); }
 .chip-niamh { background: var(--niamh); color: white; box-shadow: 0 2px 8px -2px rgba(var(--shadow-tint), 0.35); }
 .chip-rupert { background: var(--rupert); color: white; box-shadow: 0 2px 8px -2px rgba(var(--shadow-tint), 0.35); }
 .chip-joint { background: var(--joint); color: white; box-shadow: 0 2px 8px -2px rgba(var(--shadow-tint), 0.35); }
 .chip-inactive { background: var(--card); color: var(--muted); border-color: var(--border); }
+.chip-property { background: var(--accent); color: var(--card); box-shadow: 0 2px 8px -2px rgba(var(--shadow-tint), 0.35); }
+
+/* In the components layer so utilities (e.g. text-caption) can still override. */
+@layer components {
+/* One "section label" treatment everywhere. */
+.section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+
+/* Small status flag on a row — one shape for every kind of flag. */
+.pill { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 500; line-height: 16px; white-space: nowrap; background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+.pill-warn { background: var(--expense-bg); color: var(--expense-text); border-color: transparent; }
+.pill-bad { background: color-mix(in srgb, var(--negative) 12%, transparent); color: var(--negative); border-color: transparent; }
+.pill-joint { background: var(--joint-light); color: color-mix(in srgb, var(--joint) 55%, var(--ink)); border-color: transparent; }
+.pill-accent { background: var(--accent-light); color: var(--accent); border-color: transparent; }
+}
 .positive { color: var(--positive); }
 .negative { color: var(--negative); }
 
@@ -155,18 +190,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 button:focus-visible {
-  outline: 2px solid var(--rupert) !important;
+  outline: 2px solid var(--accent) !important;
   outline-offset: 2px !important;
 }
 button:focus-visible { border-radius: 4px; }
-
-/* Responsive summary grid */
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-bottom: 16px;
-}
-@media (max-width: 359px) {
-  .summary-grid { grid-template-columns: repeat(2, 1fr); }
-}

@@ -11,7 +11,7 @@ export type DebtType = 'CREDIT_CARD' | 'PERSONAL_LOAN' | 'CAR_FINANCE' | 'MORTGA
  * makes the cost visible to the fairness comparison, which would otherwise
  * treat it as personal spending and understate that person's contribution.
  */
-export interface LineItem { id: string; label: string; amount: number; priority: SpendingPriority; renewalDate?: string; autoRenews?: boolean; sharedContribution?: boolean; insuranceProvider?: string; insuranceCoverAmount?: number }
+export interface LineItem { id: string; label: string; amount: number; priority: SpendingPriority; renewalDate?: string; autoRenews?: boolean; sharedContribution?: boolean; insuranceProvider?: string; insuranceCoverAmount?: number; propertyId?: string }
 /** Detects an insurance line by its label — no separate flag to set, so the
  * extra fields just appear on anything already named as insurance. */
 export function isInsuranceItem(label: string): boolean {
@@ -26,7 +26,19 @@ export interface Category { key: string; owner: Owner; type: EntryType; label: s
  */
 export interface Asset { id: string; type: AssetType; label: string; amount: number; interestRate?: number; institution?: string; monthlyContribution?: number; employerContribution?: number }
 export interface SavingsSnapshot { date: string; owner: Owner; assets: Asset[] }
-export interface Debt { id: string; owner: Owner; type: DebtType; label: string; currentBalance: number; monthlyPayment: number; interestRate: number; isZeroPercent: boolean; zeroPercentExpiryDate?: string; institution?: string; sharedContribution?: boolean }
+export interface Debt { id: string; owner: Owner; type: DebtType; label: string; currentBalance: number; monthlyPayment: number; interestRate: number; isZeroPercent: boolean; zeroPercentExpiryDate?: string; institution?: string; sharedContribution?: boolean; propertyId?: string }
+/**
+ * A home the household owns. Mortgages link to it via `Debt.propertyId` and
+ * running costs via `LineItem.propertyId`, so equity and true monthly cost
+ * can be worked out per property. The purchase fields are the capital-gains
+ * cost basis for anything that isn't the main residence — far easier to
+ * record now than to reconstruct at sale.
+ */
+export interface Property {
+  id: string; label: string; owner: Owner; estimatedValue: number
+  isMainResidence?: boolean; isLet?: boolean; monthlyRent?: number
+  purchasePrice?: number; purchaseDate?: string; stampDutyPaid?: number; improvementCosts?: number
+}
 export interface SpendSnapshot { date: string; totalInc: number; totalExp: number; totalSav: number }
 /** Birth month as YYYY-MM — stored rather than an age so it never goes stale. */
 export interface Dependant { id: string; born: string }
@@ -49,7 +61,9 @@ export interface FinancialHealthCache {
 }
 /** Running total across every check ever run on this account — the cache above only holds the latest. */
 export interface FinancialHealthUsage { totalRuns: number; totalCostUsd: number }
-export interface BudgetData { categories: Category[]; savingsHistory: SavingsSnapshot[]; spendHistory: SpendSnapshot[]; debts: Debt[]; savedAt: string; nameNiamh: string; nameRupert: string; nameJoint: string; financialHealth?: FinancialHealthCache | null; financialHealthUsage?: FinancialHealthUsage | null; bornNiamh?: string; bornRupert?: string; dependants?: Dependant[] }
+export interface BudgetData { categories: Category[]; savingsHistory: SavingsSnapshot[]; spendHistory: SpendSnapshot[]; debts: Debt[]; savedAt: string; nameNiamh: string; nameRupert: string; nameJoint: string; financialHealth?: FinancialHealthCache | null; financialHealthUsage?: FinancialHealthUsage | null; bornNiamh?: string; bornRupert?: string; dependants?: Dependant[]; properties?: Property[]
+  /** Annual gross salary — optional, lets pension contributions be judged against the gross-based 8% minimum. */
+  grossNiamh?: number; grossRupert?: number }
 export interface Totals { incN: number; incR: number; expN: number; expR: number; savN: number; savR: number; debtN: number; debtR: number; expJoint: number; savJoint: number; debtJoint: number; halfJointExp: number; halfJointSav: number; halfJointDebt: number; netN: number; netR: number; totalInc: number; totalExp: number; totalSav: number; totalDebt: number; net: number }
 
 export function defaultBudgetData(): BudgetData {
@@ -130,7 +144,44 @@ export function calcTotals(budget: BudgetData): Totals {
 
 export const fmt = (n: number) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(n)
-export type TabFilter = 'ALL' | 'NIAMH' | 'RUPERT' | 'JOINT'
+export type TabFilter = 'ALL' | 'NIAMH' | 'RUPERT' | 'JOINT' | `property:${string}`
+
+export function effectiveRate(d: Debt): number {
+  return d.isZeroPercent ? 0 : (Number(d.interestRate) || 0)
+}
+
+/** Per-property rollup: equity, LTV and everything it costs each month. */
+export function propertySummaries(data: BudgetData) {
+  return (data.properties ?? []).map(p => {
+    const debts = data.debts.filter(d => d.propertyId === p.id)
+    const items = data.categories
+      .filter(c => c.type === 'EXPENSE')
+      .flatMap(c => c.items.filter(i => i.propertyId === p.id).map(i => ({ ...i, category: c.label, owner: c.owner })))
+    const mortgageBalance = debts.reduce((a, d) => a + d.currentBalance, 0)
+    const mortgagePayment = debts.reduce((a, d) => a + d.monthlyPayment, 0)
+    const runningCosts = items.reduce((a, i) => a + i.amount, 0)
+    return {
+      property: p, debts, items,
+      mortgageBalance, mortgagePayment, runningCosts,
+      monthlyTotal: mortgagePayment + runningCosts,
+      equity: p.estimatedValue - mortgageBalance,
+      ltvPct: p.estimatedValue > 0 ? (mortgageBalance / p.estimatedValue) * 100 : null,
+    }
+  })
+}
+
+/**
+ * Value minus everything owed. Debt balances are subtracted in full, not just
+ * mortgages — a credit card balance is as much a liability as a mortgage.
+ */
+export function netWorth(data: BudgetData, today = new Date().toISOString().slice(0, 7)) {
+  const current = data.savingsHistory.filter(s => s.date.slice(0, 7) === today).flatMap(s => Array.isArray(s.assets) ? s.assets : [])
+  const liquid = current.filter(a => a.type !== 'PENSION').reduce((a, i) => a + (i.amount || 0), 0)
+  const pensions = current.filter(a => a.type === 'PENSION').reduce((a, i) => a + (i.amount || 0), 0)
+  const property = (data.properties ?? []).reduce((a, p) => a + (p.estimatedValue || 0), 0)
+  const debts = data.debts.reduce((a, d) => a + (d.currentBalance || 0), 0)
+  return { liquid, pensions, property, debts, total: liquid + pensions + property - debts }
+}
 
 /**
  * How household costs actually break down, accounting for costs one person

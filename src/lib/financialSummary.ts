@@ -1,4 +1,4 @@
-import { BudgetData, Totals, Owner, daysUntil, monthsToClear, upcomingRenewals, householdCostSplit, ageInYears, ageInMonths } from './models'
+import { BudgetData, Totals, Owner, daysUntil, monthsToClear, upcomingRenewals, householdCostSplit, ageInYears, ageInMonths, propertySummaries, netWorth, effectiveRate } from './models'
 
 /**
  * A numbers-only snapshot of the household's finances for an AI assessment.
@@ -16,6 +16,8 @@ export interface FinancialSummary {
   }
   earners: number
   incomeSplitPct: number[] // e.g. [38, 62] — proportion of household income each earner brings
+  /** Annual gross salary per person, same order; null where not entered. */
+  grossAnnualIncomePerPerson: (number | null)[]
   /**
    * Life stage, where the user has supplied it. Ages are what make a benchmark
    * meaningful — a pension pot or emergency fund is judged very differently at
@@ -52,9 +54,28 @@ export interface FinancialSummary {
     byType: { type: string; amount: number }[]
     runwayMonths: number | null
   }
+  /**
+   * Homes owned — no labels or locations, just the figures. Mortgages and
+   * running costs are those the user has linked to each property.
+   */
+  properties: {
+    isMainResidence: boolean
+    isLet: boolean
+    monthlyRent: number
+    value: number
+    mortgageBalance: number
+    equity: number
+    ltvPct: number | null
+    monthlyMortgagePayment: number
+    monthlyRunningCosts: number
+    costBasisRecorded: boolean
+    paperGain: number | null
+  }[]
+  /** Liquid + pensions + property values − all debt balances. */
+  netWorth: number
   debts: {
     totalBalance: number
-    items: { type: string; balance: number; monthlyPayment: number; aprPct: number; isZeroPercent: boolean; zeroPercentDaysLeft: number | null; monthsToClear: number | null }[]
+    items: { type: string; securedOnProperty: boolean; balance: number; monthlyPayment: number; aprPct: number; isZeroPercent: boolean; zeroPercentDaysLeft: number | null; monthsToClear: number | null }[]
   }
   interest: { earnedPerMonth: number; paidPerMonth: number; netPerMonth: number }
   /** Category-level, not account-specific — e.g. "Energy", not a supplier name. */
@@ -144,6 +165,24 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
     ? { adultAges, dependantAgesMonths }
     : null
 
+  const properties = propertySummaries(data).map(s => {
+    const p = s.property
+    const basis = p.purchasePrice ? p.purchasePrice + (p.stampDutyPaid ?? 0) + (p.improvementCosts ?? 0) : null
+    return {
+      isMainResidence: !!p.isMainResidence,
+      isLet: !!p.isLet,
+      monthlyRent: p.isLet ? Math.round(p.monthlyRent ?? 0) : 0,
+      value: Math.round(p.estimatedValue),
+      mortgageBalance: Math.round(s.mortgageBalance),
+      equity: Math.round(s.equity),
+      ltvPct: s.ltvPct == null ? null : Math.round(s.ltvPct),
+      monthlyMortgagePayment: Math.round(s.mortgagePayment),
+      monthlyRunningCosts: Math.round(s.runningCosts),
+      costBasisRecorded: basis != null,
+      paperGain: basis != null && p.estimatedValue > 0 ? Math.round(p.estimatedValue - basis) : null,
+    }
+  })
+
   return {
     monthly: {
       totalIncome: totals.totalInc,
@@ -155,6 +194,7 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
     },
     earners: incomes.length,
     incomeSplitPct,
+    grossAnnualIncomePerPerson: [data.grossNiamh ?? null, data.grossRupert ?? null],
     household,
     householdCosts,
     assets: {
@@ -166,16 +206,19 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
       byType: Array.from(byTypeMap.entries()).map(([type, amount]) => ({ type, amount })).filter(t => t.amount > 0),
       runwayMonths,
     },
+    properties,
+    netWorth: Math.round(netWorth(data, today).total),
     debts: {
       totalBalance: data.debts.reduce((a, d) => a + d.currentBalance, 0),
       items: data.debts.filter(d => d.currentBalance > 0).map(d => ({
         type: d.type,
+        securedOnProperty: !!d.propertyId,
         balance: d.currentBalance,
         monthlyPayment: d.monthlyPayment,
         aprPct: d.isZeroPercent ? 0 : d.interestRate,
         isZeroPercent: d.isZeroPercent,
         zeroPercentDaysLeft: d.isZeroPercent && d.zeroPercentExpiryDate ? daysUntil(d.zeroPercentExpiryDate) : null,
-        monthsToClear: monthsToClear(d.currentBalance, d.monthlyPayment, d.isZeroPercent ? 0 : d.interestRate),
+        monthsToClear: monthsToClear(d.currentBalance, d.monthlyPayment, effectiveRate(d)),
       })),
     },
     interest: { earnedPerMonth: Math.round(earned), paidPerMonth: Math.round(paid), netPerMonth: Math.round(earned - paid) },
