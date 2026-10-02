@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Category, TabFilter, Owner, EntryType, fmt, calcTotals, daysUntil } from '@/lib/models'
+import { Category, TabFilter, Owner, EntryType, fmt, calcTotals, daysUntil, isInsuranceItem } from '@/lib/models'
 import { Plus, ChevronDown, ChevronUp, Check, TrendingUp, TrendingDown, CalendarClock, SlidersHorizontal } from 'lucide-react'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
@@ -238,9 +238,9 @@ function RenewalBadge({ days }: { days: number }) {
   )
 }
 
-function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemoveItem, onRenameItem, onUpdateRenewal, onToggleShared }: {
+function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemoveItem, onRenameItem, onUpdateRenewal, onToggleShared, onUpdateInsurance }: {
   catKey: string
-  item: { id: string; label: string; amount: number; renewalDate?: string; sharedContribution?: boolean }
+  item: { id: string; label: string; amount: number; renewalDate?: string; sharedContribution?: boolean; insuranceProvider?: string; insuranceCoverAmount?: number }
   canRenew: boolean
   canMarkShared: boolean
   onUpdateAmount: (catKey: string, itemId: string, v: number) => void
@@ -248,6 +248,7 @@ function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemo
   onRenameItem: (catKey: string, itemId: string, label: string) => void
   onUpdateRenewal: (catKey: string, itemId: string, date: string) => void
   onToggleShared: (catKey: string, itemId: string) => void
+  onUpdateInsurance: (catKey: string, itemId: string, fields: { provider?: string; coverAmount?: number }) => void
 }) {
   const [editingLabel, setEditingLabel] = useState(false)
   const [labelDraft, setLabelDraft] = useState(item.label)
@@ -260,6 +261,7 @@ function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemo
   }
   const cancelLongPress = () => { if (longPressTimer.current) clearTimeout(longPressTimer.current) }
   const days = item.renewalDate ? daysUntil(item.renewalDate) : null
+  const isInsurance = canRenew && isInsuranceItem(item.label)
 
   return (
     <>
@@ -299,6 +301,9 @@ function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemo
                 {item.sharedContribution && (
                   <span className="text-[10px] font-medium text-joint">Counts as household</span>
                 )}
+                {item.insuranceProvider && (
+                  <span className="text-[10px] text-muted">{item.insuranceProvider}</span>
+                )}
               </span>
             </div>
           )}
@@ -322,8 +327,10 @@ function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemo
           )}
         </div>
         {expanded && canRenew && (
-          <div className="flex items-center gap-2 pb-2 -mt-0.5">
-            <label className="text-[10px] text-muted shrink-0">Renews / contract ends</label>
+          <div className="flex items-center gap-2 pb-2 -mt-0.5 flex-wrap">
+            <label className="text-[10px] text-muted shrink-0">
+              {isInsurance ? 'Renews / policy ends' : 'Renews / contract ends'}
+            </label>
             <input
               type="date"
               value={item.renewalDate ?? ''}
@@ -338,6 +345,30 @@ function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemo
                 Clear
               </button>
             )}
+          </div>
+        )}
+        {expanded && isInsurance && (
+          <div className="flex gap-2 pb-2.5 flex-wrap">
+            <div className="flex flex-col gap-0.5">
+              <label className="text-[10px] text-muted uppercase tracking-[0.05em]">Provider</label>
+              <input
+                value={item.insuranceProvider ?? ''}
+                placeholder="e.g. Aviva"
+                onChange={e => onUpdateInsurance(catKey, item.id, { provider: e.target.value })}
+                className="w-[110px] text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none"
+              />
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <label className="text-[10px] text-muted uppercase tracking-[0.05em]">Cover £</label>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={item.insuranceCoverAmount ?? ''}
+                placeholder="0"
+                onChange={e => onUpdateInsurance(catKey, item.id, { coverAmount: parseFloat(e.target.value) || undefined })}
+                className="w-[90px] text-xs border-[1.5px] border-border rounded-md px-1.5 py-1 outline-none"
+              />
+            </div>
           </div>
         )}
         {expanded && canMarkShared && (
@@ -360,7 +391,7 @@ function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemo
 
 // ─── category card ────────────────────────────────────────────────────────────
 
-function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem, onRenameItem, onRenameCategory, onDeleteCategory, onUpdateRenewal, onToggleShared }: {
+function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem, onRenameItem, onRenameCategory, onDeleteCategory, onUpdateRenewal, onToggleShared, onUpdateInsurance }: {
   cat: Category; ownerName: string
   onUpdateAmount: (catKey: string, itemId: string, v: number) => void
   onAddItem: (catKey: string, label: string) => void
@@ -370,6 +401,7 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
   onDeleteCategory: (catKey: string) => void
   onUpdateRenewal: (catKey: string, itemId: string, date: string) => void
   onToggleShared: (catKey: string, itemId: string) => void
+  onUpdateInsurance: (catKey: string, itemId: string, fields: { provider?: string; coverAmount?: number }) => void
 }) {
   const [open, setOpen] = useState(true)
   const [addingItem, setAddingItem] = useState(false)
@@ -450,7 +482,7 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
                 canMarkShared={cat.type === 'EXPENSE' && cat.owner !== 'JOINT'}
                 onUpdateAmount={onUpdateAmount} onRemoveItem={onRemoveItem}
                 onRenameItem={onRenameItem} onUpdateRenewal={onUpdateRenewal}
-                onToggleShared={onToggleShared}
+                onToggleShared={onToggleShared} onUpdateInsurance={onUpdateInsurance}
               />
             ))}
             {addingItem ? (
@@ -486,7 +518,7 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
 const OWNER_ORDER: Owner[] = ['NIAMH', 'RUPERT', 'JOINT']
 
 export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budget: BudgetHook; tab: TabFilter; onNavigateToDebts: () => void }) {
-  const { data, totals, updateItemAmount, addItem, removeItem, renameItem, renameCategory, deleteCategory, addCategory, updateItemRenewal, toggleItemShared } = budget
+  const { data, totals, updateItemAmount, addItem, removeItem, renameItem, renameCategory, deleteCategory, addCategory, updateItemRenewal, toggleItemShared, updateItemInsurance } = budget
   const [addingCat, setAddingCat] = useState(false)
   const [newCatLabel, setNewCatLabel] = useState('')
   const [newCatOwner, setNewCatOwner] = useState<Owner>('JOINT')
@@ -552,6 +584,7 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
                 onRenameCategory={renameCategory} onDeleteCategory={deleteCategory}
                 onUpdateRenewal={updateItemRenewal}
                 onToggleShared={toggleItemShared}
+                onUpdateInsurance={updateItemInsurance}
               />
             ))}
           </div>

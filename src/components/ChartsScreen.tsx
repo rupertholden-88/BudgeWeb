@@ -600,7 +600,8 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium text-ink truncate">{r.label}</div>
                     <div className="text-[10px] text-muted">
-                      {r.category} · {new Date(r.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {r.category}{r.provider && ` · ${r.provider}`} · {new Date(r.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {r.coverAmount ? ` · ${fmt(r.coverAmount)} cover` : ''}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
