@@ -238,15 +238,16 @@ function RenewalBadge({ days }: { days: number }) {
   )
 }
 
-function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemoveItem, onRenameItem, onUpdateRenewal, onToggleShared, onUpdateInsurance }: {
+function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemoveItem, onRenameItem, onUpdateRenewal, onToggleAutoRenew, onToggleShared, onUpdateInsurance }: {
   catKey: string
-  item: { id: string; label: string; amount: number; renewalDate?: string; sharedContribution?: boolean; insuranceProvider?: string; insuranceCoverAmount?: number }
+  item: { id: string; label: string; amount: number; renewalDate?: string; autoRenews?: boolean; sharedContribution?: boolean; insuranceProvider?: string; insuranceCoverAmount?: number }
   canRenew: boolean
   canMarkShared: boolean
   onUpdateAmount: (catKey: string, itemId: string, v: number) => void
   onRemoveItem: (catKey: string, itemId: string) => void
   onRenameItem: (catKey: string, itemId: string, label: string) => void
   onUpdateRenewal: (catKey: string, itemId: string, date: string) => void
+  onToggleAutoRenew: (catKey: string, itemId: string) => void
   onToggleShared: (catKey: string, itemId: string) => void
   onUpdateInsurance: (catKey: string, itemId: string, fields: { provider?: string; coverAmount?: number }) => void
 }) {
@@ -298,6 +299,9 @@ function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemo
               </span>
               <span className="flex items-center gap-2 flex-wrap">
                 {days != null && <RenewalBadge days={days} />}
+                {item.renewalDate && item.autoRenews && (
+                  <span className="text-[10px] text-muted">Auto-renews</span>
+                )}
                 {item.sharedContribution && (
                   <span className="text-[10px] font-medium text-joint">Counts as household</span>
                 )}
@@ -347,6 +351,23 @@ function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemo
             )}
           </div>
         )}
+        {expanded && canRenew && item.renewalDate && (
+          <label className="flex items-start gap-2 pb-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!item.autoRenews}
+              onChange={() => onToggleAutoRenew(catKey, item.id)}
+              className="mt-0.5 shrink-0"
+            />
+            <span className="text-[10px] text-muted leading-snug">
+              {item.autoRenews
+                ? "Auto-renews — this date is when the price may jump, not when cover ends"
+                : isInsurance
+                  ? "Doesn't auto-renew — cover lapses on this date unless you renew it yourself"
+                  : "Doesn't auto-renew — it ends on this date unless you renew it yourself"}
+            </span>
+          </label>
+        )}
         {expanded && isInsurance && (
           <div className="flex gap-2 pb-2.5 flex-wrap">
             <div className="flex flex-col gap-0.5">
@@ -391,7 +412,7 @@ function ItemRow({ catKey, item, canRenew, canMarkShared, onUpdateAmount, onRemo
 
 // ─── category card ────────────────────────────────────────────────────────────
 
-function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem, onRenameItem, onRenameCategory, onDeleteCategory, onUpdateRenewal, onToggleShared, onUpdateInsurance }: {
+function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem, onRenameItem, onRenameCategory, onDeleteCategory, onUpdateRenewal, onToggleAutoRenew, onToggleShared, onUpdateInsurance }: {
   cat: Category; ownerName: string
   onUpdateAmount: (catKey: string, itemId: string, v: number) => void
   onAddItem: (catKey: string, label: string) => void
@@ -400,6 +421,7 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
   onRenameCategory: (catKey: string, label: string) => void
   onDeleteCategory: (catKey: string) => void
   onUpdateRenewal: (catKey: string, itemId: string, date: string) => void
+  onToggleAutoRenew: (catKey: string, itemId: string) => void
   onToggleShared: (catKey: string, itemId: string) => void
   onUpdateInsurance: (catKey: string, itemId: string, fields: { provider?: string; coverAmount?: number }) => void
 }) {
@@ -482,6 +504,7 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
                 canMarkShared={cat.type === 'EXPENSE' && cat.owner !== 'JOINT'}
                 onUpdateAmount={onUpdateAmount} onRemoveItem={onRemoveItem}
                 onRenameItem={onRenameItem} onUpdateRenewal={onUpdateRenewal}
+                onToggleAutoRenew={onToggleAutoRenew}
                 onToggleShared={onToggleShared} onUpdateInsurance={onUpdateInsurance}
               />
             ))}
@@ -518,7 +541,7 @@ function CategoryCard({ cat, ownerName, onUpdateAmount, onAddItem, onRemoveItem,
 const OWNER_ORDER: Owner[] = ['NIAMH', 'RUPERT', 'JOINT']
 
 export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budget: BudgetHook; tab: TabFilter; onNavigateToDebts: () => void }) {
-  const { data, totals, updateItemAmount, addItem, removeItem, renameItem, renameCategory, deleteCategory, addCategory, updateItemRenewal, toggleItemShared, updateItemInsurance } = budget
+  const { data, totals, updateItemAmount, addItem, removeItem, renameItem, renameCategory, deleteCategory, addCategory, updateItemRenewal, toggleItemAutoRenew, toggleItemShared, updateItemInsurance } = budget
   const [addingCat, setAddingCat] = useState(false)
   const [newCatLabel, setNewCatLabel] = useState('')
   const [newCatOwner, setNewCatOwner] = useState<Owner>('JOINT')
@@ -583,6 +606,7 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
                 onRemoveItem={removeItem} onRenameItem={renameItem}
                 onRenameCategory={renameCategory} onDeleteCategory={deleteCategory}
                 onUpdateRenewal={updateItemRenewal}
+                onToggleAutoRenew={toggleItemAutoRenew}
                 onToggleShared={toggleItemShared}
                 onUpdateInsurance={updateItemInsurance}
               />

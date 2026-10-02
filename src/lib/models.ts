@@ -11,7 +11,7 @@ export type DebtType = 'CREDIT_CARD' | 'PERSONAL_LOAN' | 'CAR_FINANCE' | 'MORTGA
  * makes the cost visible to the fairness comparison, which would otherwise
  * treat it as personal spending and understate that person's contribution.
  */
-export interface LineItem { id: string; label: string; amount: number; priority: SpendingPriority; renewalDate?: string; sharedContribution?: boolean; insuranceProvider?: string; insuranceCoverAmount?: number }
+export interface LineItem { id: string; label: string; amount: number; priority: SpendingPriority; renewalDate?: string; autoRenews?: boolean; sharedContribution?: boolean; insuranceProvider?: string; insuranceCoverAmount?: number }
 /** Detects an insurance line by its label — no separate flag to set, so the
  * extra fields just appear on anything already named as insurance. */
 export function isInsuranceItem(label: string): boolean {
@@ -212,6 +212,8 @@ export function upcomingRenewals(data: BudgetData) {
         days: daysUntil(i.renewalDate!),
         provider: i.insuranceProvider,
         coverAmount: i.insuranceCoverAmount,
+        autoRenews: i.autoRenews,
+        isInsurance: isInsuranceItem(i.label),
       })))
     .filter(r => !isNaN(r.days))
     .sort((a, b) => a.days - b.days)

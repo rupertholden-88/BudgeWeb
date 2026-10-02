@@ -249,6 +249,10 @@ export function useBudget() {
     }) }) }))
   }
 
+  const toggleItemAutoRenew = (catKey: string, itemId: string) => {
+    mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.map(i => i.id === itemId ? { ...i, autoRenews: !i.autoRenews } : i) }) }))
+  }
+
   // cache is set when there's a usable result to show; costUsd is added to the
   // running total regardless, since a refused or unparseable reply still billed.
   const recordFinancialHealthRun = (params: { cache?: FinancialHealthCache; costUsd: number }) => {
@@ -396,7 +400,7 @@ export function useBudget() {
     signIn, signOutUser, refreshFromCloud,
     updateOwnerName, updateBirthMonth, addDependant, updateDependant, removeDependant,
     addCategory, renameCategory, deleteCategory,
-    updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, updateItemInsurance, toggleItemShared, recordFinancialHealthRun,
+    updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, toggleItemAutoRenew, updateItemInsurance, toggleItemShared, recordFinancialHealthRun,
     addAsset, updateAsset, updateAssetFields, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,
