@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore'
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth'
 import { db, auth, provider } from '@/lib/firebase'
-import { BudgetData, Debt, Owner, EntryType, AssetType, Asset, DebtType, Property, defaultBudgetData, calcTotals, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
+import { BudgetData, Debt, Owner, EntryType, AssetType, Asset, DebtType, Property, defaultBudgetData, calcTotals, monthlyInterest, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
 
 function uuid() { return crypto.randomUUID() }
 
@@ -203,7 +203,7 @@ export function useBudget() {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: [...c.items, { id: uuid(), label: label.trim(), amount, priority: 'NONE' as const }] }) }))
   }
 
-  const resyncInterest = (byOwner: { owner: Owner; assets: { label: string; amount: number; interestRate?: number }[] }[]) => {
+  const resyncInterest = (byOwner: { owner: Owner; assets: Asset[] }[]) => {
     mutate(b => {
       // Remove all existing interest items
       let updated = {
@@ -217,7 +217,7 @@ export function useBudget() {
       byOwner.forEach(({ owner, assets }) => {
         const catKey = owner === 'NIAMH' ? 'inc_n' : owner === 'RUPERT' ? 'inc_r' : 'inc_joint'
         assets.forEach(a => {
-          const monthly = Math.round(a.amount * (Math.pow(1 + (a.interestRate || 0) / 100, 1 / 12) - 1))
+          const monthly = Math.round(monthlyInterest(a))
           if (monthly > 0) {
             updated = {
               ...updated,

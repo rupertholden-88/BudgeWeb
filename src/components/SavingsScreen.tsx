@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Owner, AssetType, fmt, netWorth } from '@/lib/models'
+import { Owner, Asset, AssetType, fmt, netWorth, monthlyInterest, annualInterest, blendedAer, isCapped } from '@/lib/models'
 import { Plus, TrendingUp, TrendingDown } from 'lucide-react'
 import { StatCard, ConfirmDelete, AmountCell, TapToEdit, ExpandButton, DeleteAction, Field, inputClass, useLongPress, ownerBorderClass } from './ui'
 import PropertiesSection from './PropertiesSection'
@@ -65,7 +65,7 @@ function AllocationBar({ segments }: { segments: { color: string; pct: number }[
 }
 
 function AssetRow({ asset, owner, today, updateAsset, updateAssetFields, deleteAsset, lockType }: {
-  asset: { id: string; label: string; amount: number; type: AssetType; interestRate?: number; institution?: string; monthlyContribution?: number; employerContribution?: number }
+  asset: Asset
   owner: Owner; today: string
   updateAsset: BudgetHook['updateAsset']
   updateAssetFields: BudgetHook['updateAssetFields']
@@ -74,6 +74,7 @@ function AssetRow({ asset, owner, today, updateAsset, updateAssetFields, deleteA
 }) {
   const [expanded, setExpanded] = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
+  const [showCap, setShowCap] = useState(isCapped(asset))
   const longPress = useLongPress(() => setDeleteModal(true))
 
   return (
@@ -97,11 +98,16 @@ function AssetRow({ asset, owner, today, updateAsset, updateAssetFields, deleteA
             <div className="text-caption text-muted mt-px">
               {ASSET_LABELS[asset.type] ?? asset.type}
               {asset.institution ? ` · ${asset.institution}` : ''}
-              {asset.interestRate && asset.amount > 0 ? (
+              {annualInterest(asset) > 0 ? (
                 <span className="text-positive font-semibold ml-1">
-                  {` · £${(asset.amount * (Math.pow(1 + asset.interestRate / 100, 1 / 12) - 1)).toFixed(0)}/mo (${asset.interestRate}% AER = £${((asset.amount * asset.interestRate) / 100).toFixed(0)}/yr)`}
+                  {` · £${monthlyInterest(asset).toFixed(0)}/mo (${isCapped(asset) && asset.amount > (asset.rateCap ?? 0) ? `${blendedAer(asset).toFixed(2)}% combined` : `${asset.interestRate}% AER`} = £${annualInterest(asset).toFixed(0)}/yr)`}
                 </span>
               ) : asset.interestRate ? <span>{` · ${asset.interestRate}%`}</span> : null}
+              {isCapped(asset) && asset.amount > (asset.rateCap ?? 0) && (
+                <span className="block text-expense-text">
+                  Over the £{(asset.rateCap ?? 0).toLocaleString('en-GB')} cap — new money here earns {asset.rateAboveCap || 0}%
+                </span>
+              )}
             </div>
           </div>
           <AmountCell value={asset.amount || 0} onChange={v => updateAsset(owner, today, asset.id, v, asset.interestRate, asset.institution)} />
@@ -122,7 +128,7 @@ function AssetRow({ asset, owner, today, updateAsset, updateAssetFields, deleteA
               </div>
             )}
             <div className="flex flex-col gap-0.5">
-              <label className="text-caption text-muted uppercase tracking-label">Rate %</label>
+              <label className="text-caption text-muted uppercase tracking-label">{showCap ? 'Rate % (to cap)' : 'Rate %'}</label>
               <input
                 type="number"
                 value={asset.interestRate || ''}
@@ -140,6 +146,51 @@ function AssetRow({ asset, owner, today, updateAsset, updateAssetFields, deleteA
                 className="w-[110px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none"
               />
             </div>
+            {asset.type !== 'PENSION' && (
+              <div className="w-full">
+                <label className="flex items-start gap-2 cursor-pointer min-h-[32px]">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 w-4 h-4 shrink-0"
+                    checked={showCap}
+                    onChange={e => {
+                      setShowCap(e.target.checked)
+                      if (!e.target.checked) updateAssetFields(owner, today, asset.id, { rateCap: undefined, rateAboveCap: undefined })
+                    }}
+                  />
+                  <span className="text-xs leading-snug">
+                    Rate only applies up to a limit
+                    <span className="block text-caption text-muted mt-0.5">For regular savers and capped accounts, e.g. 5.25% on the first £5,000 then 1%.</span>
+                  </span>
+                </label>
+                {showCap && (
+                  <div className="flex gap-2 flex-wrap mt-1.5">
+                    <div className="flex flex-col gap-0.5">
+                      <label className="text-caption text-muted uppercase tracking-label">Up to £</label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={asset.rateCap ?? ''}
+                        placeholder="5000"
+                        onChange={e => updateAssetFields(owner, today, asset.id, { rateCap: parseFloat(e.target.value) || undefined })}
+                        className="w-[90px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <label className="text-caption text-muted uppercase tracking-label">Then %</label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={asset.rateAboveCap ?? ''}
+                        placeholder="0"
+                        onChange={e => updateAssetFields(owner, today, asset.id, { rateAboveCap: parseFloat(e.target.value) || undefined })}
+                        className="w-[70px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {asset.type === 'PENSION' && (
               <>
                 <div className="flex flex-col gap-0.5">
@@ -377,8 +428,8 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   // Interest income
   const byOwner = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(owner => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
-    const assets = (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.interestRate && a.amount > 0 && a.type !== 'PENSION')
-    const monthly = assets.reduce((acc: number, a: any) => acc + a.amount * (Math.pow(1 + (a.interestRate || 0) / 100, 1 / 12) - 1), 0)
+    const assets = (Array.isArray(snap?.assets) ? snap!.assets : []).filter(a => a.type !== 'PENSION' && monthlyInterest(a) > 0)
+    const monthly = assets.reduce((acc, a) => acc + monthlyInterest(a), 0)
     return { owner, monthly, assets }
   }).filter(o => o.monthly > 0)
   const totalMonthly = byOwner.reduce((a, o) => a + o.monthly, 0)

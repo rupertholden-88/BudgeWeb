@@ -24,7 +24,42 @@ export interface Category { key: string; owner: Owner; type: EntryType; label: s
  * adding them to the budget as outgoings would double-count against income
  * that never included them.
  */
-export interface Asset { id: string; type: AssetType; label: string; amount: number; interestRate?: number; institution?: string; monthlyContribution?: number; employerContribution?: number }
+export interface Asset {
+  id: string; type: AssetType; label: string; amount: number; interestRate?: number; institution?: string; monthlyContribution?: number; employerContribution?: number
+  /** Capped-rate accounts (regular savers etc.): interestRate applies up to rateCap, rateAboveCap beyond it. */
+  rateCap?: number; rateAboveCap?: number
+}
+
+type InterestBearing = Pick<Asset, 'amount' | 'interestRate' | 'rateCap' | 'rateAboveCap'>
+
+/** Balance split into the portion earning the headline rate and the portion earning the above-cap rate. */
+function interestTiers(a: InterestBearing): { balance: number; aerPct: number }[] {
+  const amount = Math.max(0, a.amount || 0)
+  const rate = a.interestRate || 0
+  if (!a.rateCap || a.rateCap <= 0 || amount <= a.rateCap) return [{ balance: amount, aerPct: rate }]
+  return [
+    { balance: a.rateCap, aerPct: rate },
+    { balance: amount - a.rateCap, aerPct: a.rateAboveCap || 0 },
+  ]
+}
+
+/** Interest per month, treating each rate as an AER compounded monthly. */
+export function monthlyInterest(a: InterestBearing): number {
+  return interestTiers(a).reduce((sum, t) => sum + t.balance * (Math.pow(1 + t.aerPct / 100, 1 / 12) - 1), 0)
+}
+
+export function annualInterest(a: InterestBearing): number {
+  return interestTiers(a).reduce((sum, t) => sum + (t.balance * t.aerPct) / 100, 0)
+}
+
+/** The single rate the whole balance is effectively earning — what the bank calls a "combined" rate. */
+export function blendedAer(a: InterestBearing): number {
+  return a.amount > 0 ? (annualInterest(a) / a.amount) * 100 : (a.interestRate || 0)
+}
+
+export function isCapped(a: InterestBearing): boolean {
+  return !!a.rateCap && a.rateCap > 0
+}
 export interface SavingsSnapshot { date: string; owner: Owner; assets: Asset[] }
 export interface Debt { id: string; owner: Owner; type: DebtType; label: string; currentBalance: number; monthlyPayment: number; interestRate: number; isZeroPercent: boolean; zeroPercentExpiryDate?: string; institution?: string; sharedContribution?: boolean; propertyId?: string }
 /**

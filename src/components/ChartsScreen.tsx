@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { fmt, Owner, upcomingRenewals, monthsToClear, householdCostSplit } from '@/lib/models'
+import { fmt, Owner, upcomingRenewals, monthsToClear, householdCostSplit, monthlyInterest } from '@/lib/models'
 import { buildFinancialSummary, hashSummary } from '@/lib/financialSummary'
 import { useApiKey } from '@/hooks/useApiKey'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
@@ -432,9 +432,8 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
     const earned = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
       const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
       const assets = (Array.isArray(snap?.assets) ? snap!.assets : [])
-        .filter((a: any) => a.type !== 'PENSION' && a.interestRate && a.amount > 0)
-      return acc + assets.reduce((a: number, i: any) =>
-        a + i.amount * (Math.pow(1 + i.interestRate / 100, 1 / 12) - 1), 0)
+        .filter((a: any) => a.type !== 'PENSION')
+      return acc + assets.reduce((a: number, i: any) => a + monthlyInterest(i), 0)
     }, 0)
     const paid = data.debts.reduce((a, d) =>
       a + (d.isZeroPercent ? 0 : (d.currentBalance * d.interestRate) / 100 / 12), 0)

@@ -1,4 +1,4 @@
-import { BudgetData, Totals, Owner, daysUntil, monthsToClear, upcomingRenewals, householdCostSplit, ageInYears, ageInMonths, propertySummaries, netWorth, effectiveRate } from './models'
+import { BudgetData, Totals, Owner, daysUntil, monthsToClear, upcomingRenewals, householdCostSplit, ageInYears, ageInMonths, propertySummaries, netWorth, effectiveRate, monthlyInterest, isCapped, blendedAer } from './models'
 
 /**
  * A numbers-only snapshot of the household's finances for an AI assessment.
@@ -52,6 +52,8 @@ export interface FinancialSummary {
     /** Only pensions genuinely held jointly — usually 0. */
     pensionsJoint: number
     byType: { type: string; amount: number }[]
+    /** Accounts whose headline rate stops at a balance cap, e.g. regular savers. */
+    cappedSavings: { balance: number; capAmount: number; aerUpToCapPct: number; aerAboveCapPct: number; blendedAerPct: number }[]
     runwayMonths: number | null
   }
   /**
@@ -125,8 +127,8 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
   const earned = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
     const assets = (Array.isArray(snap?.assets) ? snap!.assets : [])
-      .filter((a: any) => a.type !== 'PENSION' && a.interestRate && a.amount > 0)
-    return acc + assets.reduce((a: number, i: any) => a + i.amount * (Math.pow(1 + i.interestRate / 100, 1 / 12) - 1), 0)
+      .filter((a: any) => a.type !== 'PENSION')
+    return acc + assets.reduce((a: number, i: any) => a + monthlyInterest(i), 0)
   }, 0)
   const paid = data.debts.reduce((a, d) => a + (d.isZeroPercent ? 0 : (d.currentBalance * d.interestRate) / 100 / 12), 0)
 
@@ -203,6 +205,18 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
       pensionsPerPerson: [pensionN, pensionR],
       pensionContributionsPerPerson: [contributionsFor('NIAMH'), contributionsFor('RUPERT')],
       pensionsJoint: pensionJoint,
+      cappedSavings: (['NIAMH', 'RUPERT', 'JOINT'] as Owner[])
+        .flatMap(owner => {
+          const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
+          return (Array.isArray(snap?.assets) ? snap!.assets : []).filter(a => a.type !== 'PENSION' && isCapped(a))
+        })
+        .map(a => ({
+          balance: Math.round(a.amount),
+          capAmount: a.rateCap!,
+          aerUpToCapPct: a.interestRate || 0,
+          aerAboveCapPct: a.rateAboveCap || 0,
+          blendedAerPct: Math.round(blendedAer(a) * 100) / 100,
+        })),
       byType: Array.from(byTypeMap.entries()).map(([type, amount]) => ({ type, amount })).filter(t => t.amount > 0),
       runwayMonths,
     },
