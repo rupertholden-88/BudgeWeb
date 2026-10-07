@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Owner, fmt, propertySummaries } from '@/lib/models'
-import { Plus, Home } from 'lucide-react'
+import { Owner, Fuel, EnergyTariff, fmt, propertySummaries, tariffAnnualCost, exitFeeFreeFrom, daysUntil, ENERGY_VAT } from '@/lib/models'
+import { Plus, Home, Zap, Flame } from 'lucide-react'
 import { AmountCell, ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, TapToEdit, inputClass, ownerBorderClass } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
@@ -18,6 +18,150 @@ function numberInput(value: number | undefined, onChange: (v: number | undefined
       onChange={e => onChange(parseFloat(e.target.value) || undefined)}
       className={`${inputClass} ${width}`}
     />
+  )
+}
+
+const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+const fmtP = (n: number) => `£${n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+function FuelTariff({ fuel, tariff, onChange }: { fuel: Fuel; tariff: EnergyTariff | undefined; onChange: (f: Partial<EnergyTariff>) => void }) {
+  const t = tariff ?? {}
+  const annual = tariffAnnualCost(t)
+  const [editing, setEditing] = useState(false)
+  const [twoRate, setTwoRate] = useState(t.nightRateP != null || t.nightUsageKwh != null)
+  const Icon = fuel === 'gas' ? Flame : Zap
+  const title = fuel === 'gas' ? 'Gas' : 'Electricity'
+  const days = t.fixedUntil ? daysUntil(t.fixedUntil) : null
+  const freeFrom = exitFeeFreeFrom(t)
+  const freeNow = freeFrom != null && daysUntil(freeFrom) <= 0
+
+  return (
+    <div className="py-2 border-t border-border first:border-t-0">
+      <div className="flex items-center gap-2">
+        <Icon size={13} className="text-muted shrink-0" />
+        <span className="text-sm font-semibold flex-1">{title}</span>
+        {annual != null && (
+          <span className="text-sm font-bold tabular-nums">{fmt(annual / 12)}<span className="text-caption text-muted font-normal">/mo</span></span>
+        )}
+        <button onClick={() => setEditing(e => !e)} className="text-xs text-muted bg-transparent border-0 cursor-pointer underline min-h-[36px] px-1">
+          {editing ? 'Done' : annual == null ? 'Add' : 'Edit'}
+        </button>
+      </div>
+      {annual == null && !editing && <div className="text-caption text-muted">Not added</div>}
+      {annual != null && (
+        <div className="text-caption text-muted leading-snug">
+          {[t.supplier, t.name].filter(Boolean).join(' · ')}
+          {(t.supplier || t.name) && <br />}
+          {fmt(annual)}/yr inc. VAT
+          {t.fixed && t.fixedUntil ? ` · fixed until ${fmtDate(t.fixedUntil)}` : t.fixed === false ? ' · variable' : ''}
+        </div>
+      )}
+      {t.fixed && days != null && (
+        days < 0
+          ? <span className="pill pill-bad mt-1">Fixed deal ended — likely on a variable rate now</span>
+          : freeNow
+            ? <span className="pill pill-warn mt-1">No exit fee now — compare and switch</span>
+            : freeFrom && <span className="pill mt-1">Exit fee waived from {fmtDate(freeFrom)}</span>
+      )}
+
+      {editing && (
+        <div className="mt-2 space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <Field label="Supplier">
+              <input value={t.supplier ?? ''} placeholder="e.g. EDF" onChange={e => onChange({ supplier: e.target.value || undefined })} className={`${inputClass} w-[120px]`} />
+            </Field>
+            <Field label="Tariff name">
+              <input value={t.name ?? ''} placeholder="optional" onChange={e => onChange({ name: e.target.value || undefined })} className={`${inputClass} w-[170px]`} />
+            </Field>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Field label={twoRate ? 'Day rate p/kWh' : 'Unit rate p/kWh'}>{numberInput(t.unitRateP, v => onChange({ unitRateP: v }), '0', 'w-[110px]')}</Field>
+            <Field label="Standing p/day">{numberInput(t.standingChargeP, v => onChange({ standingChargeP: v }), '0', 'w-[110px]')}</Field>
+            <Field label={twoRate ? 'Day usage kWh/yr' : 'Usage kWh/yr'}>{numberInput(t.annualUsageKwh, v => onChange({ annualUsageKwh: v }), '0', 'w-[110px]')}</Field>
+          </div>
+          {fuel === 'electricity' && (
+            <label className="flex items-center gap-2 cursor-pointer text-xs min-h-[32px]">
+              <input
+                type="checkbox"
+                className="w-4 h-4"
+                checked={twoRate}
+                onChange={e => {
+                  setTwoRate(e.target.checked)
+                  if (!e.target.checked) onChange({ nightRateP: undefined, nightUsageKwh: undefined })
+                }}
+              />
+              Day / night rates (Economy 7 style)
+            </label>
+          )}
+          {twoRate && (
+            <div className="flex flex-wrap gap-2">
+              <Field label="Night rate p/kWh">{numberInput(t.nightRateP, v => onChange({ nightRateP: v }), '0', 'w-[110px]')}</Field>
+              <Field label="Night usage kWh/yr">{numberInput(t.nightUsageKwh, v => onChange({ nightUsageKwh: v }), '0', 'w-[110px]')}</Field>
+            </div>
+          )}
+          <label className="flex items-center gap-2 cursor-pointer text-xs min-h-[32px]">
+            <input type="checkbox" className="w-4 h-4" checked={!!t.fixed} onChange={e => onChange({ fixed: e.target.checked })} />
+            Fixed price
+          </label>
+          {t.fixed && (
+            <div className="flex flex-wrap gap-2">
+              <Field label="Fixed until">
+                <input type="date" value={t.fixedUntil ?? ''} onChange={e => onChange({ fixedUntil: e.target.value || undefined })} className={inputClass} />
+              </Field>
+              <Field label="Exit fee £">{numberInput(t.exitFee, v => onChange({ exitFee: v }), '0', 'w-[90px]')}</Field>
+            </div>
+          )}
+          <p className="text-caption text-muted m-0 leading-snug">
+            Copy the figures from the &ldquo;About your tariff&rdquo; box on your bill. Rates there exclude VAT — {Math.round(ENERGY_VAT * 100)}% is added for you.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EnergySection({ summary, budget }: { summary: Summary; budget: BudgetHook }) {
+  const { updatePropertyEnergy, updateItemAmount } = budget
+  const p = summary.property
+  const annual = summary.energyAnnualCost
+  const monthly = annual != null ? annual / 12 : null
+  const energyItems = summary.items.filter(i => /gas|electric|energy|power/i.test(i.label))
+  const budgeted = energyItems.reduce((a, i) => a + i.amount, 0)
+  const gap = monthly != null && energyItems.length > 0 ? budgeted - monthly : null
+
+  return (
+    <PanelSection title="Energy tariff">
+      <FuelTariff fuel="electricity" tariff={p.energy?.electricity} onChange={f => updatePropertyEnergy(p.id, 'electricity', f)} />
+      <FuelTariff fuel="gas" tariff={p.energy?.gas} onChange={f => updatePropertyEnergy(p.id, 'gas', f)} />
+      {monthly != null && (
+        <div className="pt-2 mt-1 border-t border-border">
+          <div className="flex justify-between text-xs font-semibold">
+            <span>Estimated energy cost</span>
+            <span className="tabular-nums">{fmtP(monthly)}/mo · {fmt(annual!)}/yr</span>
+          </div>
+          {energyItems.length === 0 ? (
+            <p className="text-caption text-muted mt-1 mb-0 leading-snug">
+              Link this property&apos;s gas &amp; electricity bill on Budget to compare it with what you&apos;ve budgeted.
+            </p>
+          ) : gap != null && Math.abs(gap) >= 5 && (
+            <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+              <span className={`text-caption ${gap < 0 ? 'text-negative' : 'text-muted'}`}>
+                You budget {fmt(budgeted)}/mo — {gap < 0 ? `${fmt(-gap)} less than the tariff suggests` : `${fmt(gap)} more than the tariff suggests`}.
+              </span>
+              {energyItems.length === 1 && (
+                <button
+                  onClick={() => updateItemAmount(energyItems[0].catKey, energyItems[0].id, Math.round(monthly))}
+                  className="text-caption font-semibold text-accent bg-accent-light border-0 rounded-full px-2.5 min-h-[28px] cursor-pointer"
+                >
+                  Set to {fmt(monthly)}
+                </button>
+              )}
+            </div>
+          )}
+          <p className="text-caption text-muted mt-1 mb-0 leading-snug">Based on the supplier&apos;s estimated annual usage — real bills vary with the weather, so monthly Direct Debits are spread across the year.</p>
+        </div>
+      )}
+    </PanelSection>
   )
 }
 
@@ -144,6 +288,8 @@ function PropertyCard({ summary, ownerName, budget }: { summary: Summary; ownerN
                 </div>
               )}
             </PanelSection>
+
+            <EnergySection summary={summary} budget={budget} />
 
             <PanelSection title="Capital gains record">
               <p className="text-caption text-muted mt-0 mb-2 leading-snug">

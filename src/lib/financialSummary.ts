@@ -72,6 +72,9 @@ export interface FinancialSummary {
     monthlyRunningCosts: number
     costBasisRecorded: boolean
     paperGain: number | null
+    /** From the user's tariff details, inc. VAT; null if no tariff entered. */
+    energyAnnualCost: number | null
+    energy: { fuel: string; fixed: boolean; fixedDaysLeft: number | null; unitRateP: number | null; standingChargeP: number | null; annualUsageKwh: number | null }[]
   }[]
   /** Liquid + pensions + property values − all debt balances. */
   netWorth: number
@@ -155,7 +158,8 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
 
   const renewals = upcomingRenewals(data)
     .filter(r => r.days <= 120)
-    .map(r => ({ category: r.category, daysUntil: r.days, monthlyAmount: r.amount }))
+    // Energy rows carry the property's name as their category — keep it anonymous.
+    .map(r => ({ category: r.isEnergy ? 'Energy fixed deal' : r.category, daysUntil: r.days, monthlyAmount: r.amount }))
 
   const monthsOfData = new Set((data.spendHistory || []).map(s => s.date)).size
 
@@ -182,6 +186,19 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
       monthlyRunningCosts: Math.round(s.runningCosts),
       costBasisRecorded: basis != null,
       paperGain: basis != null && p.estimatedValue > 0 ? Math.round(p.estimatedValue - basis) : null,
+      energyAnnualCost: s.energyAnnualCost == null ? null : Math.round(s.energyAnnualCost),
+      energy: (['electricity', 'gas'] as const).flatMap(fuel => {
+        const t = p.energy?.[fuel]
+        if (!t || t.unitRateP == null) return []
+        return [{
+          fuel,
+          fixed: !!t.fixed,
+          fixedDaysLeft: t.fixed && t.fixedUntil ? daysUntil(t.fixedUntil) : null,
+          unitRateP: t.unitRateP ?? null,
+          standingChargeP: t.standingChargeP ?? null,
+          annualUsageKwh: (t.annualUsageKwh ?? 0) + (t.nightUsageKwh ?? 0) || null,
+        }]
+      }),
     }
   })
 

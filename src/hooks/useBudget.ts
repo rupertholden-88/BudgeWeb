@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore'
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth'
 import { db, auth, provider } from '@/lib/firebase'
-import { BudgetData, Debt, Owner, EntryType, AssetType, Asset, DebtType, Property, defaultBudgetData, calcTotals, monthlyInterest, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
+import { BudgetData, Debt, Owner, EntryType, AssetType, Asset, DebtType, Property, Fuel, EnergyTariff, defaultBudgetData, calcTotals, monthlyInterest, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
 
 function uuid() { return crypto.randomUUID() }
 
@@ -281,6 +281,16 @@ export function useBudget() {
     }))
   }
 
+  const updatePropertyEnergy = (id: string, fuel: Fuel, fields: Partial<EnergyTariff>) => {
+    mutate(b => ({
+      ...b,
+      properties: (b.properties ?? []).map(p => p.id !== id ? p : {
+        ...p,
+        energy: { ...p.energy, [fuel]: { ...p.energy?.[fuel], ...fields } },
+      }),
+    }))
+  }
+
   const deleteProperty = (id: string) => {
     mutate(b => ({
       ...b,
@@ -450,7 +460,7 @@ export function useBudget() {
     updateOwnerName, updateBirthMonth, addDependant, updateDependant, removeDependant,
     addCategory, renameCategory, deleteCategory,
     updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, toggleItemAutoRenew, updateItemInsurance, toggleItemShared, updateItemProperty, recordFinancialHealthRun,
-    updateGrossIncome, addProperty, updateProperty, deleteProperty,
+    updateGrossIncome, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,
     addAsset, updateAsset, updateAssetFields, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,

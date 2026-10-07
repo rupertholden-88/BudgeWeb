@@ -69,8 +69,45 @@ export interface Debt { id: string; owner: Owner; type: DebtType; label: string;
  * cost basis for anything that isn't the main residence — far easier to
  * record now than to reconstruct at sale.
  */
+/**
+ * One fuel's tariff as printed on the bill. Rates are in pence and exclude
+ * VAT, matching how suppliers' "About your tariff" boxes quote them.
+ */
+export interface EnergyTariff {
+  supplier?: string; name?: string; fixed?: boolean
+  unitRateP?: number; standingChargeP?: number; annualUsageKwh?: number
+  /** Two-rate (Economy 7 style) meters: unitRateP/annualUsageKwh are then the day figures. */
+  nightRateP?: number; nightUsageKwh?: number
+  /** YYYY-MM-DD the fixed price ends. */
+  fixedUntil?: string; exitFee?: number
+}
+export type Fuel = 'electricity' | 'gas'
+
+/** Domestic energy is VAT'd at the reduced 5% rate. */
+export const ENERGY_VAT = 0.05
+
+/** Ofgem bars exit fees in the last 49 days of a fixed deal. */
+export const EXIT_FEE_FREE_DAYS = 49
+
+export function tariffAnnualCost(t: EnergyTariff | undefined): number | null {
+  if (!t || t.unitRateP == null || t.standingChargeP == null || !t.annualUsageKwh) return null
+  const night = (t.nightRateP ?? 0) * (t.nightUsageKwh ?? 0)
+  const exVat = (t.annualUsageKwh * t.unitRateP + night + 365 * t.standingChargeP) / 100
+  return exVat * (1 + ENERGY_VAT)
+}
+
+/** First day switching away is free of exit fees. */
+export function exitFeeFreeFrom(t: EnergyTariff | undefined): string | null {
+  if (!t?.fixedUntil) return null
+  const d = new Date(t.fixedUntil)
+  if (isNaN(d.getTime())) return null
+  d.setDate(d.getDate() - EXIT_FEE_FREE_DAYS)
+  return d.toISOString().slice(0, 10)
+}
+
 export interface Property {
   id: string; label: string; owner: Owner; estimatedValue: number
+  energy?: Partial<Record<Fuel, EnergyTariff>>
   isMainResidence?: boolean; isLet?: boolean; monthlyRent?: number
   purchasePrice?: number; purchaseDate?: string; stampDutyPaid?: number; improvementCosts?: number
 }
@@ -191,13 +228,17 @@ export function propertySummaries(data: BudgetData) {
     const debts = data.debts.filter(d => d.propertyId === p.id)
     const items = data.categories
       .filter(c => c.type === 'EXPENSE')
-      .flatMap(c => c.items.filter(i => i.propertyId === p.id).map(i => ({ ...i, category: c.label, owner: c.owner })))
+      .flatMap(c => c.items.filter(i => i.propertyId === p.id).map(i => ({ ...i, category: c.label, catKey: c.key, owner: c.owner })))
     const mortgageBalance = debts.reduce((a, d) => a + d.currentBalance, 0)
     const mortgagePayment = debts.reduce((a, d) => a + d.monthlyPayment, 0)
     const runningCosts = items.reduce((a, i) => a + i.amount, 0)
+    const energyAnnual = (['electricity', 'gas'] as Fuel[])
+      .map(f => tariffAnnualCost(p.energy?.[f]))
+      .filter((c): c is number => c != null)
+    const energyAnnualCost = energyAnnual.length > 0 ? energyAnnual.reduce((a, c) => a + c, 0) : null
     return {
       property: p, debts, items,
-      mortgageBalance, mortgagePayment, runningCosts,
+      mortgageBalance, mortgagePayment, runningCosts, energyAnnualCost,
       monthlyTotal: mortgagePayment + runningCosts,
       equity: p.estimatedValue - mortgageBalance,
       ltvPct: p.estimatedValue > 0 ? (mortgageBalance / p.estimatedValue) * 100 : null,
@@ -282,8 +323,28 @@ export function daysUntil(dateStr: string): number {
   return Math.round((target.getTime() - startOfToday.getTime()) / 86400000)
 }
 
-/** Every expense line carrying a renewal date, soonest first. */
+/** Every expense line carrying a renewal date, plus fixed energy deals ending, soonest first. */
 export function upcomingRenewals(data: BudgetData) {
+  const energy = (data.properties ?? []).flatMap(p => (['electricity', 'gas'] as Fuel[]).flatMap(fuel => {
+    const t = p.energy?.[fuel]
+    if (!t?.fixed || !t.fixedUntil) return []
+    const annual = tariffAnnualCost(t)
+    return [{
+      id: `${p.id}:${fuel}`,
+      label: `${fuel === 'gas' ? 'Gas' : 'Electricity'} fixed deal ends`,
+      amount: annual != null ? Math.round(annual / 12) : 0,
+      category: p.label,
+      owner: p.owner,
+      date: t.fixedUntil,
+      days: daysUntil(t.fixedUntil),
+      provider: t.supplier,
+      coverAmount: undefined as number | undefined,
+      autoRenews: undefined as boolean | undefined,
+      isInsurance: false,
+      isEnergy: true,
+      exitFeeFreeFrom: exitFeeFreeFrom(t),
+    }]
+  }))
   return data.categories
     .filter(c => c.type === 'EXPENSE')
     .flatMap(c => c.items
@@ -300,7 +361,10 @@ export function upcomingRenewals(data: BudgetData) {
         coverAmount: i.insuranceCoverAmount,
         autoRenews: i.autoRenews,
         isInsurance: isInsuranceItem(i.label),
+        isEnergy: false,
+        exitFeeFreeFrom: null as string | null,
       })))
+    .concat(energy)
     .filter(r => !isNaN(r.days))
     .sort((a, b) => a.days - b.days)
 }

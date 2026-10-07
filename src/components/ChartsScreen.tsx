@@ -588,7 +588,11 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
                       {r.category}{r.provider && ` · ${r.provider}`} · {new Date(r.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                       {r.coverAmount ? ` · ${fmt(r.coverAmount)} cover` : ''}
                     </div>
-                    {r.autoRenews
+                    {r.isEnergy
+                      ? <span className="pill pill-warn mt-0.5">
+                          Rolls onto a variable rate{r.exitFeeFreeFrom ? ` · no exit fee from ${new Date(r.exitFeeFreeFrom).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}
+                        </span>
+                      : r.autoRenews
                       ? <span className="pill mt-0.5">Auto-renews — check the new price</span>
                       : r.isInsurance && r.days <= 60
                         ? <span className="pill pill-warn mt-0.5">Not set to auto-renew — check cover continues</span>
