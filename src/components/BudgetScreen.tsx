@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Category, LineItem, TabFilter, Owner, EntryType, Property, fmt, calcTotals, daysUntil, isInsuranceItem, monthsToClear, effectiveRate, propertySummaries } from '@/lib/models'
+import { Category, LineItem, TabFilter, Owner, EntryType, Property, fmt, calcTotals, daysUntil, isInsuranceItem, debtPayoff, propertySummaries } from '@/lib/models'
 import { Plus, Check, TrendingUp, TrendingDown, SlidersHorizontal, Home } from 'lucide-react'
-import { AmountCell, ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, inputClass, useLongPress, ownerBorderClass, ownerTextClass } from './ui'
+import { AmountCell, ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, NumberInput, inputClass, useLongPress, ownerBorderClass, ownerTextClass } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -53,8 +53,9 @@ function AllocationBar({ inc, exp, sav }: { inc: number; exp: number; sav: numbe
 
 // ─── budget overview ──────────────────────────────────────────────────────────
 
-function BudgetOverview({ totals }: { totals: ReturnType<typeof calcTotals> }) {
-  const { totalInc, totalExp, totalSav, net } = totals
+function BudgetOverview({ heading, inc: totalInc, exp: totalExp, sav: totalSav, net, note }: {
+  heading: string; inc: number; exp: number; sav: number; net: number; note?: string
+}) {
   const isHealthy = net >= 0
   if (totalInc === 0 && totalExp === 0) return null
 
@@ -62,9 +63,7 @@ function BudgetOverview({ totals }: { totals: ReturnType<typeof calcTotals> }) {
     <div className="card mb-4 overflow-hidden">
       <div className={`h-1 w-full ${isHealthy ? 'bg-positive' : 'bg-negative'}`} />
       <div className="p-4">
-        <div className="section-label text-caption mb-1">
-          {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
-        </div>
+        <div className="section-label text-caption mb-1">{heading}</div>
         <div className="flex items-end justify-between gap-2">
           <div>
             <div className="text-label text-muted mb-0.5">Total income</div>
@@ -76,6 +75,7 @@ function BudgetOverview({ totals }: { totals: ReturnType<typeof calcTotals> }) {
           </div>
         </div>
         <AllocationBar inc={totalInc} exp={totalExp} sav={totalSav} />
+        {note && <p className="text-caption text-muted mt-2 mb-0 leading-snug">{note}</p>}
         <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-border">
           {[
             { label: 'Expenses', value: totalExp, cls: 'text-expense-text' },
@@ -85,6 +85,42 @@ function BudgetOverview({ totals }: { totals: ReturnType<typeof calcTotals> }) {
             <div key={label} className="text-center">
               <div className="text-caption text-muted mb-0.5">{label}</div>
               <div className={`text-sm font-bold tabular-nums ${cls}`}>{fmt(value)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── joint pot (joint filter) ─────────────────────────────────────────────────
+
+function JointOverview({ name, exp, sav, debt }: { name: string; exp: number; sav: number; debt: number }) {
+  const total = exp + sav + debt
+  if (total === 0) return null
+  return (
+    <div className="card mb-4 overflow-hidden border-l-[3px] border-l-joint">
+      <div className="p-4">
+        <div className="section-label text-caption mb-1">{name} · {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</div>
+        <div className="flex items-end justify-between gap-2">
+          <div>
+            <div className="text-label text-muted mb-0.5">Paid from the joint pot</div>
+            <div className="font-serif text-3xl font-bold text-ink tabular-nums leading-none">{fmt(total)}<span className="text-sm text-muted font-sans font-normal">/mo</span></div>
+          </div>
+          <div className="text-right">
+            <div className="text-label text-muted mb-0.5">Each of you</div>
+            <div className="font-serif text-xl font-bold tabular-nums leading-none">{fmt(total / 2)}</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-border">
+          {[
+            { label: 'Expenses', value: exp, cls: 'text-expense-text' },
+            { label: 'Debts', value: debt, cls: 'text-expense-text' },
+            { label: 'Savings', value: sav, cls: 'text-savings-text' },
+          ].map(({ label, value, cls }) => (
+            <div key={label} className="text-center">
+              <div className="text-caption text-muted mb-0.5">{label}</div>
+              <div className={`text-sm font-bold tabular-nums ${value > 0 ? cls : 'text-muted'}`}>{value > 0 ? fmt(value) : '—'}</div>
             </div>
           ))}
         </div>
@@ -330,12 +366,9 @@ function ItemRow({ cat, item, properties, budget }: {
                     />
                   </Field>
                   <Field label="Cover £">
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      value={item.insuranceCoverAmount ?? ''}
-                      placeholder="0"
-                      onChange={e => updateItemInsurance(cat.key, item.id, { coverAmount: parseFloat(e.target.value) || undefined })}
+                    <NumberInput
+                      value={item.insuranceCoverAmount}
+                      onChange={v => updateItemInsurance(cat.key, item.id, { coverAmount: v })}
                       className={`${inputClass} w-[110px]`}
                     />
                   </Field>
@@ -458,6 +491,7 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
   const [newCatType, setNewCatType] = useState<EntryType>('EXPENSE')
 
   const properties = data.properties ?? []
+  const monthLabel = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
   const propertyId = tab.startsWith('property:') ? tab.slice('property:'.length) : null
   const propertySummary = propertyId ? propertySummaries(data).find(s => s.property.id === propertyId) ?? null : null
 
@@ -484,7 +518,24 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
 
   return (
     <div className="h-full overflow-y-auto p-4">
-      {propertySummary ? <PropertyRollup summary={propertySummary} /> : <BudgetOverview totals={totals} />}
+      {propertySummary ? <PropertyRollup summary={propertySummary} />
+        : tab === 'JOINT' ? <JointOverview name={ownerName('JOINT')} exp={totals.expJoint} sav={totals.savJoint} debt={totals.debtJoint} />
+        : tab === 'NIAMH' || tab === 'RUPERT' ? (() => {
+            // A person's own month: their income, their own spending, and their half of the joint pot.
+            const n = tab === 'NIAMH'
+            const halfJoint = totals.halfJointExp + totals.halfJointDebt
+            return (
+              <BudgetOverview
+                heading={`${ownerName(tab)} · ${monthLabel}`}
+                inc={n ? totals.incN : totals.incR}
+                exp={(n ? totals.expN + totals.debtN : totals.expR + totals.debtR) + halfJoint}
+                sav={(n ? totals.savN : totals.savR) + totals.halfJointSav}
+                net={n ? totals.netN : totals.netR}
+                note={`Includes half of the joint pot (${fmt(halfJoint + totals.halfJointSav)}).`}
+              />
+            )
+          })()
+        : <BudgetOverview heading={monthLabel} inc={totals.totalInc} exp={totals.totalExp} sav={totals.totalSav} net={totals.net} />}
 
       {tab === 'ALL' && (totals.incN > 0 || totals.incR > 0) && (
         <div className="grid grid-cols-2 gap-2 mb-1">
@@ -532,7 +583,7 @@ export default function BudgetScreen({ budget, tab, onNavigateToDebts }: { budge
             </span>
           </div>
           {visibleDebts.map(d => {
-            const months = d.currentBalance > 0 ? monthsToClear(d.currentBalance, d.monthlyPayment, effectiveRate(d)) : null
+            const months = d.currentBalance > 0 ? debtPayoff(d).months : null
             const property = properties.find(p => p.id === d.propertyId)
             return (
               <div key={d.id} className={`card mb-2 ${ownerBorderClass(d.owner)} fade-up`}>

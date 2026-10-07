@@ -5,22 +5,13 @@ import { Owner, Fuel, EnergyTariff, TariffOption, fmt, propertySummaries, tariff
 import type { TariffSearchRequest } from '@/app/api/energy-tariffs/route'
 import { useApiKey } from '@/hooks/useApiKey'
 import { Plus, Home, Zap, Flame, Search, ExternalLink, KeyRound } from 'lucide-react'
-import { AmountCell, ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, TapToEdit, inputClass, ownerBorderClass } from './ui'
+import { AmountCell, ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, TapToEdit, NumberInput, inputClass, ownerBorderClass } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 type Summary = ReturnType<typeof propertySummaries>[number]
 
 function numberInput(value: number | undefined, onChange: (v: number | undefined) => void, placeholder = '0', width = 'w-[120px]') {
-  return (
-    <input
-      type="number"
-      inputMode="decimal"
-      value={value ?? ''}
-      placeholder={placeholder}
-      onChange={e => onChange(parseFloat(e.target.value) || undefined)}
-      className={`${inputClass} ${width}`}
-    />
-  )
+  return <NumberInput value={value} onChange={onChange} placeholder={placeholder} className={`${inputClass} ${width}`} />
 }
 
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })

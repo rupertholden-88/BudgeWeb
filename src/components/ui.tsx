@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, ReactNode } from 'react'
+import { useState, useRef, useEffect, ReactNode } from 'react'
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import { fmt, Owner } from '@/lib/models'
 
@@ -180,8 +180,12 @@ export const inputClass = 'text-sm border-[1.5px] border-border rounded-lg px-2 
 /** Long press as a shortcut only — every delete also has a visible button. */
 export function useLongPress(onLongPress: () => void, disabled = false) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const start = () => {
+  const start = (e: React.SyntheticEvent) => {
     if (disabled) return
+    // Pressing and holding inside a field (to paste, select text…) or on a
+    // control must never turn into a delete prompt.
+    const target = e.target as HTMLElement | null
+    if (target?.closest('input, select, textarea, button, a, label, [role="button"]')) return
     timer.current = setTimeout(() => { navigator.vibrate?.(50); onLongPress() }, 600)
   }
   const cancel = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null } }
@@ -189,4 +193,41 @@ export function useLongPress(onLongPress: () => void, disabled = false) {
     onMouseDown: start, onMouseUp: cancel, onMouseLeave: cancel,
     onTouchStart: start, onTouchEnd: cancel, onTouchMove: cancel, onTouchCancel: cancel,
   }
+}
+
+/**
+ * Number field that keeps exactly what was typed ("0.", ".5", "0") while
+ * reporting the parsed value as you go — a plain `parseFloat(v) || x`
+ * swallows zeros and mangles half-typed decimals.
+ */
+export function NumberInput({ value, onChange, placeholder = '0', className, ariaLabel }: {
+  value: number | null | undefined
+  onChange: (v: number | undefined) => void
+  placeholder?: string
+  className?: string
+  ariaLabel?: string
+}) {
+  const show = (v: number | null | undefined) => (v == null || Number.isNaN(v) ? '' : String(v))
+  const [draft, setDraft] = useState(show(value))
+  const focused = useRef(false)
+  useEffect(() => { if (!focused.current) setDraft(show(value)) }, [value])
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={draft}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      onFocus={() => { focused.current = true }}
+      onBlur={() => { focused.current = false; setDraft(show(value)) }}
+      onChange={e => {
+        const raw = e.target.value.replace(/[£,\s%]/g, '')
+        if (!/^\d*\.?\d*$/.test(raw)) return
+        setDraft(raw)
+        if (raw === '' || raw === '.') onChange(undefined)
+        else { const n = parseFloat(raw); if (Number.isFinite(n)) onChange(n) }
+      }}
+      className={className ?? inputClass}
+    />
+  )
 }

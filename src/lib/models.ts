@@ -337,6 +337,42 @@ export function monthsToClear(balance: number, payment: number, annualRate: numb
   return Math.ceil(-Math.log(1 - (balance * r) / payment) / Math.log(1 + r))
 }
 
+export function isMortgage(d: Debt): boolean {
+  return d.type === 'MORTGAGE'
+}
+
+/**
+ * Month-by-month payoff, so a 0% deal correctly switches to its follow-on
+ * rate when it ends. `months` is null when the payment never clears the
+ * balance (it doesn't cover the interest). `interestAfterZeroEnds` is the
+ * balance still owed when a 0% period ends, if any.
+ */
+export function debtPayoff(d: Debt): { months: number | null; interest: number; balanceWhenZeroEnds: number | null } {
+  let balance = d.currentBalance
+  if (balance <= 0) return { months: 0, interest: 0, balanceWhenZeroEnds: null }
+  const payment = d.monthlyPayment
+  if (payment <= 0) return { months: null, interest: 0, balanceWhenZeroEnds: null }
+  const followOnRate = (Number(d.interestRate) || 0) / 100 / 12
+  let zeroMonths = 0
+  if (d.isZeroPercent) {
+    const days = d.zeroPercentExpiryDate ? daysUntil(d.zeroPercentExpiryDate.length === 7 ? `${d.zeroPercentExpiryDate}-01` : d.zeroPercentExpiryDate) : NaN
+    // No end date recorded: treat it as 0% throughout rather than guess.
+    zeroMonths = isNaN(days) ? Infinity : Math.max(0, Math.floor(days / 30.44))
+  }
+  let interest = 0
+  let balanceWhenZeroEnds: number | null = null
+  for (let m = 1; m <= 1200; m++) {
+    const r = m <= zeroMonths ? 0 : followOnRate
+    if (m === zeroMonths + 1 && d.isZeroPercent && zeroMonths !== Infinity) balanceWhenZeroEnds = balance
+    const monthInterest = balance * r
+    if (r > 0 && payment <= monthInterest) return { months: null, interest, balanceWhenZeroEnds }
+    interest += monthInterest
+    balance = balance + monthInterest - payment
+    if (balance <= 0.005) return { months: m, interest, balanceWhenZeroEnds }
+  }
+  return { months: null, interest, balanceWhenZeroEnds }
+}
+
 /** Whole months since a YYYY-MM birth month, or null if unset/malformed. */
 export function ageInMonths(born: string | undefined): number | null {
   if (!born) return null

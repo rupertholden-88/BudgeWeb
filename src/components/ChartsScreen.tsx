@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { fmt, Owner, upcomingRenewals, monthsToClear, householdCostSplit, monthlyInterest, energySwitchReminders } from '@/lib/models'
+import { fmt, Owner, Debt, upcomingRenewals, householdCostSplit, monthlyInterest, energySwitchReminders, debtPayoff, isMortgage } from '@/lib/models'
 import { buildFinancialSummary, hashSummary } from '@/lib/financialSummary'
 import { useApiKey } from '@/hooks/useApiKey'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
@@ -388,22 +388,25 @@ export default function ChartsScreen({ budget, onOpenProperty }: { budget: Budge
   const runway = monthlyOutgoings > 0 ? liquidAssets / monthlyOutgoings : null
 
   // ── Debt payoff ───────────────────────────────────────────────────────────
+  // Mortgages are kept apart: a 25-year home loan isn't "debt to clear", and
+  // mixing it in buries the consumer debt that actually needs attention.
   const debtAnalysis = useMemo(() => {
+    const byMonths = (a: { months: number | null }, b: { months: number | null }) => (b.months ?? 9999) - (a.months ?? 9999)
     const rows = data.debts
       .filter(d => d.currentBalance > 0)
       .map(d => {
-        const effectiveRate = d.isZeroPercent ? 0 : d.interestRate
-        const months = monthsToClear(d.currentBalance, d.monthlyPayment, effectiveRate)
-        const totalPaid = months != null ? d.monthlyPayment * months : null
-        const interest = totalPaid != null ? Math.max(0, totalPaid - d.currentBalance) : null
+        const p = debtPayoff(d)
         const naive = d.monthlyPayment > 0 ? Math.ceil(d.currentBalance / d.monthlyPayment) : null
-        return { debt: d, months, interest, naive }
+        return { debt: d, months: p.months, interest: p.months == null ? null : p.interest, naive }
       })
-      .sort((a, b) => (b.months ?? 9999) - (a.months ?? 9999))
-    const longest = rows.reduce((max, r) => Math.max(max, r.months ?? 0), 0)
-    const stalled = rows.some(r => r.months == null)
-    const totalInterest = rows.reduce((a, r) => a + (r.interest ?? 0), 0)
-    return { rows, longest, stalled, totalInterest }
+    const consumer = rows.filter(r => !isMortgage(r.debt)).sort(byMonths)
+    const mortgages = rows.filter(r => isMortgage(r.debt)).sort(byMonths)
+    const longest = consumer.reduce((max, r) => Math.max(max, r.months ?? 0), 0)
+    const longestMortgage = mortgages.reduce((max, r) => Math.max(max, r.months ?? 0), 0)
+    const stalled = consumer.some(r => r.months == null)
+    const totalInterest = consumer.reduce((a, r) => a + (r.interest ?? 0), 0)
+    const mortgageInterest = mortgages.reduce((a, r) => a + (r.interest ?? 0), 0)
+    return { consumer, mortgages, longest, longestMortgage, stalled, totalInterest, mortgageInterest }
   }, [data.debts])
 
   // ── 0% expiries ───────────────────────────────────────────────────────────
@@ -435,9 +438,10 @@ export default function ChartsScreen({ budget, onOpenProperty }: { budget: Budge
         .filter((a: any) => a.type !== 'PENSION')
       return acc + assets.reduce((a: number, i: any) => a + monthlyInterest(i), 0)
     }, 0)
-    const paid = data.debts.reduce((a, d) =>
-      a + (d.isZeroPercent ? 0 : (d.currentBalance * d.interestRate) / 100 / 12), 0)
-    return { earned, paid, net: earned - paid }
+    const monthly = (d: Debt) => d.isZeroPercent ? 0 : (d.currentBalance * d.interestRate) / 100 / 12
+    const paid = data.debts.filter(d => !isMortgage(d)).reduce((a, d) => a + monthly(d), 0)
+    const mortgagePaid = data.debts.filter(isMortgage).reduce((a, d) => a + monthly(d), 0)
+    return { earned, paid, mortgagePaid, net: earned - paid }
   }, [data.savingsHistory, data.debts, today])
 
   // ── Fair share ────────────────────────────────────────────────────────────
@@ -473,13 +477,17 @@ export default function ChartsScreen({ budget, onOpenProperty }: { budget: Budge
 
   const hasHistory = monthlyData.length > 1
 
-  const expenseBreakdown = useMemo(() =>
-    data.categories
+  // Debt repayments are part of total expenses, so they get a row too —
+  // otherwise the percentages can't add up to 100.
+  const expenseBreakdown = useMemo(() => {
+    const ownerName = (o: Owner) => o === 'NIAMH' ? n1 : o === 'RUPERT' ? n2 : null
+    const rows = data.categories
       .filter(c => c.type === 'EXPENSE')
-      .map(c => ({ name: c.label, amount: c.items.reduce((a, i) => a + i.amount, 0) }))
-      .filter(c => c.amount > 0)
-      .sort((a, b) => b.amount - a.amount)
-  , [data.categories])
+      .map(c => ({ name: ownerName(c.owner) ? `${c.label} · ${ownerName(c.owner)}` : c.label, amount: c.items.reduce((a, i) => a + i.amount, 0) }))
+    const debtPayments = data.debts.reduce((a, d) => a + d.monthlyPayment, 0)
+    if (debtPayments > 0) rows.push({ name: data.debts.some(isMortgage) ? 'Mortgage & debt payments' : 'Debt payments', amount: debtPayments })
+    return rows.filter(c => c.amount > 0).sort((a, b) => b.amount - a.amount)
+  }, [data.categories, data.debts, n1, n2])
 
   const savingsRate = totals.totalInc > 0 ? Math.round((totals.totalSav / totals.totalInc) * 100) : 0
 
@@ -511,7 +519,7 @@ export default function ChartsScreen({ budget, onOpenProperty }: { budget: Budge
         <StatCard
           label="Net interest"
           value={`${interestPosition.net >= 0 ? '+' : ''}${fmt(interestPosition.net)}`}
-          sub="per month"
+          sub={interestPosition.mortgagePaid > 0 ? 'per month, excl. mortgages' : 'per month'}
           intent={interestPosition.net >= 0 ? 'positive' : 'negative'}
         />
         <StatCard
@@ -760,7 +768,7 @@ export default function ChartsScreen({ budget, onOpenProperty }: { budget: Budge
       )}
 
       {/* Net interest position */}
-      {(interestPosition.earned > 0 || interestPosition.paid > 0) && (
+      {(interestPosition.earned > 0 || interestPosition.paid > 0 || interestPosition.mortgagePaid > 0) && (
         <SectionCard
           title="Interest position"
           sub="What your savings earn against what your debts cost"
@@ -768,13 +776,13 @@ export default function ChartsScreen({ budget, onOpenProperty }: { budget: Budge
         >
           <div className="flex items-center gap-3">
             <div className="flex-1">
-              <div className="text-caption text-muted mb-0.5">Earning</div>
+              <div className="text-caption text-muted mb-0.5">Savings earn</div>
               <div className="text-base font-bold tabular-nums text-positive">{fmt(interestPosition.earned)}</div>
             </div>
             <div className="hairline-v" />
             <div className="flex-1">
-              <div className="text-caption text-muted mb-0.5">Paying</div>
-              <div className="text-base font-bold tabular-nums text-negative">{fmt(interestPosition.paid)}</div>
+              <div className="text-caption text-muted mb-0.5">Debts cost</div>
+              <div className={`text-base font-bold tabular-nums ${interestPosition.paid > 0 ? 'text-negative' : 'text-muted'}`}>{fmt(interestPosition.paid)}</div>
             </div>
             <div className="hairline-v" />
             <div className="flex-1">
@@ -784,52 +792,71 @@ export default function ChartsScreen({ budget, onOpenProperty }: { budget: Budge
               </div>
             </div>
           </div>
-          <p className="text-label text-muted mt-3 pt-3 border-t border-border mb-0">
+          <p className="text-label text-muted mt-3 pt-3 border-t border-border mb-0 leading-snug">
             {interestPosition.paid > interestPosition.earned
-              ? `Your debts cost more than your savings earn — overpaying debt beats holding cash by ${fmt(interestPosition.paid - interestPosition.earned)}/mo.`
-              : `Your savings out-earn your debt costs by ${fmt(interestPosition.net)}/mo — ${fmt(interestPosition.net * 12)} a year.`}
+              ? runway != null && runway >= 3
+                ? `Your debts cost ${fmt(interestPosition.paid)}/mo in interest, more than your savings earn. With ${runway.toFixed(1)} months of cover in the bank, putting spare cash towards the highest-rate debt is likely the better use of it.`
+                : `Your debts cost ${fmt(interestPosition.paid)}/mo in interest, more than your savings earn — but keep at least 3 months of outgoings as an emergency fund before using savings to pay debt down.`
+              : interestPosition.paid > 0
+                ? `Your savings out-earn your debt costs by ${fmt(interestPosition.net)}/mo — ${fmt(interestPosition.net * 12)} a year.`
+                : `Your savings earn ${fmt(interestPosition.earned)}/mo — ${fmt(interestPosition.earned * 12)} a year.`}
           </p>
+          {interestPosition.mortgagePaid > 0 && (
+            <p className="text-label text-muted mt-2 mb-0 leading-snug">
+              Mortgage interest of about {fmt(interestPosition.mortgagePaid)}/mo isn&apos;t included above — a home loan is long-term borrowing, not something to clear from savings.
+            </p>
+          )}
         </SectionCard>
       )}
 
       {/* Debt payoff */}
-      {debtAnalysis.rows.length > 0 && (
+      {(debtAnalysis.consumer.length > 0 || debtAnalysis.mortgages.length > 0) && (
         <SectionCard
           title="Debt payoff"
-          sub={debtAnalysis.stalled
-            ? 'One payment is too small to clear its interest'
-            : `Debt free ${addMonths(debtAnalysis.longest)} at current payments`}
+          sub={debtAnalysis.consumer.length === 0
+            ? 'No debts other than mortgages'
+            : debtAnalysis.stalled
+              ? 'One payment is too small to clear its interest'
+              : `Debt free ${addMonths(debtAnalysis.longest)} at current payments${debtAnalysis.mortgages.length > 0 ? ', excluding mortgages' : ''}`}
         >
-          <div className="space-y-3">
-            {debtAnalysis.rows.map(({ debt, months, interest, naive }) => (
-              <div key={debt.id}>
-                <div className="flex justify-between items-baseline mb-1">
-                  <span className="text-body font-medium text-ink truncate pr-2">{debt.label}</span>
-                  <span className="text-xs tabular-nums text-muted shrink-0">
-                    {months == null
-                      ? <span className="text-negative font-semibold">never at this rate</span>
-                      : <>{months} mo · <span className="text-ink font-semibold">{addMonths(months)}</span></>
-                    }
-                  </span>
-                </div>
-                <div className="h-[6px] bg-surface rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${debt.isZeroPercent ? 'bg-savings-text' : 'bg-expense-text'}`}
-                    style={{ width: `${months == null ? 100 : Math.min(100, (months / Math.max(1, debtAnalysis.longest)) * 100)}%` }}
-                  />
-                </div>
-                <div className="text-caption text-muted mt-1">
-                  {fmt(debt.currentBalance)} at {debt.isZeroPercent ? '0%' : `${debt.interestRate}%`}
-                  {interest != null && interest > 0 && ` · ${fmt(interest)} interest to come`}
-                  {naive != null && months != null && months > naive &&
-                    ` · ${months - naive} mo longer than the balance suggests`}
-                </div>
+          {[
+            { rows: debtAnalysis.consumer, longest: debtAnalysis.longest, heading: null as string | null },
+            { rows: debtAnalysis.mortgages, longest: debtAnalysis.longestMortgage, heading: debtAnalysis.mortgages.length > 0 ? 'Mortgages' : null },
+          ].filter(g => g.rows.length > 0).map((group, gi) => (
+            <div key={gi} className={gi > 0 ? 'mt-4 pt-3 border-t border-border' : ''}>
+              {group.heading && <div className="section-label text-caption mb-2">{group.heading}</div>}
+              <div className="space-y-3">
+                {group.rows.map(({ debt, months, interest, naive }) => (
+                  <div key={debt.id}>
+                    <div className="flex justify-between items-baseline mb-1">
+                      <span className="text-body font-medium text-ink truncate pr-2">{debt.label}</span>
+                      <span className="text-xs tabular-nums text-muted shrink-0">
+                        {months == null
+                          ? <span className="text-negative font-semibold">never at this rate</span>
+                          : <>{months} mo · <span className="text-ink font-semibold">{addMonths(months)}</span></>
+                        }
+                      </span>
+                    </div>
+                    <div className="h-[6px] bg-surface rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${isMortgage(debt) ? 'bg-muted' : debt.isZeroPercent ? 'bg-savings-text' : 'bg-expense-text'}`}
+                        style={{ width: `${months == null ? 100 : Math.min(100, (months / Math.max(1, group.longest)) * 100)}%` }}
+                      />
+                    </div>
+                    <div className="text-caption text-muted mt-1">
+                      {fmt(debt.currentBalance)} at {debt.isZeroPercent ? `0%${debt.interestRate ? `, then ${debt.interestRate}%` : ''}` : `${debt.interestRate}%`}
+                      {interest != null && interest >= 1 && ` · ${fmt(interest)} interest to come`}
+                      {!isMortgage(debt) && naive != null && months != null && months > naive &&
+                        ` · ${months - naive} mo longer than the balance suggests`}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          {debtAnalysis.totalInterest > 0 && (
+            </div>
+          ))}
+          {debtAnalysis.totalInterest >= 1 && (
             <div className="flex justify-between text-xs pt-3 mt-3 border-t border-border">
-              <span className="text-muted font-medium">Interest still to pay</span>
+              <span className="text-muted font-medium">Interest still to pay{debtAnalysis.mortgages.length > 0 ? ', excl. mortgages' : ''}</span>
               <span className="tabular-nums font-bold text-negative">{fmt(debtAnalysis.totalInterest)}</span>
             </div>
           )}
@@ -851,7 +878,7 @@ export default function ChartsScreen({ budget, onOpenProperty }: { budget: Budge
                   <stop offset="95%" stopColor="var(--expense-text)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" padding={{ left: 14, right: 14 }} />
               <YAxis hide />
               <Tooltip content={<ChartTooltip />} />
               <Area type="monotone" dataKey="Income" name="Income"
@@ -873,7 +900,7 @@ export default function ChartsScreen({ budget, onOpenProperty }: { budget: Budge
 
       {/* Spending breakdown */}
       {expenseBreakdown.length > 0 && (
-        <SectionCard title="Where it goes" sub="This month's expenses, largest first">
+        <SectionCard title="Where it goes" sub="This month's outgoings, largest first">
           <div className="space-y-3">
             {expenseBreakdown.map((cat, i) => {
               const pct = totals.totalExp > 0 ? (cat.amount / totals.totalExp) * 100 : 0

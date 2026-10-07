@@ -454,6 +454,22 @@ export function useBudget() {
     })
   }, [data.categories, data.debts]) // eslint-disable-line
 
+  // Carry last month's balances into a new month as soon as the app has loaded,
+  // not only when Assets is opened — otherwise on the 1st, Analysis, net worth
+  // and the health check all read the new month as zero savings. Waits for the
+  // cloud copy so it never stamps a stale local copy as newer. Once per month
+  // per session, so "These are last month's figures" can still clear the month.
+  const rolledForMonth = useRef<string | null>(null)
+  useEffect(() => {
+    if (authLoading || cloudLoading || localLoading) return
+    const month = new Date().toISOString().slice(0, 7)
+    if (rolledForMonth.current === month) return
+    rolledForMonth.current = month
+    const hasCurrent = data.savingsHistory.some(s => s.date.slice(0, 7) === month && Array.isArray(s.assets) && s.assets.length > 0)
+    const hasEarlier = data.savingsHistory.some(s => s.date.slice(0, 7) < month && Array.isArray(s.assets) && s.assets.length > 0)
+    if (!hasCurrent && hasEarlier) copyForwardAssets()
+  }, [authLoading, cloudLoading, localLoading, data.savingsHistory]) // eslint-disable-line
+
   return {
     data, user, authLoading, cloudLoading, localLoading, savedAt, isRefreshing, totals,
     signIn, signOutUser, refreshFromCloud,

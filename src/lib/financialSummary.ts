@@ -1,4 +1,4 @@
-import { BudgetData, Totals, Owner, daysUntil, monthsToClear, upcomingRenewals, householdCostSplit, ageInYears, ageInMonths, propertySummaries, netWorth, effectiveRate, monthlyInterest, isCapped, blendedAer } from './models'
+import { BudgetData, Totals, Owner, daysUntil, upcomingRenewals, householdCostSplit, ageInYears, ageInMonths, propertySummaries, netWorth, debtPayoff, isMortgage, monthlyInterest, isCapped, blendedAer } from './models'
 
 /**
  * A numbers-only snapshot of the household's finances for an AI assessment.
@@ -82,7 +82,8 @@ export interface FinancialSummary {
     totalBalance: number
     items: { type: string; securedOnProperty: boolean; balance: number; monthlyPayment: number; aprPct: number; isZeroPercent: boolean; zeroPercentDaysLeft: number | null; monthsToClear: number | null }[]
   }
-  interest: { earnedPerMonth: number; paidPerMonth: number; netPerMonth: number }
+  /** paidPerMonth / netPerMonth exclude mortgages, which are reported on their own. */
+  interest: { earnedPerMonth: number; paidPerMonth: number; netPerMonth: number; mortgageInterestPerMonth: number }
   /** Category-level, not account-specific — e.g. "Energy", not a supplier name. */
   upcomingRenewals: { category: string; daysUntil: number; monthlyAmount: number }[]
   history: { monthsOfData: number }
@@ -133,7 +134,9 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
       .filter((a: any) => a.type !== 'PENSION')
     return acc + assets.reduce((a: number, i: any) => a + monthlyInterest(i), 0)
   }, 0)
-  const paid = data.debts.reduce((a, d) => a + (d.isZeroPercent ? 0 : (d.currentBalance * d.interestRate) / 100 / 12), 0)
+  const debtInterest = (d: BudgetData['debts'][number]) => d.isZeroPercent ? 0 : (d.currentBalance * d.interestRate) / 100 / 12
+  const paid = data.debts.filter(d => !isMortgage(d)).reduce((a, d) => a + debtInterest(d), 0)
+  const mortgagePaid = data.debts.filter(isMortgage).reduce((a, d) => a + debtInterest(d), 0)
 
   const totalExpenses = totals.totalExp
   const leftover = totals.net
@@ -249,10 +252,10 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
         aprPct: d.isZeroPercent ? 0 : d.interestRate,
         isZeroPercent: d.isZeroPercent,
         zeroPercentDaysLeft: d.isZeroPercent && d.zeroPercentExpiryDate ? daysUntil(d.zeroPercentExpiryDate) : null,
-        monthsToClear: monthsToClear(d.currentBalance, d.monthlyPayment, effectiveRate(d)),
+        monthsToClear: debtPayoff(d).months,
       })),
     },
-    interest: { earnedPerMonth: Math.round(earned), paidPerMonth: Math.round(paid), netPerMonth: Math.round(earned - paid) },
+    interest: { earnedPerMonth: Math.round(earned), paidPerMonth: Math.round(paid), netPerMonth: Math.round(earned - paid), mortgageInterestPerMonth: Math.round(mortgagePaid) },
     upcomingRenewals: renewals,
     history: { monthsOfData },
   }
