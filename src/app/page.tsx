@@ -7,7 +7,7 @@ import BudgetScreen from '@/components/BudgetScreen'
 import SavingsScreen from '@/components/SavingsScreen'
 import DebtsScreen from '@/components/DebtsScreen'
 import SettingsScreen from '@/components/SettingsScreen'
-import { TabFilter } from '@/lib/models'
+import { TabFilter, energySwitchReminders } from '@/lib/models'
 import { LayoutDashboard, BarChart3, PiggyBank, CreditCard, User, RefreshCw, Settings, CheckCircle, AlertCircle, Home } from 'lucide-react'
 
 const ChartsScreen = dynamic(() => import('@/components/ChartsScreen'))
@@ -100,10 +100,12 @@ export default function HomePage() {
   const budget = useBudget()
   const [screen, setScreen] = useState<Screen>('budget')
   const [tab, setTab] = useState<TabFilter>('ALL')
+  const [focusPropertyId, setFocusPropertyId] = useState<string | null>(null)
   const [setupDone, setSetupDone] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const swipeRef = useRef<{ x: number; y: number; t: number } | null>(null)
   const { data, user, authLoading, cloudLoading, localLoading, savedAt, isRefreshing, signIn, signOutUser, refreshFromCloud, updateOwnerName } = budget
+  const hasSwitchReminder = energySwitchReminders(data).length > 0
   // A property filter outlives its property if that property is deleted.
   const activeTab: TabFilter = tab.startsWith('property:') && !(data.properties ?? []).some(p => `property:${p.id}` === tab) ? 'ALL' : tab
 
@@ -249,8 +251,8 @@ export default function HomePage() {
       >
         <div key={screen} className="h-full screen-enter">
           {screen === 'budget'   && <BudgetScreen   budget={budget} tab={activeTab} onNavigateToDebts={() => setScreen('debts')} />}
-          {screen === 'charts'   && <ChartsScreen   budget={budget} />}
-          {screen === 'savings'  && <SavingsScreen  budget={budget} />}
+          {screen === 'charts'   && <ChartsScreen   budget={budget} onOpenProperty={id => { setFocusPropertyId(id); setScreen('savings') }} />}
+          {screen === 'savings'  && <SavingsScreen  budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={() => setFocusPropertyId(null)} />}
           {screen === 'debts'    && <DebtsScreen    budget={budget} />}
           {screen === 'settings' && <SettingsScreen budget={budget} />}
         </div>
@@ -264,8 +266,11 @@ export default function HomePage() {
             aria-current={screen === id ? 'page' : undefined}
             className={`flex-1 flex flex-col items-center justify-center gap-[3px] py-2 min-h-[52px] bg-transparent border-0 cursor-pointer text-caption ${screen === id ? 'text-ink font-semibold' : 'text-muted font-normal'}`}
           >
-            <span className={`nav-pill flex ${screen === id ? 'nav-pill-active' : ''}`}>
+            <span className={`nav-pill flex relative ${screen === id ? 'nav-pill-active' : ''}`}>
               <Icon size={20} strokeWidth={screen === id ? 2.4 : 1.8} />
+              {id === 'charts' && hasSwitchReminder && (
+                <span className="absolute top-0.5 right-2.5 w-2 h-2 rounded-full bg-negative ring-2 ring-card" aria-label="Energy switch reminder" />
+              )}
             </span>
             {label}
           </button>

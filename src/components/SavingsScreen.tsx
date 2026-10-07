@@ -333,7 +333,7 @@ function PensionOwnerPanel({ owner, name, budget, addAsset, updateAsset, updateA
   )
 }
 
-export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
+export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled }: { budget: BudgetHook; focusPropertyId?: string | null; onFocusHandled?: () => void }) {
   const { data, addAsset, updateAsset, updateAssetFields, deleteAsset, resyncInterest, copyForwardAssets, moveAssetsToLastMonth } = budget
   const today = new Date().toISOString().slice(0, 7)
 
@@ -589,7 +589,7 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
         </div>
       )}
 
-      <PropertiesSection budget={budget} />
+      <PropertiesSection budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={onFocusHandled} />
 
       {/* Pensions section */}
       <div className="mt-6 pt-6 border-t-2 border-pension-light">

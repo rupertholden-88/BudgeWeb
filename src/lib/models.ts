@@ -408,6 +408,42 @@ export function upcomingRenewals(data: BudgetData) {
     .sort((a, b) => a.days - b.days)
 }
 
+/** How far ahead of the fee-free window a reminder appears, and how long it lingers after a deal ends. */
+export const SWITCH_REMINDER_LEAD_DAYS = 14
+export const SWITCH_REMINDER_AFTER_END_DAYS = 60
+
+export type SwitchReminderStatus = 'upcoming' | 'open' | 'ended'
+
+/**
+ * Fixed energy deals worth acting on now: the exit-fee-free window is about
+ * to open, is open, or the deal has recently ended (and the supply has likely
+ * rolled onto a pricier variable rate). One entry per property and status.
+ */
+export function energySwitchReminders(data: BudgetData) {
+  const out: { propertyId: string; propertyLabel: string; status: SwitchReminderStatus; fuels: Fuel[]; freeFrom: string; fixedUntil: string; daysToFree: number; daysToEnd: number }[] = []
+  for (const p of data.properties ?? []) {
+    for (const fuel of ['electricity', 'gas'] as Fuel[]) {
+      const t = p.energy?.[fuel]
+      if (!t?.fixed || !t.fixedUntil) continue
+      const freeFrom = exitFeeFreeFrom(t)
+      if (!freeFrom) continue
+      const daysToFree = daysUntil(freeFrom)
+      const daysToEnd = daysUntil(t.fixedUntil)
+      const status: SwitchReminderStatus | null =
+        daysToEnd < 0 ? (daysToEnd >= -SWITCH_REMINDER_AFTER_END_DAYS ? 'ended' : null)
+        : daysToFree <= 0 ? 'open'
+        : daysToFree <= SWITCH_REMINDER_LEAD_DAYS ? 'upcoming'
+        : null
+      if (!status) continue
+      const same = out.find(r => r.propertyId === p.id && r.status === status && r.fixedUntil === t.fixedUntil)
+      if (same) same.fuels.push(fuel)
+      else out.push({ propertyId: p.id, propertyLabel: p.label, status, fuels: [fuel], freeFrom, fixedUntil: t.fixedUntil, daysToFree, daysToEnd })
+    }
+  }
+  const rank = { ended: 0, open: 1, upcoming: 2 }
+  return out.sort((a, b) => rank[a.status] - rank[b.status] || a.daysToEnd - b.daysToEnd)
+}
+
 export function isFirstRun(data: BudgetData): boolean {
   return !data.nameNiamh && !data.nameRupert
 }

@@ -1,11 +1,11 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { fmt, Owner, upcomingRenewals, monthsToClear, householdCostSplit, monthlyInterest } from '@/lib/models'
+import { fmt, Owner, upcomingRenewals, monthsToClear, householdCostSplit, monthlyInterest, energySwitchReminders } from '@/lib/models'
 import { buildFinancialSummary, hashSummary } from '@/lib/financialSummary'
 import { useApiKey } from '@/hooks/useApiKey'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown, CalendarClock, Sparkles, KeyRound } from 'lucide-react'
+import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown, CalendarClock, Sparkles, KeyRound, Zap } from 'lucide-react'
 import { StatCard } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
@@ -368,7 +368,7 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
   )
 }
 
-export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
+export default function ChartsScreen({ budget, onOpenProperty }: { budget: BudgetHook; onOpenProperty?: (propertyId: string) => void }) {
   const { data, totals, user, recordFinancialHealthRun } = budget
   const today = new Date().toISOString().slice(0, 7)
 
@@ -484,6 +484,7 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
   const savingsRate = totals.totalInc > 0 ? Math.round((totals.totalSav / totals.totalInc) * 100) : 0
 
   const renewals = useMemo(() => upcomingRenewals(data), [data])
+  const switchReminders = useMemo(() => energySwitchReminders(data), [data])
   // Anything inside the switching window, plus anything already lapsed.
   const dueSoon = renewals.filter(r => r.days <= 60)
 
@@ -523,6 +524,40 @@ export default function ChartsScreen({ budget }: { budget: BudgetHook }) {
 
       {/* Time-sensitive first: 0% expiries, then renewals; then Fair Share,
           the thing most often opened this screen for; the optional AI check after. */}
+      {switchReminders.map(r => {
+        const fuelText = r.fuels.length === 2 ? 'gas & electricity' : r.fuels[0]
+        const day = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })
+        const title = r.status === 'ended'
+          ? `${r.propertyLabel}: fixed ${fuelText} deal ended`
+          : r.status === 'open'
+            ? `${r.propertyLabel}: switch ${fuelText} with no exit fee`
+            : `${r.propertyLabel}: exit fees end in ${r.daysToFree} ${r.daysToFree === 1 ? 'day' : 'days'}`
+        const body = r.status === 'ended'
+          ? `It ended ${day(r.fixedUntil)}, so you're probably on the supplier's standard variable rate now — usually the priciest option. Worth finding a new deal.`
+          : r.status === 'open'
+            ? `Your fixed deal ends ${day(r.fixedUntil)} (in ${r.daysToEnd} ${r.daysToEnd === 1 ? 'day' : 'days'}). You can leave now without paying exit fees — compare deals before it rolls onto a variable rate.`
+            : `From ${day(r.freeFrom)} you can switch ${fuelText} without paying exit fees; the fixed deal ends ${day(r.fixedUntil)}.`
+        return (
+          <div key={`${r.propertyId}:${r.status}`} className={`card p-4 mb-3 border-l-[3px] ${r.status === 'upcoming' ? 'border-l-expense-text' : 'border-l-negative'}`}>
+            <div className="flex items-start gap-2">
+              <Zap size={14} className={`mt-0.5 shrink-0 ${r.status === 'upcoming' ? 'text-expense-text' : 'text-negative'}`} />
+              <div className="min-w-0 flex-1">
+                <div className="text-body font-semibold text-ink">{title}</div>
+                <p className="text-label text-muted mt-0.5 mb-0 leading-snug">{body}</p>
+                {onOpenProperty && (
+                  <button
+                    onClick={() => onOpenProperty(r.propertyId)}
+                    className="mt-2.5 bg-ink text-on-ink border-0 rounded-xl px-3.5 min-h-[36px] text-xs font-semibold cursor-pointer"
+                  >
+                    Find cheaper tariffs →
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+
       {expiries.map(({ debt, days, expiry, balanceAtExpiry, monthlyInterestAfter, rate }) => (
         <div
           key={debt.id}
