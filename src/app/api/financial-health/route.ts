@@ -7,14 +7,17 @@ export const runtime = 'nodejs'
 // Vercel's default function duration to generate — raise the ceiling.
 export const maxDuration = 60
 
-// User's choice — Sonnet 5 for a good cost/quality balance on this task.
-const MODEL = 'claude-sonnet-5'
+// User's choice — Sonnet 5.5 for a good cost/quality balance on this task.
+const MODEL = 'claude-sonnet-5-5'
+// If Sonnet 5.5's safety classifiers decline (rare for this content), the API
+// re-runs the request on a fallback model within the same call.
+const FALLBACK_BETA = 'server-side-fallback-2026-07-01'
 
 // $ per 1M tokens, first-party API rates. Update if the model or its
 // pricing changes — there's no live pricing endpoint to read this from.
 const PRICE_PER_MILLION = { input: 2.0, output: 10.0 }
 
-function estimateCostUsd(usage: Anthropic.Usage) {
+function estimateCostUsd(usage: Anthropic.Beta.BetaUsage) {
   const costUsd = (usage.input_tokens / 1_000_000) * PRICE_PER_MILLION.input
     + (usage.output_tokens / 1_000_000) * PRICE_PER_MILLION.output
   return { costUsd, inputTokens: usage.input_tokens, outputTokens: usage.output_tokens }
@@ -62,8 +65,8 @@ For "sections", cover whichever of these topics the data actually supports — t
 }
 
 /** First text block in a response — thinking blocks (on by default) come before it. */
-function extractText(content: Anthropic.ContentBlock[]): string {
-  const block = content.find((b): b is Anthropic.TextBlock => b.type === 'text')
+function extractText(content: Anthropic.Beta.BetaContentBlock[]): string {
+  const block = content.find((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text')
   return block?.text ?? ''
 }
 
@@ -102,13 +105,15 @@ export async function POST(req: NextRequest) {
 
   const client = new Anthropic({ apiKey })
 
-  let response: Anthropic.Message
+  let response: Anthropic.Beta.BetaMessage
   try {
     // Streamed internally rather than a single blocking create() call — a
     // long non-streamed request risks the underlying connection timing out
     // before Anthropic finishes, independent of Vercel's own function limit.
-    const stream = client.messages.stream({
+    const stream = client.beta.messages.stream({
       model: MODEL,
+      betas: [FALLBACK_BETA],
+      fallbacks: 'default',
       max_tokens: 16000,
       thinking: { type: 'adaptive' },
       // Dialed back from 'high' — repeated failures suggest something is timing

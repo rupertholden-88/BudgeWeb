@@ -5,7 +5,8 @@ export const runtime = 'nodejs'
 // Several searches and page fetches in one go — give it the most time Vercel's plan allows.
 export const maxDuration = 60
 
-const MODEL = 'claude-sonnet-5'
+const MODEL = 'claude-sonnet-5-5'
+const FALLBACK_BETA = 'server-side-fallback-2026-07-01'
 // $ per 1M tokens, plus web search at $10 per 1,000 searches. Web fetch has
 // no per-use fee. Update alongside the health-check route if pricing changes.
 const PRICE_PER_MILLION = { input: 2.0, output: 10.0 }
@@ -64,9 +65,9 @@ Reply with ONLY one JSON object, no markdown, in exactly this shape:
 All option rates must be in pence INCLUDING VAT, as consumers are normally quoted (unit rates p/kWh, standing charges p/day). If a page quotes ex-VAT, multiply by 1.05. Don't work out annual costs — the app calculates them from the rates.`
 }
 
-function joinText(content: Anthropic.ContentBlock[]): string {
+function joinText(content: Anthropic.Beta.BetaContentBlock[]): string {
   // Web search answers carry citations, which split the reply across several text blocks.
-  return content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map(b => b.text).join('')
+  return content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text').map(b => b.text).join('')
 }
 
 function parseJson(raw: string): unknown | null {
@@ -98,25 +99,27 @@ export async function POST(req: NextRequest) {
   }
 
   const client = new Anthropic({ apiKey })
-  const tools: Anthropic.ToolUnion[] = [
+  const tools: Anthropic.Beta.BetaToolUnion[] = [
     {
       type: 'web_search_20260209', name: 'web_search', max_uses: 5,
       user_location: { type: 'approximate', country: 'GB', timezone: 'Europe/London' },
     },
     { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 4, max_content_tokens: 10000 },
   ]
-  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: buildPrompt(request) }]
+  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: buildPrompt(request) }]
   const totals = { inputTokens: 0, outputTokens: 0, searches: 0 }
   const costUsd = () =>
     (totals.inputTokens / 1_000_000) * PRICE_PER_MILLION.input
     + (totals.outputTokens / 1_000_000) * PRICE_PER_MILLION.output
     + totals.searches * USD_PER_SEARCH
 
-  let response: Anthropic.Message | null = null
+  let response: Anthropic.Beta.BetaMessage | null = null
   try {
     for (let i = 0; i <= MAX_CONTINUATIONS; i++) {
-      response = await client.messages.stream({
+      response = await client.beta.messages.stream({
         model: MODEL,
+        betas: [FALLBACK_BETA],
+        fallbacks: 'default',
         max_tokens: 16000,
         thinking: { type: 'adaptive' },
         // Searching and reading pages is the slow part; low effort keeps the
