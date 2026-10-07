@@ -105,9 +105,48 @@ export function exitFeeFreeFrom(t: EnergyTariff | undefined): string | null {
   return d.toISOString().slice(0, 10)
 }
 
+/** Rates as quoted to consumers — pence, VAT included. */
+export interface QuotedRates { unitRateP: number; nightRateP?: number | null; standingChargeP: number }
+
+/** One tariff the finder turned up. Costs are worked out locally, not trusted from the model. */
+export interface TariffOption {
+  supplier: string; tariffName: string; type: 'fixed' | 'variable'
+  termMonths?: number | null; exitFeePerFuel?: number | null
+  electricity?: QuotedRates | null; gas?: QuotedRates | null
+  sourceUrl?: string | null; notes?: string | null
+}
+
+export interface TariffSearchResult {
+  summary: string
+  regionNote?: string | null
+  options: TariffOption[]
+  advice: string
+  caveats: string[]
+}
+
+export interface TariffSearchCache {
+  generatedAt: string; costUsd: number; searches: number
+  result: TariffSearchResult | null; rawText: string | null
+}
+
+/** Annual cost of a quoted (VAT-inclusive) tariff at this property's own usage. */
+export function quotedAnnualCost(rates: QuotedRates | null | undefined, usage: EnergyTariff | undefined): number | null {
+  if (!rates || !usage?.annualUsageKwh) return null
+  const twoRate = usage.nightUsageKwh != null && usage.nightUsageKwh > 0
+  if (twoRate && rates.nightRateP == null) {
+    // Single-rate quote for a two-rate meter: everything at the one rate.
+    return ((usage.annualUsageKwh + (usage.nightUsageKwh ?? 0)) * rates.unitRateP + 365 * rates.standingChargeP) / 100
+  }
+  const night = twoRate ? (usage.nightUsageKwh ?? 0) * (rates.nightRateP ?? 0) : 0
+  return (usage.annualUsageKwh * rates.unitRateP + night + 365 * rates.standingChargeP) / 100
+}
+
 export interface Property {
   id: string; label: string; owner: Owner; estimatedValue: number
   energy?: Partial<Record<Fuel, EnergyTariff>>
+  /** First half of the postcode (e.g. NR21) — energy prices vary by region. */
+  postcodeArea?: string
+  tariffSearch?: TariffSearchCache | null
   isMainResidence?: boolean; isLet?: boolean; monthlyRent?: number
   purchasePrice?: number; purchaseDate?: string; stampDutyPaid?: number; improvementCosts?: number
 }
