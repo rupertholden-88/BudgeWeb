@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Owner, DebtType, Debt, Property, fmt, monthsToClear, effectiveRate } from '@/lib/models'
+import { Owner, DebtType, Debt, Property, fmt, debtPayoff } from '@/lib/models'
 import { Plus, Home } from 'lucide-react'
-import { ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, inputClass, useLongPress, ownerBorderClass } from './ui'
+import { ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, NumberInput, inputClass, useLongPress, ownerBorderClass } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -23,9 +23,8 @@ function DebtCard({ debt, ownerName, properties, onUpdate, onDelete }: {
   const commitLabel = () => { if (labelDraft.trim()) onUpdate(debt.id, { label: labelDraft.trim() }); setEditingLabel(false) }
   // Amortised, not balance ÷ payment — interest makes the real figure longer,
   // and a payment below the monthly interest never clears it at all.
-  const months = debt.currentBalance > 0 && debt.monthlyPayment > 0
-    ? monthsToClear(debt.currentBalance, debt.monthlyPayment, effectiveRate(debt))
-    : undefined
+  // Simulated month by month, so a 0% deal switches to its follow-on rate when it ends.
+  const months = debt.currentBalance > 0 && debt.monthlyPayment > 0 ? debtPayoff(debt).months : undefined
   const property = properties.find(p => p.id === debt.propertyId)
   const securable = debt.type === 'MORTGAGE' || debt.type === 'OTHER' || debt.type === 'PERSONAL_LOAN'
 
@@ -87,12 +86,10 @@ function DebtCard({ debt, ownerName, properties, onUpdate, onDelete }: {
                   { label: 'Rate %',    value: debt.interestRate,   key: 'interestRate' },
                 ] as const).map(({ label, value, key }) => (
                   <Field key={key} label={label}>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      value={value || ''}
-                      onChange={e => onUpdate(debt.id, { [key]: parseFloat(e.target.value) || 0 })}
-                      placeholder="0"
+                    <NumberInput
+                      value={value || undefined}
+                      onChange={v => onUpdate(debt.id, { [key]: v ?? 0 })}
+                      ariaLabel={label}
                       className={`${inputClass} w-[100px]`}
                     />
                   </Field>

@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Owner, Asset, AssetType, fmt, netWorth, monthlyInterest, annualInterest, blendedAer, isCapped } from '@/lib/models'
 import { Plus, TrendingUp, TrendingDown } from 'lucide-react'
-import { StatCard, ConfirmDelete, AmountCell, TapToEdit, ExpandButton, DeleteAction, Field, inputClass, useLongPress, ownerBorderClass } from './ui'
+import { StatCard, ConfirmDelete, AmountCell, TapToEdit, ExpandButton, DeleteAction, Field, NumberInput, inputClass, useLongPress, ownerBorderClass } from './ui'
 import PropertiesSection from './PropertiesSection'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
@@ -129,13 +129,7 @@ function AssetRow({ asset, owner, today, updateAsset, updateAssetFields, deleteA
             )}
             <div className="flex flex-col gap-0.5">
               <label className="text-caption text-muted uppercase tracking-label">{showCap ? 'Rate % (to cap)' : 'Rate %'}</label>
-              <input
-                type="number"
-                value={asset.interestRate || ''}
-                placeholder="0"
-                onChange={e => updateAsset(owner, today, asset.id, asset.amount, parseFloat(e.target.value) || undefined, asset.institution)}
-                className="w-[70px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none"
-              />
+              <NumberInput value={asset.interestRate} onChange={v => updateAsset(owner, today, asset.id, asset.amount, v, asset.institution)} className="w-[70px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none" />
             </div>
             <div className="flex flex-col gap-0.5">
               <label className="text-caption text-muted uppercase tracking-label">Institution</label>
@@ -167,25 +161,11 @@ function AssetRow({ asset, owner, today, updateAsset, updateAssetFields, deleteA
                   <div className="flex gap-2 flex-wrap mt-1.5">
                     <div className="flex flex-col gap-0.5">
                       <label className="text-caption text-muted uppercase tracking-label">Up to £</label>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        value={asset.rateCap ?? ''}
-                        placeholder="5000"
-                        onChange={e => updateAssetFields(owner, today, asset.id, { rateCap: parseFloat(e.target.value) || undefined })}
-                        className="w-[90px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none"
-                      />
+                      <NumberInput value={asset.rateCap} placeholder="5000" onChange={v => updateAssetFields(owner, today, asset.id, { rateCap: v })} className="w-[90px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none" />
                     </div>
                     <div className="flex flex-col gap-0.5">
                       <label className="text-caption text-muted uppercase tracking-label">Then %</label>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        value={asset.rateAboveCap ?? ''}
-                        placeholder="0"
-                        onChange={e => updateAssetFields(owner, today, asset.id, { rateAboveCap: parseFloat(e.target.value) || undefined })}
-                        className="w-[70px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none"
-                      />
+                      <NumberInput value={asset.rateAboveCap} placeholder="0" onChange={v => updateAssetFields(owner, today, asset.id, { rateAboveCap: v })} className="w-[70px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none" />
                     </div>
                   </div>
                 )}
@@ -195,25 +175,11 @@ function AssetRow({ asset, owner, today, updateAsset, updateAssetFields, deleteA
               <>
                 <div className="flex flex-col gap-0.5">
                   <label className="text-caption text-muted uppercase tracking-label">You £/mo</label>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    value={asset.monthlyContribution ?? ''}
-                    placeholder="0"
-                    onChange={e => updateAssetFields(owner, today, asset.id, { monthlyContribution: parseFloat(e.target.value) || undefined })}
-                    className="w-[80px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none"
-                  />
+                  <NumberInput value={asset.monthlyContribution} placeholder="0" onChange={v => updateAssetFields(owner, today, asset.id, { monthlyContribution: v })} className="w-[80px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none" />
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <label className="text-caption text-muted uppercase tracking-label">Employer £/mo</label>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    value={asset.employerContribution ?? ''}
-                    placeholder="0"
-                    onChange={e => updateAssetFields(owner, today, asset.id, { employerContribution: parseFloat(e.target.value) || undefined })}
-                    className="w-[80px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none"
-                  />
+                  <NumberInput value={asset.employerContribution} placeholder="0" onChange={v => updateAssetFields(owner, today, asset.id, { employerContribution: v })} className="w-[80px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none" />
                 </div>
                 <p className="text-caption text-muted w-full m-0 leading-snug">
                   For the health check only — workplace pensions usually come out before your
@@ -333,7 +299,7 @@ function PensionOwnerPanel({ owner, name, budget, addAsset, updateAsset, updateA
   )
 }
 
-export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
+export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled }: { budget: BudgetHook; focusPropertyId?: string | null; onFocusHandled?: () => void }) {
   const { data, addAsset, updateAsset, updateAssetFields, deleteAsset, resyncInterest, copyForwardAssets, moveAssetsToLastMonth } = budget
   const today = new Date().toISOString().slice(0, 7)
 
@@ -368,15 +334,8 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
   // Everything owned minus everything owed — property values in, all debt out.
   const worth = netWorth(data, today)
   const monthDiff = totalLastMonth > 0 ? totalAll - totalLastMonth : null
-  const currentMonthHasData = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).some(owner => {
-    const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === today)
-    return Array.isArray(snap?.assets) && snap!.assets.length > 0
-  })
   const hasPreviousData = data.savingsHistory.some(s => s.date.slice(0, 7) < today)
 
-  useEffect(() => {
-    if (!currentMonthHasData && hasPreviousData) copyForwardAssets()
-  }, []) // eslint-disable-line
 
   const months = Array.from(new Set(data.savingsHistory.map(s => s.date.slice(0, 7)))).sort()
   if (!months.includes(today)) months.push(today)
@@ -589,7 +548,7 @@ export default function SavingsScreen({ budget }: { budget: BudgetHook }) {
         </div>
       )}
 
-      <PropertiesSection budget={budget} />
+      <PropertiesSection budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={onFocusHandled} />
 
       {/* Pensions section */}
       <div className="mt-6 pt-6 border-t-2 border-pension-light">

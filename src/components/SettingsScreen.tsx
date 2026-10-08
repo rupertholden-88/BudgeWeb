@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Check, KeyRound, Plus } from 'lucide-react'
 import { useApiKey } from '@/hooks/useApiKey'
+import { NumberInput } from './ui'
 import { ageInYears, ageInMonths } from '@/lib/models'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
@@ -41,8 +42,8 @@ function NameRow({ label, value, onSave, colorClass }: { label: string; value: s
   )
 }
 
-export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, user, updateOwnerName, getJsonString, importFromJson, updateBirthMonth, addDependant, updateDependant, removeDependant, updateGrossIncome } = budget
+export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook; onToast?: (msg: string) => void }) {
+  const { data, user, updateOwnerName, getJsonString, importFromJson, updateBirthMonth, addDependant, updateDependant, removeDependant, updateGrossIncome, updatePayday } = budget
   const [importText, setImportText] = useState('')
   const [importResult, setImportResult] = useState<{ ok: boolean; text: string } | null>(null)
   const [darkMode, setDarkMode] = useState(false)
@@ -161,17 +162,20 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
             <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${p.colour}`} />
             <span className="text-sm flex-1 min-w-0 truncate">{p.label}&apos;s gross salary</span>
             <span className="text-xs text-muted">£</span>
-            <input
-              type="number"
-              inputMode="decimal"
-              value={p.value ?? ''}
-              placeholder="per year"
-              onChange={e => updateGrossIncome(p.owner, parseFloat(e.target.value) || undefined)}
-              aria-label={`${p.label} gross annual salary`}
-              className="w-[110px] text-sm border-[1.5px] border-border rounded-lg px-2 py-1.5 outline-none bg-card shrink-0 text-right"
-            />
+            <NumberInput value={p.value} placeholder="per year" onChange={v => updateGrossIncome(p.owner, v)} ariaLabel={`${p.label} gross annual salary`} className="w-[110px] text-sm border-[1.5px] border-border rounded-lg px-2 py-1.5 outline-none bg-card shrink-0 text-right" />
           </div>
         ))}
+
+        <div className="flex items-center gap-2 py-2.5 border-b border-border">
+          <span className="text-sm flex-1 min-w-0">Payday <span className="text-muted">(day of the month)</span></span>
+          <NumberInput
+            value={data.payday}
+            placeholder="e.g. 25"
+            onChange={v => updatePayday(v)}
+            ariaLabel="Payday, day of the month"
+            className="w-[90px] text-sm border border-line-2 rounded-xl px-3 py-2 outline-none bg-panel shrink-0 text-right min-h-[44px]"
+          />
+        </div>
 
         {(data.dependants ?? []).map((d, i) => {
           const months = ageInMonths(d.born)

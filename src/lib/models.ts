@@ -174,7 +174,9 @@ export interface FinancialHealthCache {
 export interface FinancialHealthUsage { totalRuns: number; totalCostUsd: number }
 export interface BudgetData { categories: Category[]; savingsHistory: SavingsSnapshot[]; spendHistory: SpendSnapshot[]; debts: Debt[]; savedAt: string; nameNiamh: string; nameRupert: string; nameJoint: string; financialHealth?: FinancialHealthCache | null; financialHealthUsage?: FinancialHealthUsage | null; bornNiamh?: string; bornRupert?: string; dependants?: Dependant[]; properties?: Property[]
   /** Annual gross salary — optional, lets pension contributions be judged against the gross-based 8% minimum. */
-  grossNiamh?: number; grossRupert?: number }
+  grossNiamh?: number; grossRupert?: number
+  /** Day of the month take-home pay lands (1-31), for the "days to payday" line. */
+  payday?: number }
 export interface Totals { incN: number; incR: number; expN: number; expR: number; savN: number; savR: number; debtN: number; debtR: number; expJoint: number; savJoint: number; debtJoint: number; halfJointExp: number; halfJointSav: number; halfJointDebt: number; netN: number; netR: number; totalInc: number; totalExp: number; totalSav: number; totalDebt: number; net: number }
 
 export function defaultBudgetData(): BudgetData {
@@ -337,6 +339,42 @@ export function monthsToClear(balance: number, payment: number, annualRate: numb
   return Math.ceil(-Math.log(1 - (balance * r) / payment) / Math.log(1 + r))
 }
 
+export function isMortgage(d: Debt): boolean {
+  return d.type === 'MORTGAGE'
+}
+
+/**
+ * Month-by-month payoff, so a 0% deal correctly switches to its follow-on
+ * rate when it ends. `months` is null when the payment never clears the
+ * balance (it doesn't cover the interest). `interestAfterZeroEnds` is the
+ * balance still owed when a 0% period ends, if any.
+ */
+export function debtPayoff(d: Debt): { months: number | null; interest: number; balanceWhenZeroEnds: number | null } {
+  let balance = d.currentBalance
+  if (balance <= 0) return { months: 0, interest: 0, balanceWhenZeroEnds: null }
+  const payment = d.monthlyPayment
+  if (payment <= 0) return { months: null, interest: 0, balanceWhenZeroEnds: null }
+  const followOnRate = (Number(d.interestRate) || 0) / 100 / 12
+  let zeroMonths = 0
+  if (d.isZeroPercent) {
+    const days = d.zeroPercentExpiryDate ? daysUntil(d.zeroPercentExpiryDate.length === 7 ? `${d.zeroPercentExpiryDate}-01` : d.zeroPercentExpiryDate) : NaN
+    // No end date recorded: treat it as 0% throughout rather than guess.
+    zeroMonths = isNaN(days) ? Infinity : Math.max(0, Math.floor(days / 30.44))
+  }
+  let interest = 0
+  let balanceWhenZeroEnds: number | null = null
+  for (let m = 1; m <= 1200; m++) {
+    const r = m <= zeroMonths ? 0 : followOnRate
+    if (m === zeroMonths + 1 && d.isZeroPercent && zeroMonths !== Infinity) balanceWhenZeroEnds = balance
+    const monthInterest = balance * r
+    if (r > 0 && payment <= monthInterest) return { months: null, interest, balanceWhenZeroEnds }
+    interest += monthInterest
+    balance = balance + monthInterest - payment
+    if (balance <= 0.005) return { months: m, interest, balanceWhenZeroEnds }
+  }
+  return { months: null, interest, balanceWhenZeroEnds }
+}
+
 /** Whole months since a YYYY-MM birth month, or null if unset/malformed. */
 export function ageInMonths(born: string | undefined): number | null {
   if (!born) return null
@@ -406,6 +444,114 @@ export function upcomingRenewals(data: BudgetData) {
     .concat(energy)
     .filter(r => !isNaN(r.days))
     .sort((a, b) => a.days - b.days)
+}
+
+/** How far ahead of the fee-free window a reminder appears, and how long it lingers after a deal ends. */
+export const SWITCH_REMINDER_LEAD_DAYS = 14
+export const SWITCH_REMINDER_AFTER_END_DAYS = 60
+
+export type SwitchReminderStatus = 'upcoming' | 'open' | 'ended'
+
+/**
+ * Fixed energy deals worth acting on now: the exit-fee-free window is about
+ * to open, is open, or the deal has recently ended (and the supply has likely
+ * rolled onto a pricier variable rate). One entry per property and status.
+ */
+export function energySwitchReminders(data: BudgetData) {
+  const out: { propertyId: string; propertyLabel: string; status: SwitchReminderStatus; fuels: Fuel[]; freeFrom: string; fixedUntil: string; daysToFree: number; daysToEnd: number }[] = []
+  for (const p of data.properties ?? []) {
+    for (const fuel of ['electricity', 'gas'] as Fuel[]) {
+      const t = p.energy?.[fuel]
+      if (!t?.fixed || !t.fixedUntil) continue
+      const freeFrom = exitFeeFreeFrom(t)
+      if (!freeFrom) continue
+      const daysToFree = daysUntil(freeFrom)
+      const daysToEnd = daysUntil(t.fixedUntil)
+      const status: SwitchReminderStatus | null =
+        daysToEnd < 0 ? (daysToEnd >= -SWITCH_REMINDER_AFTER_END_DAYS ? 'ended' : null)
+        : daysToFree <= 0 ? 'open'
+        : daysToFree <= SWITCH_REMINDER_LEAD_DAYS ? 'upcoming'
+        : null
+      if (!status) continue
+      const same = out.find(r => r.propertyId === p.id && r.status === status && r.fixedUntil === t.fixedUntil)
+      if (same) same.fuels.push(fuel)
+      else out.push({ propertyId: p.id, propertyLabel: p.label, status, fuels: [fuel], freeFrom, fixedUntil: t.fixedUntil, daysToFree, daysToEnd })
+    }
+  }
+  const rank = { ended: 0, open: 1, upcoming: 2 }
+  return out.sort((a, b) => rank[a.status] - rank[b.status] || a.daysToEnd - b.daysToEnd)
+}
+
+/** Easter Sunday (Gregorian), for the Good Friday and Easter Monday bank holidays. */
+function easterSunday(year: number): Date {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3)
+  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4
+  const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451)
+  const month = Math.floor((h + l - 7 * m + 114) / 31) - 1
+  return new Date(year, month, ((h + l - 7 * m + 114) % 31) + 1)
+}
+
+const ymd = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
+
+/**
+ * England & Wales bank holidays for a year, as y-m-d keys. Covers the regular
+ * pattern including weekend substitutes; one-off extra days (coronations,
+ * jubilees) aren't predictable and are left out.
+ */
+const bankHolidayCache = new Map<number, Set<string>>()
+export function ukBankHolidays(year: number): Set<string> {
+  const cached = bankHolidayCache.get(year)
+  if (cached) return cached
+  const days: Date[] = []
+  const firstMonday = (month: number) => { const d = new Date(year, month, 1); d.setDate(1 + ((8 - d.getDay()) % 7)); return d }
+  const lastMonday = (month: number) => { const d = new Date(year, month + 1, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d }
+  // New Year's Day, moved to Monday if it falls at the weekend.
+  const ny = new Date(year, 0, 1)
+  if (ny.getDay() === 6) ny.setDate(3); else if (ny.getDay() === 0) ny.setDate(2)
+  days.push(ny)
+  const easter = easterSunday(year)
+  days.push(new Date(year, easter.getMonth(), easter.getDate() - 2), new Date(year, easter.getMonth(), easter.getDate() + 1))
+  days.push(firstMonday(4), lastMonday(4), lastMonday(7))
+  // Christmas and Boxing Day, with substitutes when either is at the weekend.
+  const xmasDow = new Date(year, 11, 25).getDay()
+  if (xmasDow === 5) days.push(new Date(year, 11, 25), new Date(year, 11, 28))      // Fri, Sat → Mon
+  else if (xmasDow === 6) days.push(new Date(year, 11, 27), new Date(year, 11, 28)) // Sat, Sun → Mon, Tue
+  else if (xmasDow === 0) days.push(new Date(year, 11, 26), new Date(year, 11, 27)) // Sun, Mon → Mon, Tue
+  else days.push(new Date(year, 11, 25), new Date(year, 11, 26))
+  const set = new Set(days.map(ymd))
+  bankHolidayCache.set(year, set)
+  return set
+}
+
+export function isWorkingDay(d: Date): boolean {
+  const dow = d.getDay()
+  return dow !== 0 && dow !== 6 && !ukBankHolidays(d.getFullYear()).has(ymd(d))
+}
+
+/**
+ * The actual pay date in a given month: the payday clamped to the month's
+ * length, moved back to the last working day before it when it lands on a
+ * weekend or bank holiday.
+ */
+export function payDateFor(payday: number, year: number, month: number): Date {
+  const d = new Date(year, month, Math.min(payday, new Date(year, month + 1, 0).getDate()))
+  while (!isWorkingDay(d)) d.setDate(d.getDate() - 1)
+  return d
+}
+
+/** Whole days until the next pay date, or null when no payday is set. */
+export function daysToPayday(payday: number | undefined, now = new Date()): number | null {
+  return nextPayday(payday, now)?.days ?? null
+}
+
+/** The next pay date on or after today, with how many days away it is. */
+export function nextPayday(payday: number | undefined, now = new Date()): { date: Date; days: number } | null {
+  if (!payday || payday < 1 || payday > 31) return null
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  let next = payDateFor(payday, today.getFullYear(), today.getMonth())
+  if (next < today) next = payDateFor(payday, today.getFullYear(), today.getMonth() + 1)
+  return { date: next, days: Math.round((next.getTime() - today.getTime()) / 86400000) }
 }
 
 export function isFirstRun(data: BudgetData): boolean {

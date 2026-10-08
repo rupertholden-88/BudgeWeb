@@ -253,6 +253,10 @@ export function useBudget() {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.map(i => i.id === itemId ? { ...i, propertyId: propertyId || undefined } : i) }) }))
   }
 
+  const updatePayday = (payday: number | undefined) => {
+    mutate(b => ({ ...b, payday: payday && payday >= 1 && payday <= 31 ? Math.round(payday) : undefined }))
+  }
+
   const updateGrossIncome = (owner: Owner, gross: number | undefined) => {
     mutate(b => ({
       ...b,
@@ -454,13 +458,29 @@ export function useBudget() {
     })
   }, [data.categories, data.debts]) // eslint-disable-line
 
+  // Carry last month's balances into a new month as soon as the app has loaded,
+  // not only when Assets is opened — otherwise on the 1st, Analysis, net worth
+  // and the health check all read the new month as zero savings. Waits for the
+  // cloud copy so it never stamps a stale local copy as newer. Once per month
+  // per session, so "These are last month's figures" can still clear the month.
+  const rolledForMonth = useRef<string | null>(null)
+  useEffect(() => {
+    if (authLoading || cloudLoading || localLoading) return
+    const month = new Date().toISOString().slice(0, 7)
+    if (rolledForMonth.current === month) return
+    rolledForMonth.current = month
+    const hasCurrent = data.savingsHistory.some(s => s.date.slice(0, 7) === month && Array.isArray(s.assets) && s.assets.length > 0)
+    const hasEarlier = data.savingsHistory.some(s => s.date.slice(0, 7) < month && Array.isArray(s.assets) && s.assets.length > 0)
+    if (!hasCurrent && hasEarlier) copyForwardAssets()
+  }, [authLoading, cloudLoading, localLoading, data.savingsHistory]) // eslint-disable-line
+
   return {
     data, user, authLoading, cloudLoading, localLoading, savedAt, isRefreshing, totals,
     signIn, signOutUser, refreshFromCloud,
     updateOwnerName, updateBirthMonth, addDependant, updateDependant, removeDependant,
     addCategory, renameCategory, deleteCategory,
     updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, toggleItemAutoRenew, updateItemInsurance, toggleItemShared, updateItemProperty, recordFinancialHealthRun,
-    updateGrossIncome, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,
+    updateGrossIncome, updatePayday, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,
     addAsset, updateAsset, updateAssetFields, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,

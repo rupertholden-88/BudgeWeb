@@ -1,26 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Owner, Fuel, EnergyTariff, TariffOption, fmt, propertySummaries, tariffAnnualCost, quotedAnnualCost, exitFeeFreeFrom, daysUntil, ENERGY_VAT } from '@/lib/models'
 import type { TariffSearchRequest } from '@/app/api/energy-tariffs/route'
 import { useApiKey } from '@/hooks/useApiKey'
 import { Plus, Home, Zap, Flame, Search, ExternalLink, KeyRound } from 'lucide-react'
-import { AmountCell, ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, TapToEdit, inputClass, ownerBorderClass } from './ui'
+import { AmountCell, ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, TapToEdit, NumberInput, inputClass, ownerBorderClass } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 type Summary = ReturnType<typeof propertySummaries>[number]
 
 function numberInput(value: number | undefined, onChange: (v: number | undefined) => void, placeholder = '0', width = 'w-[120px]') {
-  return (
-    <input
-      type="number"
-      inputMode="decimal"
-      value={value ?? ''}
-      placeholder={placeholder}
-      onChange={e => onChange(parseFloat(e.target.value) || undefined)}
-      className={`${inputClass} ${width}`}
-    />
-  )
+  return <NumberInput value={value} onChange={onChange} placeholder={placeholder} className={`${inputClass} ${width}`} />
 }
 
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -381,10 +372,18 @@ function EnergySection({ summary, budget }: { summary: Summary; budget: BudgetHo
   )
 }
 
-function PropertyCard({ summary, ownerName, budget }: { summary: Summary; ownerName: (o: Owner) => string; budget: BudgetHook }) {
+function PropertyCard({ summary, ownerName, budget, focused, onFocusHandled }: { summary: Summary; ownerName: (o: Owner) => string; budget: BudgetHook; focused?: boolean; onFocusHandled?: () => void }) {
   const { updateProperty, deleteProperty } = budget
   const { property: p, debts, items, mortgageBalance, mortgagePayment, runningCosts, monthlyTotal, equity, ltvPct } = summary
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(!!focused)
+  const finderRef = useRef<HTMLDivElement>(null)
+  // Arriving from a switch reminder: open the card and bring the tariff finder into view.
+  useEffect(() => {
+    if (!focused) return
+    setExpanded(true)
+    const t = setTimeout(() => { finderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); onFocusHandled?.() }, 250)
+    return () => clearTimeout(t)
+  }, [focused]) // eslint-disable-line
   const [confirmDelete, setConfirmDelete] = useState(false)
   const set = (fields: Parameters<typeof updateProperty>[1]) => updateProperty(p.id, fields)
 
@@ -505,7 +504,7 @@ function PropertyCard({ summary, ownerName, budget }: { summary: Summary; ownerN
               )}
             </PanelSection>
 
-            <EnergySection summary={summary} budget={budget} />
+            <div ref={finderRef}><EnergySection summary={summary} budget={budget} /></div>
 
             <PanelSection title="Capital gains record">
               <p className="text-caption text-muted mt-0 mb-2 leading-snug">
@@ -540,7 +539,7 @@ function PropertyCard({ summary, ownerName, budget }: { summary: Summary; ownerN
   )
 }
 
-export default function PropertiesSection({ budget }: { budget: BudgetHook }) {
+export default function PropertiesSection({ budget, focusPropertyId, onFocusHandled }: { budget: BudgetHook; focusPropertyId?: string | null; onFocusHandled?: () => void }) {
   const { data, addProperty } = budget
   const [adding, setAdding] = useState(false)
   const [label, setLabel] = useState('')
@@ -562,7 +561,7 @@ export default function PropertiesSection({ budget }: { budget: BudgetHook }) {
         )}
       </div>
 
-      {summaries.map(s => <PropertyCard key={s.property.id} summary={s} ownerName={ownerName} budget={budget} />)}
+      {summaries.map(s => <PropertyCard key={s.property.id} summary={s} ownerName={ownerName} budget={budget} focused={s.property.id === focusPropertyId} onFocusHandled={onFocusHandled} />)}
 
       {summaries.length === 0 && !adding && (
         <p className="text-xs text-muted mt-0 mb-3 leading-relaxed">

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef, ReactNode } from 'react'
+import { useState, useRef, useEffect, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import { fmt, Owner } from '@/lib/models'
 
@@ -20,7 +21,8 @@ export function ownerTextClass(owner: Owner) {
 export function ConfirmDelete({ label, detail, onConfirm, onCancel }: {
   label: string; detail?: string; onConfirm: () => void; onCancel: () => void
 }) {
-  return (
+  // Portalled to <body> so it always sits above the tab bar and any open sheet.
+  return createPortal(
     <div className="fixed inset-0 z-[1000] bg-black/45 flex items-end justify-center" onClick={onCancel}>
       <div
         role="dialog"
@@ -31,15 +33,16 @@ export function ConfirmDelete({ label, detail, onConfirm, onCancel }: {
         <div className="text-lead font-semibold mb-1 break-words">Delete &ldquo;{label}&rdquo;?</div>
         <div className="text-body text-muted mb-5">{detail ?? "This can't be undone."}</div>
         <div className="flex flex-col gap-2">
-          <button onClick={onConfirm} className="bg-negative text-on-ink border-0 rounded-xl p-3.5 cursor-pointer text-lead font-semibold">
+          <button onClick={onConfirm} className="bg-ink text-on-ink border-0 rounded-xl p-3.5 cursor-pointer text-lead font-semibold min-h-[48px]">
             Delete
           </button>
-          <button onClick={onCancel} className="bg-surface text-ink border-0 rounded-xl p-3.5 cursor-pointer text-lead">
+          <button onClick={onCancel} className="bg-fill text-ink border-0 rounded-xl p-3.5 cursor-pointer text-lead min-h-[48px]">
             Cancel
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -175,13 +178,17 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   )
 }
 
-export const inputClass = 'text-sm border-[1.5px] border-border rounded-lg px-2 py-1.5 outline-none bg-card min-h-[36px]'
+export const inputClass = 'text-[15px] text-ink border border-line-2 rounded-xl px-3 py-2 outline-none bg-panel min-h-[44px]'
 
 /** Long press as a shortcut only — every delete also has a visible button. */
 export function useLongPress(onLongPress: () => void, disabled = false) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const start = () => {
+  const start = (e: React.SyntheticEvent) => {
     if (disabled) return
+    // Pressing and holding inside a field (to paste, select text…) or on a
+    // control must never turn into a delete prompt.
+    const target = e.target as HTMLElement | null
+    if (target?.closest('input, select, textarea, button, a, label, [role="button"]')) return
     timer.current = setTimeout(() => { navigator.vibrate?.(50); onLongPress() }, 600)
   }
   const cancel = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null } }
@@ -189,4 +196,41 @@ export function useLongPress(onLongPress: () => void, disabled = false) {
     onMouseDown: start, onMouseUp: cancel, onMouseLeave: cancel,
     onTouchStart: start, onTouchEnd: cancel, onTouchMove: cancel, onTouchCancel: cancel,
   }
+}
+
+/**
+ * Number field that keeps exactly what was typed ("0.", ".5", "0") while
+ * reporting the parsed value as you go — a plain `parseFloat(v) || x`
+ * swallows zeros and mangles half-typed decimals.
+ */
+export function NumberInput({ value, onChange, placeholder = '0', className, ariaLabel }: {
+  value: number | null | undefined
+  onChange: (v: number | undefined) => void
+  placeholder?: string
+  className?: string
+  ariaLabel?: string
+}) {
+  const show = (v: number | null | undefined) => (v == null || Number.isNaN(v) ? '' : String(v))
+  const [draft, setDraft] = useState(show(value))
+  const focused = useRef(false)
+  useEffect(() => { if (!focused.current) setDraft(show(value)) }, [value])
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={draft}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      onFocus={() => { focused.current = true }}
+      onBlur={() => { focused.current = false; setDraft(show(value)) }}
+      onChange={e => {
+        const raw = e.target.value.replace(/[£,\s%]/g, '')
+        if (!/^\d*\.?\d*$/.test(raw)) return
+        setDraft(raw)
+        if (raw === '' || raw === '.') onChange(undefined)
+        else { const n = parseFloat(raw); if (Number.isFinite(n)) onChange(n) }
+      }}
+      className={className ?? inputClass}
+    />
+  )
 }
