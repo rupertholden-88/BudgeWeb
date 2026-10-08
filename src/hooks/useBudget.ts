@@ -253,6 +253,10 @@ export function useBudget() {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.map(i => i.id === itemId ? { ...i, propertyId: propertyId || undefined } : i) }) }))
   }
 
+  const updatePayday = (payday: number | undefined) => {
+    mutate(b => ({ ...b, payday: payday && payday >= 1 && payday <= 31 ? Math.round(payday) : undefined }))
+  }
+
   const updateGrossIncome = (owner: Owner, gross: number | undefined) => {
     mutate(b => ({
       ...b,
@@ -476,7 +480,7 @@ export function useBudget() {
     updateOwnerName, updateBirthMonth, addDependant, updateDependant, removeDependant,
     addCategory, renameCategory, deleteCategory,
     updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, toggleItemAutoRenew, updateItemInsurance, toggleItemShared, updateItemProperty, recordFinancialHealthRun,
-    updateGrossIncome, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,
+    updateGrossIncome, updatePayday, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,
     addAsset, updateAsset, updateAssetFields, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,

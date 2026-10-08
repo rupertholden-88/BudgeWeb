@@ -368,7 +368,7 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
   )
 }
 
-export default function ChartsScreen({ budget, onOpenProperty }: { budget: BudgetHook; onOpenProperty?: (propertyId: string) => void }) {
+export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth }: { budget: BudgetHook; onOpenProperty?: (propertyId: string) => void; onOpenWealth?: () => void }) {
   const { data, totals, user, recordFinancialHealthRun } = budget
   const today = new Date().toISOString().slice(0, 7)
 
@@ -632,13 +632,13 @@ export default function ChartsScreen({ budget, onOpenProperty }: { budget: Budge
                       {r.coverAmount ? ` · ${fmt(r.coverAmount)} cover` : ''}
                     </div>
                     {r.isEnergy
-                      ? <span className="pill pill-warn mt-0.5">
+                      ? <span className="pill pill-warn mt-0.5 whitespace-normal">
                           Rolls onto a variable rate{r.exitFeeFreeFrom ? ` · no exit fee from ${new Date(r.exitFeeFreeFrom).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}
                         </span>
                       : r.autoRenews
-                      ? <span className="pill mt-0.5">Auto-renews — check the new price</span>
+                      ? <span className="pill mt-0.5 whitespace-normal">Auto-renews — check the new price</span>
                       : r.isInsurance && r.days <= 60
-                        ? <span className="pill pill-warn mt-0.5">Not set to auto-renew — check cover continues</span>
+                        ? <span className="pill pill-warn mt-0.5 whitespace-normal">Not set to auto-renew — check cover continues</span>
                         : null}
                   </div>
                   <div className="text-right shrink-0">

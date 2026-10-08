@@ -174,7 +174,9 @@ export interface FinancialHealthCache {
 export interface FinancialHealthUsage { totalRuns: number; totalCostUsd: number }
 export interface BudgetData { categories: Category[]; savingsHistory: SavingsSnapshot[]; spendHistory: SpendSnapshot[]; debts: Debt[]; savedAt: string; nameNiamh: string; nameRupert: string; nameJoint: string; financialHealth?: FinancialHealthCache | null; financialHealthUsage?: FinancialHealthUsage | null; bornNiamh?: string; bornRupert?: string; dependants?: Dependant[]; properties?: Property[]
   /** Annual gross salary — optional, lets pension contributions be judged against the gross-based 8% minimum. */
-  grossNiamh?: number; grossRupert?: number }
+  grossNiamh?: number; grossRupert?: number
+  /** Day of the month take-home pay lands (1-31), for the "days to payday" line. */
+  payday?: number }
 export interface Totals { incN: number; incR: number; expN: number; expR: number; savN: number; savR: number; debtN: number; debtR: number; expJoint: number; savJoint: number; debtJoint: number; halfJointExp: number; halfJointSav: number; halfJointDebt: number; netN: number; netR: number; totalInc: number; totalExp: number; totalSav: number; totalDebt: number; net: number }
 
 export function defaultBudgetData(): BudgetData {
@@ -478,6 +480,27 @@ export function energySwitchReminders(data: BudgetData) {
   }
   const rank = { ended: 0, open: 1, upcoming: 2 }
   return out.sort((a, b) => rank[a.status] - rank[b.status] || a.daysToEnd - b.daysToEnd)
+}
+
+/**
+ * The actual pay date in a given month: the payday clamped to the month's
+ * length, moved back to the Friday before when it lands on a weekend.
+ */
+export function payDateFor(payday: number, year: number, month: number): Date {
+  const d = new Date(year, month, Math.min(payday, new Date(year, month + 1, 0).getDate()))
+  const dow = d.getDay()
+  if (dow === 6) d.setDate(d.getDate() - 1)
+  if (dow === 0) d.setDate(d.getDate() - 2)
+  return d
+}
+
+/** Whole days until the next pay date, or null when no payday is set. */
+export function daysToPayday(payday: number | undefined, now = new Date()): number | null {
+  if (!payday || payday < 1 || payday > 31) return null
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  let next = payDateFor(payday, today.getFullYear(), today.getMonth())
+  if (next < today) next = payDateFor(payday, today.getFullYear(), today.getMonth() + 1)
+  return Math.round((next.getTime() - today.getTime()) / 86400000)
 }
 
 export function isFirstRun(data: BudgetData): boolean {

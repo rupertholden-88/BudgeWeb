@@ -42,8 +42,8 @@ function NameRow({ label, value, onSave, colorClass }: { label: string; value: s
   )
 }
 
-export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, user, updateOwnerName, getJsonString, importFromJson, updateBirthMonth, addDependant, updateDependant, removeDependant, updateGrossIncome } = budget
+export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook; onToast?: (msg: string) => void }) {
+  const { data, user, updateOwnerName, getJsonString, importFromJson, updateBirthMonth, addDependant, updateDependant, removeDependant, updateGrossIncome, updatePayday } = budget
   const [importText, setImportText] = useState('')
   const [importResult, setImportResult] = useState<{ ok: boolean; text: string } | null>(null)
   const [darkMode, setDarkMode] = useState(false)
@@ -165,6 +165,17 @@ export default function SettingsScreen({ budget }: { budget: BudgetHook }) {
             <NumberInput value={p.value} placeholder="per year" onChange={v => updateGrossIncome(p.owner, v)} ariaLabel={`${p.label} gross annual salary`} className="w-[110px] text-sm border-[1.5px] border-border rounded-lg px-2 py-1.5 outline-none bg-card shrink-0 text-right" />
           </div>
         ))}
+
+        <div className="flex items-center gap-2 py-2.5 border-b border-border">
+          <span className="text-sm flex-1 min-w-0">Payday <span className="text-muted">(day of the month)</span></span>
+          <NumberInput
+            value={data.payday}
+            placeholder="e.g. 25"
+            onChange={v => updatePayday(v)}
+            ariaLabel="Payday, day of the month"
+            className="w-[90px] text-sm border border-line-2 rounded-xl px-3 py-2 outline-none bg-panel shrink-0 text-right min-h-[44px]"
+          />
+        </div>
 
         {(data.dependants ?? []).map((d, i) => {
           const months = ageInMonths(d.born)

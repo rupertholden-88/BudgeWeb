@@ -1,43 +1,36 @@
 /** @type {import('tailwindcss').Config} */
+const v = name => `var(--${name})`
+
 module.exports = {
   content: ['./src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
-      colors: {
-        ink: 'var(--ink)',
-        muted: 'var(--muted)',
-        surface: 'var(--surface)',
-        card: 'var(--card)',
-        border: 'var(--border)',
-        niamh: 'var(--niamh)',
-        'niamh-light': 'var(--niamh-light)',
-        rupert: 'var(--rupert)',
-        'rupert-light': 'var(--rupert-light)',
-        joint: 'var(--joint)',
-        'joint-light': 'var(--joint-light)',
-        positive: 'var(--positive)',
-        negative: 'var(--negative)',
-        'income-bg': 'var(--income-bg)',
-        'income-text': 'var(--income-text)',
-        'expense-bg': 'var(--expense-bg)',
-        'expense-text': 'var(--expense-text)',
-        'savings-bg': 'var(--savings-bg)',
-        'savings-text': 'var(--savings-text)',
-        pension: 'var(--pension)',
-        'pension-light': 'var(--pension-light)',
-        accent: 'var(--accent)',
-        'accent-light': 'var(--accent-light)',
-        'on-ink': 'var(--on-ink)',
+      colors: Object.fromEntries([
+        'bg', 'panel', 'fill', 'fill-2', 'line', 'line-2', 'ink', 'ink-2', 'muted', 'faint',
+        'niamh', 'niamh-text', 'niamh-light', 'rupert', 'rupert-text', 'rupert-light', 'joint', 'joint-text', 'joint-light',
+        'pos', 'pos-tint', 'neg', 'neg-tint', 'warn', 'warn-tint', 'spend', 'save', 'save-tint', 'free', 'on-ink',
+        // Legacy names, aliased to the palette above in globals.css
+        'surface', 'card', 'border', 'positive', 'negative', 'income-bg', 'income-text', 'expense-bg', 'expense-text',
+        'savings-bg', 'savings-text', 'pension', 'pension-light', 'accent', 'accent-light',
+      ].map(n => [n, v(n)])),
+      fontFamily: {
+        sans: ['"Inter Variable"', 'Inter', 'system-ui', 'sans-serif'],
+        // Headline figures are Inter now; the serif is reserved for the logo.
+        serif: ['"Inter Variable"', 'Inter', 'system-ui', 'sans-serif'],
+        display: ['"DM Serif Display"', 'serif'],
       },
-      // Named steps instead of one-off pixel sizes.
+      // Named steps; nothing under 12px.
       fontSize: {
-        caption: ['10px', '14px'],
-        label: ['11px', '15px'],
-        body: ['13px', '18px'],
-        lead: ['15px', '20px'],
+        caption: ['12px', '16px'],
+        label: ['13px', '18px'],
+        body: ['15px', '20px'],
+        lead: ['17px', '22px'],
       },
       letterSpacing: {
-        label: '0.08em',
+        label: '0.07em',
+      },
+      borderRadius: {
+        panel: '22px',
       },
     },
   },

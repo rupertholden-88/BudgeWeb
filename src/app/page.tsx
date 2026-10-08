@@ -4,25 +4,26 @@ import { useState, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { useBudget } from '@/hooks/useBudget'
 import BudgetScreen from '@/components/BudgetScreen'
-import SavingsScreen from '@/components/SavingsScreen'
-import DebtsScreen from '@/components/DebtsScreen'
+import WealthScreen from '@/components/WealthScreen'
+import Brand from '@/components/Brand'
 import SettingsScreen from '@/components/SettingsScreen'
-import { TabFilter, energySwitchReminders } from '@/lib/models'
-import { LayoutDashboard, BarChart3, PiggyBank, CreditCard, User, RefreshCw, Settings, CheckCircle, AlertCircle, Home } from 'lucide-react'
+import { TabFilter } from '@/lib/models'
+import { needsAttention } from '@/lib/attention'
+import { Wallet, BarChart3, Landmark, Settings2, User, CheckCircle } from 'lucide-react'
 
 const ChartsScreen = dynamic(() => import('@/components/ChartsScreen'))
 
-type Screen = 'budget' | 'charts' | 'savings' | 'debts' | 'settings'
+type Screen = 'budget' | 'charts' | 'wealth' | 'settings'
 
 const NAV = [
-  { id: 'budget'   as Screen, label: 'Budget',   Icon: LayoutDashboard },
+  { id: 'budget'   as Screen, label: 'Budget',   Icon: Wallet },
   { id: 'charts'   as Screen, label: 'Analysis', Icon: BarChart3 },
-  { id: 'savings'  as Screen, label: 'Assets',   Icon: PiggyBank },
-  { id: 'debts'    as Screen, label: 'Debts',    Icon: CreditCard },
-  { id: 'settings' as Screen, label: 'Settings', Icon: Settings },
+  { id: 'wealth'   as Screen, label: 'Wealth',   Icon: Landmark },
+  { id: 'settings' as Screen, label: 'Settings', Icon: Settings2 },
 ]
 
-const SCREEN_ORDER: Screen[] = ['budget', 'charts', 'savings', 'debts', 'settings']
+const SCREEN_ORDER: Screen[] = ['budget', 'charts', 'wealth', 'settings']
+
 
 function SetupScreen({ onDone, updateOwnerName, signIn, isSignedIn }: {
   onDone: () => void
@@ -104,8 +105,8 @@ export default function HomePage() {
   const [setupDone, setSetupDone] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const swipeRef = useRef<{ x: number; y: number; t: number } | null>(null)
-  const { data, user, authLoading, cloudLoading, localLoading, savedAt, isRefreshing, signIn, signOutUser, refreshFromCloud, updateOwnerName } = budget
-  const hasSwitchReminder = energySwitchReminders(data).length > 0
+  const { data, user, authLoading, cloudLoading, localLoading, signIn, signOutUser, updateOwnerName } = budget
+  const attentionCount = needsAttention(data).length
   // A property filter outlives its property if that property is deleted.
   const activeTab: TabFilter = tab.startsWith('property:') && !(data.properties ?? []).some(p => `property:${p.id}` === tab) ? 'ALL' : tab
 
@@ -114,9 +115,8 @@ export default function HomePage() {
     setTimeout(() => setToast(null), 2500)
   }
 
-  const handleRefresh = async () => {
-    await refreshFromCloud()
-    showToast('Synced!')
+  const confirmSignOut = () => {
+    if (window.confirm(`Signed in as ${user?.email}.\n\nSign out of Budge on this device?`)) signOutUser()
   }
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -157,92 +157,38 @@ export default function HomePage() {
     )
   }
 
+  const initial = (name: string, fallback: string) => (name.trim()[0] || fallback).toUpperCase()
+
   return (
-    <div className="flex flex-col h-[100dvh] bg-surface">
+    <div className="flex flex-col h-[100dvh] bg-bg">
 
       {toast && (
-        // Centred by flex, not by transform — the fade-up animation sets its own
-        // transform and would otherwise cancel a -translate-x-1/2.
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-20 inset-x-0 z-[100] flex justify-center pointer-events-none px-4"
-        >
-          <div className="bg-ink text-on-ink px-5 py-2.5 rounded-full text-body font-medium flex items-center gap-1.5 shadow-[0_4px_12px_rgba(0,0,0,0.2)] fade-up">
+        <div role="status" aria-live="polite" className="fixed bottom-24 inset-x-0 z-[100] flex justify-center pointer-events-none px-4">
+          <div className="bg-ink text-on-ink px-5 py-2.5 rounded-full text-label font-medium flex items-center gap-1.5 shadow-[0_4px_12px_rgba(0,0,0,0.2)] fade-up">
             <CheckCircle size={14} /> {toast}
           </div>
         </div>
       )}
 
-      <header className="glass border-b border-border px-4 h-14 flex items-center gap-3 shrink-0 z-10">
-        <h1 className="font-serif text-2xl m-0 flex-1">Budge</h1>
-        {savedAt && (
-          <span className="text-label text-muted">
-            Saved {new Date(savedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-          </span>
-        )}
+      <header className="px-5 pt-[max(12px,env(safe-area-inset-top))] pb-1 flex items-center justify-between shrink-0 min-h-[56px]">
+        <Brand />
         {user ? (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleRefresh}
-              aria-label="Sync from cloud"
-              className="bg-transparent border-0 cursor-pointer text-muted p-2 flex min-w-9 min-h-9 items-center justify-center"
-            >
-              <RefreshCw size={16} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
-            </button>
-            <button
-              onClick={signOutUser}
-              title={`${user.email} — tap to sign out`}
-              aria-label={`Signed in as ${user.email}. Tap to sign out.`}
-              className="w-9 h-9 rounded-full bg-accent text-on-ink flex items-center justify-center text-body font-semibold cursor-pointer border-0 p-0 overflow-hidden ring-2 ring-border"
-            >
-              {user.photoURL
-                ? <img src={user.photoURL} alt={user.email ?? ''} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                : user.email?.[0].toUpperCase()
-              }
-            </button>
-          </div>
-        ) : (
           <button
-            onClick={signIn}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border-[1.5px] border-border bg-card cursor-pointer text-body font-medium"
+            onClick={confirmSignOut}
+            title={`${user.email} — tap to sign out`}
+            aria-label={`Signed in as ${user.email}. Tap to sign out.`}
+            className="flex items-center min-h-[44px] min-w-[44px] justify-end cursor-pointer"
           >
-            <User size={14} /> Sign in
+            <span className="w-[30px] h-[30px] rounded-full grid place-items-center text-caption font-semibold bg-niamh-light text-niamh-text ring-2 ring-bg">{initial(data.nameNiamh, 'N')}</span>
+            <span className="w-[30px] h-[30px] rounded-full grid place-items-center text-caption font-semibold bg-rupert-light text-rupert-text ring-2 ring-bg -ml-[9px]">{initial(data.nameRupert, 'R')}</span>
+          </button>
+        ) : (
+          <button onClick={signIn} className="flex items-center gap-1.5 min-h-[44px] text-label text-muted cursor-pointer">
+            <User size={14} aria-hidden="true" />
+            <span>On this phone only · <span className="font-semibold text-ink underline underline-offset-2">Back up</span></span>
           </button>
         )}
       </header>
-
-      {!user && (
-        <button
-          onClick={signIn}
-          className="bg-surface text-muted border-0 border-b border-border px-4 py-2 shrink-0 flex items-center justify-center gap-1.5 text-label cursor-pointer w-full text-left"
-        >
-          <AlertCircle size={12} className="shrink-0" />
-          <span>Saved on this device only. <span className="font-semibold underline text-ink">Sign in to back up and sync.</span></span>
-        </button>
-      )}
-
-      {screen === 'budget' && (
-        <div className="bg-card border-b border-border px-4 py-2 flex gap-2 shrink-0 overflow-x-auto items-center">
-          {(['ALL', 'NIAMH', 'RUPERT', 'JOINT'] as TabFilter[]).map(t => {
-            const label = t === 'ALL' ? 'All' : t === 'NIAMH' ? (data.nameNiamh || 'Person 1') : t === 'RUPERT' ? (data.nameRupert || 'Person 2') : (data.nameJoint || 'Joint')
-            return (
-              <button key={t} onClick={() => setTab(t)} aria-pressed={activeTab === t} className={activeTab === t ? `chip chip-${t.toLowerCase()}` : 'chip chip-inactive'}>
-                {label}
-              </button>
-            )
-          })}
-          {(data.properties ?? []).length > 0 && <span className="w-px h-5 bg-border shrink-0" aria-hidden />}
-          {(data.properties ?? []).map(p => {
-            const t = `property:${p.id}` as TabFilter
-            return (
-              <button key={p.id} onClick={() => setTab(t)} aria-pressed={activeTab === t} className={activeTab === t ? 'chip chip-property' : 'chip chip-inactive'}>
-                <Home size={12} /> {p.label}
-              </button>
-            )
-          })}
-        </div>
-      )}
 
       <main
         className="flex-1 overflow-hidden touch-pan-y"
@@ -250,26 +196,27 @@ export default function HomePage() {
         onTouchEnd={handleTouchEnd}
       >
         <div key={screen} className="h-full screen-enter">
-          {screen === 'budget'   && <BudgetScreen   budget={budget} tab={activeTab} onNavigateToDebts={() => setScreen('debts')} />}
-          {screen === 'charts'   && <ChartsScreen   budget={budget} onOpenProperty={id => { setFocusPropertyId(id); setScreen('savings') }} />}
-          {screen === 'savings'  && <SavingsScreen  budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={() => setFocusPropertyId(null)} />}
-          {screen === 'debts'    && <DebtsScreen    budget={budget} />}
-          {screen === 'settings' && <SettingsScreen budget={budget} />}
+          {screen === 'budget'   && <BudgetScreen   budget={budget} tab={activeTab} onTabChange={setTab} onNavigateToDebts={() => setScreen('wealth')} />}
+          {screen === 'charts'   && <ChartsScreen   budget={budget} onOpenProperty={id => { setFocusPropertyId(id); setScreen('wealth') }} onOpenWealth={() => setScreen('wealth')} />}
+          {screen === 'wealth'   && <WealthScreen   budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={() => setFocusPropertyId(null)} />}
+          {screen === 'settings' && <SettingsScreen budget={budget} onToast={showToast} />}
         </div>
       </main>
 
-      <nav aria-label="Main navigation" className="glass border-t border-border flex shrink-0 pb-[env(safe-area-inset-bottom)]">
+      <nav aria-label="Main navigation" className="bg-bg border-t border-line flex shrink-0 pb-[env(safe-area-inset-bottom)]">
         {NAV.map(({ id, label, Icon }) => (
           <button
             key={id}
             onClick={() => setScreen(id)}
             aria-current={screen === id ? 'page' : undefined}
-            className={`flex-1 flex flex-col items-center justify-center gap-[3px] py-2 min-h-[52px] bg-transparent border-0 cursor-pointer text-caption ${screen === id ? 'text-ink font-semibold' : 'text-muted font-normal'}`}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 pt-2 pb-1.5 min-h-[56px] cursor-pointer text-caption ${screen === id ? 'text-ink font-semibold' : 'text-muted font-medium'}`}
           >
-            <span className={`nav-pill flex relative ${screen === id ? 'nav-pill-active' : ''}`}>
-              <Icon size={20} strokeWidth={screen === id ? 2.4 : 1.8} />
-              {id === 'charts' && hasSwitchReminder && (
-                <span className="absolute top-0.5 right-2.5 w-2 h-2 rounded-full bg-negative ring-2 ring-card" aria-label="Energy switch reminder" />
+            <span className="relative flex">
+              <Icon size={22} strokeWidth={screen === id ? 2.1 : 1.75} aria-hidden="true" />
+              {id === 'charts' && attentionCount > 0 && (
+                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 rounded-full bg-neg text-on-ink text-caption leading-[18px] font-bold text-center ring-2 ring-bg">
+                  {attentionCount}<span className="sr-only"> things need attention</span>
+                </span>
               )}
             </span>
             {label}
