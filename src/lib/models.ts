@@ -482,25 +482,76 @@ export function energySwitchReminders(data: BudgetData) {
   return out.sort((a, b) => rank[a.status] - rank[b.status] || a.daysToEnd - b.daysToEnd)
 }
 
+/** Easter Sunday (Gregorian), for the Good Friday and Easter Monday bank holidays. */
+function easterSunday(year: number): Date {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3)
+  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4
+  const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451)
+  const month = Math.floor((h + l - 7 * m + 114) / 31) - 1
+  return new Date(year, month, ((h + l - 7 * m + 114) % 31) + 1)
+}
+
+const ymd = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
+
+/**
+ * England & Wales bank holidays for a year, as y-m-d keys. Covers the regular
+ * pattern including weekend substitutes; one-off extra days (coronations,
+ * jubilees) aren't predictable and are left out.
+ */
+const bankHolidayCache = new Map<number, Set<string>>()
+export function ukBankHolidays(year: number): Set<string> {
+  const cached = bankHolidayCache.get(year)
+  if (cached) return cached
+  const days: Date[] = []
+  const firstMonday = (month: number) => { const d = new Date(year, month, 1); d.setDate(1 + ((8 - d.getDay()) % 7)); return d }
+  const lastMonday = (month: number) => { const d = new Date(year, month + 1, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d }
+  // New Year's Day, moved to Monday if it falls at the weekend.
+  const ny = new Date(year, 0, 1)
+  if (ny.getDay() === 6) ny.setDate(3); else if (ny.getDay() === 0) ny.setDate(2)
+  days.push(ny)
+  const easter = easterSunday(year)
+  days.push(new Date(year, easter.getMonth(), easter.getDate() - 2), new Date(year, easter.getMonth(), easter.getDate() + 1))
+  days.push(firstMonday(4), lastMonday(4), lastMonday(7))
+  // Christmas and Boxing Day, with substitutes when either is at the weekend.
+  const xmasDow = new Date(year, 11, 25).getDay()
+  if (xmasDow === 5) days.push(new Date(year, 11, 25), new Date(year, 11, 28))      // Fri, Sat → Mon
+  else if (xmasDow === 6) days.push(new Date(year, 11, 27), new Date(year, 11, 28)) // Sat, Sun → Mon, Tue
+  else if (xmasDow === 0) days.push(new Date(year, 11, 26), new Date(year, 11, 27)) // Sun, Mon → Mon, Tue
+  else days.push(new Date(year, 11, 25), new Date(year, 11, 26))
+  const set = new Set(days.map(ymd))
+  bankHolidayCache.set(year, set)
+  return set
+}
+
+export function isWorkingDay(d: Date): boolean {
+  const dow = d.getDay()
+  return dow !== 0 && dow !== 6 && !ukBankHolidays(d.getFullYear()).has(ymd(d))
+}
+
 /**
  * The actual pay date in a given month: the payday clamped to the month's
- * length, moved back to the Friday before when it lands on a weekend.
+ * length, moved back to the last working day before it when it lands on a
+ * weekend or bank holiday.
  */
 export function payDateFor(payday: number, year: number, month: number): Date {
   const d = new Date(year, month, Math.min(payday, new Date(year, month + 1, 0).getDate()))
-  const dow = d.getDay()
-  if (dow === 6) d.setDate(d.getDate() - 1)
-  if (dow === 0) d.setDate(d.getDate() - 2)
+  while (!isWorkingDay(d)) d.setDate(d.getDate() - 1)
   return d
 }
 
 /** Whole days until the next pay date, or null when no payday is set. */
 export function daysToPayday(payday: number | undefined, now = new Date()): number | null {
+  return nextPayday(payday, now)?.days ?? null
+}
+
+/** The next pay date on or after today, with how many days away it is. */
+export function nextPayday(payday: number | undefined, now = new Date()): { date: Date; days: number } | null {
   if (!payday || payday < 1 || payday > 31) return null
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   let next = payDateFor(payday, today.getFullYear(), today.getMonth())
   if (next < today) next = payDateFor(payday, today.getFullYear(), today.getMonth() + 1)
-  return Math.round((next.getTime() - today.getTime()) / 86400000)
+  return { date: next, days: Math.round((next.getTime() - today.getTime()) / 86400000) }
 }
 
 export function isFirstRun(data: BudgetData): boolean {

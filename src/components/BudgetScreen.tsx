@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Category, LineItem, TabFilter, Owner, EntryType, Debt, Property, fmt, daysUntil, isInsuranceItem,
-  debtPayoff, isMortgage, propertySummaries, daysToPayday, energySwitchReminders, householdCostSplit,
+  debtPayoff, isMortgage, propertySummaries, nextPayday, energySwitchReminders, householdCostSplit,
 } from '@/lib/models'
 import { needsAttention } from '@/lib/attention'
 import { Plus, ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, X } from 'lucide-react'
@@ -496,10 +496,14 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
   const now = new Date()
   const hour = now.getHours()
   const greeting = `${hour < 12 ? 'Morning' : hour < 18 ? 'Afternoon' : 'Evening'}${me ? `, ${me}` : ''}`
-  const payday = daysToPayday(data.payday)
+  const pay = nextPayday(data.payday)
+  // Name the day when a weekend or bank holiday has moved it earlier.
+  const moved = pay && pay.date.getDate() !== Math.min(data.payday!, new Date(pay.date.getFullYear(), pay.date.getMonth() + 1, 0).getDate())
+  const payWhen = moved ? ` (${pay.date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })})` : ''
+  const payday = pay?.days ?? null
   const daysLeftInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate()
   const timing = payday != null
-    ? payday === 0 ? 'Payday today' : `${payday} ${payday === 1 ? 'day' : 'days'} to payday`
+    ? payday === 0 ? 'Payday today' : `${payday} ${payday === 1 ? 'day' : 'days'} to payday${payWhen}`
     : `${daysLeftInMonth} ${daysLeftInMonth === 1 ? 'day' : 'days'} left in ${now.toLocaleDateString('en-GB', { month: 'long' })}`
   const asOf = savedAt ? ` · as of ${new Date(savedAt).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' })}` : ''
 
