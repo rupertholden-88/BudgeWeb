@@ -146,7 +146,9 @@ h1, h2, h3 { font-family: inherit; font-weight: 650; letter-spacing: -0.02em; }
 
 /* Money: tabular, lining figures everywhere they line up in columns. */
 .num, .tabular-nums { font-variant-numeric: tabular-nums lining-nums; }
-.cur { font-size: .65em; font-weight: 400; color: var(--muted); margin-right: .04em; }
+.cur { font-weight: inherit; }
+/* Headline figures: a full-size £ in a quieter colour, rather than a shrunken one. */
+.figure .cur { font-weight: 500; color: var(--faint); margin-right: .06em; }
 
 /* Inputs at 16px or iOS Safari zooms the page on focus. */
 @media (max-width: 640px) {
