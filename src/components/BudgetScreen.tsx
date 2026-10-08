@@ -48,77 +48,83 @@ const plusYear = (d: string) => {
 
 interface Segment { label: string; value: number; color: string }
 
-/** The month's two answers: what each of you moves into the joint account, and what's left. */
-function JointTransfer({ nameN, nameR, each, jointPot, parts, sharedNote }: {
-  nameN: string; nameR: string; each: number; jointPot: number
-  parts: { bills: number; debts: number; saving: number }; sharedNote: string | null
+/**
+ * The top card: one headline figure, a bar showing what it's made of, an
+ * optional note, and an optional quieter second figure underneath.
+ */
+function Hero({ label, value, suffix, negative, pair, segments, legendEnd, note, secondary }: {
+  label: string; value: number; suffix?: string; negative?: boolean
+  /** Two side-by-side figures under the headline (each person's share). */
+  pair?: { owner: Owner; label: string; value: number }[]
+  segments: Segment[]
+  /** Right-hand legend entry with no bar colour, e.g. "Total £3,349". */
+  legendEnd?: { label: string; value: React.ReactNode }
+  note?: { owner?: Owner; text: React.ReactNode }
+  secondary?: { label: string; value: number; negative?: boolean; sub: React.ReactNode; delta?: number | null }
 }) {
-  const covers = [
-    parts.bills > 0 ? `bills ${fmt(parts.bills)}` : null,
-    parts.debts > 0 ? `debts ${fmt(parts.debts)}` : null,
-    parts.saving > 0 ? `saving ${fmt(parts.saving)}` : null,
-  ].filter(Boolean).join(', ')
+  const shown = segments.filter(s => s.value > 0)
+  const delta = secondary?.delta
   return (
-    <div className="pb-5 mb-5 border-b border-line">
-      <span className="text-[15px] text-ink-2">Into the joint account this month</span>
-      <div className="grid grid-cols-2 gap-3 mt-2">
-        {[{ owner: 'NIAMH' as const, name: nameN }, { owner: 'RUPERT' as const, name: nameR }].map(p => (
-          <div key={p.owner} className="min-w-0">
-            <div className="flex items-center gap-1.5 text-label text-muted truncate"><OwnerDot owner={p.owner} label={p.name} /> {p.name}</div>
-            <div className="text-[32px] leading-10 font-semibold tracking-[-0.03em] text-ink"><Money value={each} /></div>
-          </div>
-        ))}
+    <section className="panel p-5 mt-3.5" aria-label={label}>
+      <div className="text-label font-medium text-muted">{label}</div>
+      <div className={`figure mt-2 flex items-baseline flex-wrap gap-x-2 text-[44px] leading-none font-bold tracking-[-0.035em] ${negative ? 'text-neg' : 'text-ink'}`}>
+        <Money value={value} />
+        {suffix && <span className="text-[17px] font-medium tracking-normal text-muted">{suffix}</span>}
       </div>
-      <p className="text-label text-muted mt-1.5 mb-0 leading-snug">
-        Covers <b className="text-ink-2 font-semibold num">{fmt(jointPot)}</b> of joint costs{covers ? ` (${covers})` : ''}, split 50/50.
-        {sharedNote && <> {sharedNote}</>}
-      </p>
-    </div>
-  )
-}
-
-function Hero({ label, value, suffix, sub, delta, segments, negative, top }: {
-  label: string; value: number; suffix?: string; sub: React.ReactNode; delta?: number | null
-  segments: Segment[]; negative?: boolean; top?: React.ReactNode
-}) {
-  const total = segments.reduce((a, s) => a + Math.max(0, s.value), 0)
-  return (
-    <section className="panel p-5 mt-4" aria-label={label}>
-      {top}
-      <div className="flex items-center justify-between gap-2 min-h-[28px]">
-        <span className="text-[15px] text-ink-2">{label}</span>
-        {delta != null && Math.abs(delta) >= 1 && (
-          <span className={`pill ${delta > 0 ? 'pill-good' : 'pill-warn'}`}>
-            {delta > 0 ? <ArrowUp size={12} aria-hidden="true" /> : <ArrowDown size={12} aria-hidden="true" />}
-            {fmt(Math.abs(delta))} {delta > 0 ? 'more' : 'less'} than last month
-          </span>
-        )}
-      </div>
-      <div className={`mt-1 text-[52px] leading-[58px] font-semibold tracking-[-0.04em] ${negative ? 'text-neg' : 'text-ink'}`}>
-        <Money value={value} />{suffix && <span className="text-[17px] font-normal tracking-normal text-muted ml-1">{suffix}</span>}
-      </div>
-      <p className="text-[15px] text-ink-2 mt-1 mb-0 leading-snug">{sub}</p>
-      {total > 0 && (
+      {pair && (
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          {pair.map(p => (
+            <div key={p.owner} className="min-w-0">
+              <div className="flex items-center gap-1.5 text-label text-muted truncate"><OwnerDot owner={p.owner} label={p.label} />{p.label}</div>
+              <div className="figure text-[28px] leading-8 font-bold tracking-[-0.03em] mt-1"><Money value={p.value} /></div>
+            </div>
+          ))}
+        </div>
+      )}
+      {shown.length > 0 && (
         <>
-          <div className="flex h-2 gap-[3px] mt-5" aria-hidden="true">
-            {segments.filter(s => s.value > 0).map(s => (
-              <div key={s.label} className="h-full rounded-[3px]" style={{ flexGrow: s.value, background: s.color }} />
-            ))}
+          <div className="flex h-1.5 gap-[2px] rounded-[3px] overflow-hidden mt-4" aria-hidden="true">
+            {shown.map(s => <div key={s.label} className="h-full" style={{ flexGrow: s.value, background: s.color }} />)}
           </div>
-          <div className="grid mt-3 gap-2" style={{ gridTemplateColumns: `repeat(${segments.length}, minmax(0, 1fr))` }}>
-            {segments.map((s, i) => {
-              const last = i === segments.length - 1 && segments.length > 2
-              return (
-                <div key={s.label} className={last ? 'text-right' : ''}>
-                  <div className={`flex items-center gap-1.5 text-label text-muted ${last ? 'justify-end' : ''}`}>
-                    <span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ background: s.color }} aria-hidden="true" />{s.label}
+          <div className="grid gap-2 mt-2.5 num" style={{ gridTemplateColumns: `repeat(${shown.length + (legendEnd ? 1 : 0)}, minmax(0, 1fr))` }}>
+            {[...shown.map(s => ({ key: s.label, label: s.label, color: s.color as string | undefined, value: fmt(s.value) as React.ReactNode })),
+              ...(legendEnd ? [{ key: '_end', label: legendEnd.label, color: undefined, value: legendEnd.value }] : [])]
+              .map((e, i, all) => {
+                const last = i === all.length - 1 && all.length > 1
+                return (
+                  <div key={e.key} className={`min-w-0 ${last ? 'text-right' : ''}`}>
+                    <div className={`flex items-center gap-1.5 text-caption text-muted truncate ${last ? 'justify-end' : ''}`}>
+                      {e.color && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: e.color }} aria-hidden="true" />}{e.label}
+                    </div>
+                    <div className="text-[15px] font-semibold text-ink mt-0.5">{e.value}</div>
                   </div>
-                  <div className="text-[19px] font-semibold mt-0.5"><Money value={s.value} /></div>
-                </div>
-              )
-            })}
+                )
+              })}
           </div>
         </>
+      )}
+      {note && (
+        <div className="flex items-center gap-2 mt-3.5 pt-3 border-t border-line text-label text-muted">
+          {note.owner && <OwnerDot owner={note.owner} />}
+          <span className="min-w-0">{note.text}</span>
+        </div>
+      )}
+      {secondary && (
+        <div className="flex items-end justify-between gap-3 mt-4 pt-4 border-t border-line">
+          <div className="min-w-0">
+            <div className="text-label font-medium text-muted">{secondary.label}</div>
+            <div className={`figure text-[28px] leading-none font-bold tracking-[-0.03em] mt-1.5 ${secondary.negative ? 'text-neg' : 'text-ink'}`}><Money value={secondary.value} /></div>
+            <div className="text-caption text-muted mt-1.5">{secondary.sub}</div>
+          </div>
+          {delta != null && Math.abs(delta) >= 1 && (
+            <div className="text-caption text-muted text-right shrink-0">
+              <span className={`inline-flex items-center gap-0.5 font-semibold num ${delta > 0 ? 'text-pos' : 'text-warn'}`}>
+                {delta > 0 ? <ArrowUp size={12} aria-hidden="true" /> : <ArrowDown size={12} aria-hidden="true" />}{fmt(Math.abs(delta))}
+              </span>
+              <br />{delta > 0 ? 'more' : 'less'} than last month
+            </div>
+          )}
+        </div>
       )}
     </section>
   )
@@ -557,35 +563,45 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
   const jointPot = totals.expJoint + totals.savJoint + totals.debtJoint
   const jointEach = jointPot / 2
   const split = householdCostSplit(data, totals)
-  const sharedNote = (() => {
-    const parts = [
-      split.sharedByN > 0 ? `${ownerName('NIAMH')} also pays ${fmt(split.sharedByN)}` : null,
-      split.sharedByR > 0 ? `${ownerName('RUPERT')} also pays ${fmt(split.sharedByR)}` : null,
-    ].filter(Boolean)
-    return parts.length ? `${parts.join(' and ')} for the household from their own account.` : null
-  })()
+  const jointSegments: Segment[] = [
+    { label: 'Bills', value: totals.expJoint, color: 'var(--ink)' },
+    { label: 'Debts', value: totals.debtJoint, color: 'var(--spend)' },
+    { label: 'Saving', value: totals.savJoint, color: 'var(--save)' },
+  ]
+  // Household costs one person pays straight from their own account.
+  const directOwner: Owner | undefined = split.sharedByR > 0 && split.sharedByN === 0 ? 'RUPERT' : split.sharedByN > 0 && split.sharedByR === 0 ? 'NIAMH' : undefined
+  const directNote = split.sharedByN > 0 || split.sharedByR > 0 ? {
+    owner: directOwner,
+    text: <>
+      {split.sharedByN > 0 && <>{ownerName('NIAMH')} also pays <b className="text-ink font-semibold num">{fmt(split.sharedByN)}</b></>}
+      {split.sharedByN > 0 && split.sharedByR > 0 && ' and '}
+      {split.sharedByR > 0 && <>{ownerName('RUPERT')} also pays <b className="text-ink font-semibold num">{fmt(split.sharedByR)}</b></>}
+      {' '}directly
+    </>,
+  } : undefined
+  const leftToSpend = {
+    label: totals.net < 0 ? 'Over budget by' : 'Left to spend', value: Math.abs(totals.net), negative: totals.net < 0,
+    sub: <>of <span className="num">{fmt(totals.totalInc)}</span> take-home</>,
+    delta: lastMonthLeft != null ? totals.net - lastMonthLeft : null,
+  }
 
   // ── hero for the current filter
   const hero = (() => {
     if (propertySummary) {
       const s = propertySummary
       return <Hero
-        label={`${s.property.label} costs`} value={s.monthlyTotal} suffix="/mo"
-        sub={s.property.estimatedValue > 0
-          ? <>Equity <b className="num">{fmt(s.equity)}</b>{s.ltvPct != null && s.mortgageBalance > 0 ? ` · ${s.ltvPct.toFixed(0)}% loan-to-value` : ''}</>
-          : 'Add its value on Wealth to see equity'}
-        segments={[{ label: 'Mortgage', value: s.mortgagePayment, color: 'var(--spend)' }, { label: 'Running costs', value: s.runningCosts, color: 'var(--save)' }]}
+        label={`${s.property.label} costs`} value={s.monthlyTotal} suffix="a month"
+        segments={[{ label: 'Mortgage', value: s.mortgagePayment, color: 'var(--ink)' }, { label: 'Running costs', value: s.runningCosts, color: 'var(--spend)' }]}
+        note={{ text: s.property.estimatedValue > 0
+          ? <>Equity <b className="text-ink font-semibold num">{fmt(s.equity)}</b>{s.ltvPct != null && s.mortgageBalance > 0 ? ` · ${s.ltvPct.toFixed(0)}% loan-to-value` : ''}</>
+          : 'Add its value on Wealth to see equity' }}
       />
     }
     if (ownerTab === 'JOINT') {
       return <Hero
-        label="Into the joint account" value={jointPot} suffix="/mo"
-        sub={<>{ownerName('NIAMH')} and {ownerName('RUPERT')} each put in <b className="num">{fmt(jointEach)}</b> — split 50/50</>}
-        segments={[
-          { label: 'Bills', value: totals.expJoint, color: 'var(--spend)' },
-          { label: 'Debts', value: totals.debtJoint, color: 'var(--ink-2)' },
-          { label: 'Saving', value: totals.savJoint, color: 'var(--save)' },
-        ]}
+        label="Into the joint account" value={jointPot} suffix="a month"
+        pair={[{ owner: 'NIAMH', label: `${ownerName('NIAMH')} puts in`, value: jointEach }, { owner: 'RUPERT', label: `${ownerName('RUPERT')} puts in`, value: jointEach }]}
+        segments={jointSegments} legendEnd={{ label: 'Split', value: '50/50' }}
       />
     }
     if (ownerTab) {
@@ -594,27 +610,30 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
       const own = n ? totals.expN + totals.debtN : totals.expR + totals.debtR
       const save = n ? totals.savN : totals.savR
       const left = n ? totals.netN : totals.netR
+      const direct = n ? split.sharedByN : split.sharedByR
       return <Hero
-        label={left < 0 ? `${ownerName(ownerTab)} is over by` : `${ownerName(ownerTab)}’s spending money`} value={Math.abs(left)} negative={left < 0}
-        sub={<>of <b className="num">{fmt(inc)}</b> take-home, after <b className="num">{fmt(jointEach)}</b> into the joint account and their own costs</>}
+        label={left < 0 ? `${ownerName(ownerTab)} is over by` : `${ownerName(ownerTab)}’s spending money`} value={Math.abs(left)} negative={left < 0} suffix="this month"
         segments={[
-          { label: 'To joint', value: jointEach, color: 'var(--save)' },
-          { label: 'Own & saving', value: own + save, color: 'var(--spend)' },
-          { label: 'Free', value: Math.max(0, left), color: 'var(--free)' },
+          { label: 'To joint', value: jointEach, color: 'var(--ink)' },
+          { label: 'Own & saving', value: own + save, color: 'var(--save)' },
+          { label: 'Free', value: Math.max(0, left), color: 'var(--spend)' },
         ]}
+        note={direct > 0 ? { owner: ownerTab, text: <>Includes <b className="text-ink font-semibold num">{fmt(direct)}</b> of household costs paid directly</> } : undefined}
+        secondary={{ label: 'Take-home', value: inc, sub: 'after tax, each month' }}
+      />
+    }
+    if (jointPot <= 0) {
+      return <Hero
+        label={leftToSpend.label} value={leftToSpend.value} negative={leftToSpend.negative}
+        segments={[{ label: 'Spending', value: totals.totalExp, color: 'var(--ink)' }, { label: 'Saving', value: totals.totalSav, color: 'var(--save)' }, { label: 'Free', value: Math.max(0, totals.net), color: 'var(--spend)' }]}
+        secondary={{ label: 'Take-home', value: totals.totalInc, sub: 'after bills and saving', delta: leftToSpend.delta }}
       />
     }
     return <Hero
-      top={jointPot > 0 ? (
-        <JointTransfer
-          nameN={ownerName('NIAMH')} nameR={ownerName('RUPERT')} each={jointEach} jointPot={jointPot}
-          parts={{ bills: totals.expJoint, debts: totals.debtJoint, saving: totals.savJoint }} sharedNote={sharedNote}
-        />
-      ) : undefined}
-      label={totals.net < 0 ? 'Over budget by' : 'Left to spend'} value={Math.abs(totals.net)} negative={totals.net < 0}
-      delta={lastMonthLeft != null ? totals.net - lastMonthLeft : null}
-      sub={<>of <b className="num">{fmt(totals.totalInc)}</b> take-home, after bills and saving</>}
-      segments={[{ label: 'Spending', value: totals.totalExp, color: 'var(--spend)' }, { label: 'Saving', value: totals.totalSav, color: 'var(--save)' }, { label: 'Free', value: Math.max(0, totals.net), color: 'var(--free)' }]}
+      label="Into the joint account this month" value={jointEach} suffix="each"
+      segments={jointSegments} legendEnd={{ label: 'Total', value: fmt(jointPot) }}
+      note={directNote}
+      secondary={leftToSpend}
     />
   })()
 
@@ -628,7 +647,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
 
       {/* greeting + homes */}
       <div className="flex items-center justify-between gap-3 pt-2">
-        <h1 className="text-[26px] leading-8 font-semibold tracking-[-0.025em] m-0 truncate min-w-0">{greeting}</h1>
+        <h1 className="text-[24px] leading-[30px] font-semibold tracking-[-0.02em] m-0 truncate min-w-0">{greeting}</h1>
         {properties.length > 0 && (
           <label className="relative shrink-0">
             <span className="sr-only">Show homes</span>
