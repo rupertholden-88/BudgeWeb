@@ -383,9 +383,20 @@ h1, h2, h3 { font-family: inherit; font-weight: 650; letter-spacing: -0.02em; }
 .figure .cur { font-weight: 500; color: var(--faint); margin-right: .06em; }
 
 /* Inputs at 16px or iOS Safari zooms the page on focus. */
-@media (max-width: 640px) {
-  input, select, textarea { font-size: max(16px, 1em) !important; }
-}
+/*
+ * Phones zoom in on any field under 16px. Fields are 16px by default (and
+ * inputClass is 16px), but at zero specificity so a field with a deliberate
+ * size, like the big amounts, keeps it.
+ */
+:where(input, select, textarea) { font-size: 16px; }
+
+/* Native controls (checkboxes, date pickers, scrollbars) follow the palette and theme. */
+:root { accent-color: var(--ink); color-scheme: light; }
+[data-theme="dark"] { color-scheme: dark; }
+
+/* A bigger hit area without changing how a small control looks. */
+.hit-44 { position: relative; }
+.hit-44::after { content: ''; position: absolute; inset: -7px; }
 
 /* Big amount fields in sheets: the figure itself is large, and the whole box takes the focus ring. */
 .amount-field { display: flex; align-items: center; gap: 6px; min-height: 72px; padding: 0 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line-2); cursor: text; }
@@ -419,7 +430,7 @@ button:active { opacity: .7; }
 
 /* Segmented control — names take more room than "All" before truncating. */
 .seg { display: grid; background: var(--fill); border-radius: 12px; padding: 3px; gap: 2px; }
-.seg > button { min-height: 38px; border-radius: 9px; font-size: 14px; font-weight: 550; color: var(--ink-2); display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px; min-width: 0; cursor: pointer; border: 0; background: transparent; }
+.seg > button { min-height: 40px; border-radius: 9px; font-size: 14px; font-weight: 550; color: var(--ink-2); display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px; min-width: 0; cursor: pointer; border: 0; background: transparent; }
 .seg > button > .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seg > button[aria-pressed="true"] { background: var(--seg-thumb); color: var(--ink); box-shadow: var(--seg-shadow); }
 
@@ -510,3 +521,7 @@ button:focus-visible {
   outline: 2px solid var(--ink) !important;
   outline-offset: 2px !important;
 }
+/* Bordered fields: the ring sits on the border, so it never crowds the button beside it. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible { outline-offset: -1px !important; }

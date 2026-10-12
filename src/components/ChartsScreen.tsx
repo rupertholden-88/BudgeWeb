@@ -506,11 +506,11 @@ export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth }: {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4">
-      <h2 className="font-serif text-xl mt-0 mb-4">Analysis</h2>
+    <div className="h-full overflow-y-auto px-5 pt-2 pb-[calc(32px+env(safe-area-inset-bottom))]">
+      <h1 className="text-[30px] leading-[36px] font-semibold tracking-[-0.02em] mt-0 mb-4">Analysis</h1>
 
       {/* Headline stats */}
-      <div className="flex gap-2 mb-4">
+      <div className="grid grid-cols-3 gap-2 mb-4">
         <StatCard
           label="Runway"
           value={runway != null ? `${runway.toFixed(1)} mo` : '—'}
@@ -518,18 +518,20 @@ export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth }: {
           intent={runway == null ? 'neutral' : runway >= 6 ? 'positive' : runway >= 3 ? 'neutral' : 'negative'}
         />
         <StatCard
-          label="Net interest"
+          label="Interest"
           value={`${interestPosition.net >= 0 ? '+' : ''}${fmt(interestPosition.net)}`}
           sub={interestPosition.mortgagePaid > 0 ? 'per month, excl. mortgages' : 'per month'}
           intent={interestPosition.net >= 0 ? 'positive' : 'negative'}
         />
         <StatCard
-          label="Savings rate"
+          label="Saving"
           value={`${savingsRate}%`}
           sub={savingsRate >= 20 ? 'On track' : 'Below 20% goal'}
           intent={savingsRate >= 20 ? 'positive' : 'neutral'}
         />
       </div>
+
+      <div className="lg:columns-2 lg:gap-5 [&>*]:break-inside-avoid">
 
       {/* Time-sensitive first: 0% expiries, then renewals; then Fair Share,
           the thing most often opened this screen for; the optional AI check after. */}
@@ -930,6 +932,7 @@ export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth }: {
           </div>
         </SectionCard>
       )}
+      </div>
     </div>
   )
 }

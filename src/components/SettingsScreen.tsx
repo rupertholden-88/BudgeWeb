@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Check, KeyRound, Plus } from 'lucide-react'
 import { useApiKey } from '@/hooks/useApiKey'
-import { NumberInput } from './ui'
+import { NumberInput, MonthInput, inputClass } from './ui'
 import { ageInYears, ageInMonths, paydayFor } from '@/lib/models'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
@@ -13,9 +13,9 @@ function NameRow({ label, value, onSave, colorClass }: { label: string; value: s
   const [draft, setDraft] = useState(value)
   const commit = () => { if (draft.trim()) { onSave(draft.trim()); setEditing(false) } }
   return (
-    <div className="flex items-center gap-2 py-2.5 border-b border-border">
+    <div className="flex items-center gap-2 py-1.5 border-b border-border">
       <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${colorClass}`} />
-      <span className="text-xs text-muted w-[60px] shrink-0">{label}</span>
+      <span className="text-label text-muted w-[64px] shrink-0">{label}</span>
       {editing ? (
         <>
           <input
@@ -23,20 +23,23 @@ function NameRow({ label, value, onSave, colorClass }: { label: string; value: s
             onChange={e => setDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') commit() }}
             onBlur={commit}
-            className="flex-1 min-w-0 text-sm border-[1.5px] border-accent bg-accent-light rounded-lg px-2 py-1.5 outline-none"
+            aria-label={`${label} name`}
+            className={`${inputClass} flex-1 min-w-0`}
             autoFocus
           />
-          <button onClick={commit} aria-label="Save name" className="bg-ink text-on-ink border-0 rounded-lg w-9 h-9 cursor-pointer flex items-center justify-center shrink-0">
-            <Check size={14} />
+          <button onClick={commit} aria-label="Save name" className="bg-ink text-on-ink border-0 rounded-xl w-[44px] h-[44px] cursor-pointer flex items-center justify-center shrink-0">
+            <Check size={16} />
           </button>
         </>
       ) : (
-        <span
+        <button
+          type="button"
           onClick={() => { setDraft(value); setEditing(true) }}
-          className="flex-1 text-sm font-semibold cursor-text"
+          aria-label={`${label}: ${value}. Tap to rename`}
+          className="flex-1 min-h-[44px] text-left text-[16px] font-semibold cursor-text"
         >
           {value}
-        </span>
+        </button>
       )}
     </div>
   )
@@ -63,7 +66,7 @@ function ChildName({ value, placeholder, onSave }: { value: string; placeholder:
       onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
       placeholder={placeholder}
       aria-label={`Name for ${value || placeholder}`}
-      className="text-sm w-[84px] shrink-0 bg-transparent border-0 border-b border-dashed border-line-2 rounded-none px-0 py-1 outline-none text-ink placeholder:text-ink-2"
+      className="text-[16px] w-[96px] shrink-0 min-h-[44px] bg-transparent border-0 border-b border-dashed border-line-2 rounded-none px-0 outline-none text-ink placeholder:text-ink-2"
     />
   )
 }
@@ -156,8 +159,9 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4">
-      <h2 className="font-serif text-xl mb-4 mt-0">Settings</h2>
+    <div className="h-full overflow-y-auto px-5 pt-2 pb-[calc(32px+env(safe-area-inset-bottom))]">
+      <h1 className="text-[30px] leading-[36px] font-semibold tracking-[-0.02em] mt-0 mb-4">Settings</h1>
+      <div className="lg:columns-2 lg:gap-5 [&>*]:break-inside-avoid">
 
       <div className="card py-1 px-4 mb-3">
         <div className="text-label font-semibold uppercase tracking-label text-muted py-2.5 pb-1">Person Names</div>
@@ -178,17 +182,11 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
         ]).map(p => (
           <div key={p.owner} className="flex items-center gap-2 py-2.5 border-b border-border">
             <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${p.colour}`} />
-            <span className="text-sm w-[84px] shrink-0 truncate">{p.label}</span>
-            <input
-              type="month"
-              value={p.value ?? ''}
-              onChange={e => updateBirthMonth(p.owner, e.target.value)}
-              aria-label={`${p.label} born`}
-              className="flex-1 min-w-0 text-xs border-[1.5px] border-border rounded-lg px-2 py-1 outline-none bg-card"
-            />
-            {p.value && (
-              <span className="text-label text-muted tabular-nums shrink-0 w-8 text-right">{ageInYears(p.value)}y</span>
-            )}
+            <span className="text-[15px] w-[96px] shrink-0 truncate">{p.label}</span>
+            <div className="flex-1 min-w-0">
+              <MonthInput value={p.value} onChange={v => updateBirthMonth(p.owner, v)} ariaLabel={`${p.label} born`} />
+            </div>
+            <span className="text-label text-muted tabular-nums shrink-0 w-9 text-right">{p.value ? `${ageInYears(p.value)}y` : ''}</span>
           </div>
         ))}
 
@@ -198,9 +196,11 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
         ]).map(p => (
           <div key={`gross-${p.owner}`} className="flex items-center gap-2 py-2.5 border-b border-border">
             <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${p.colour}`} />
-            <span className="text-sm flex-1 min-w-0 truncate">{p.label}&apos;s gross salary</span>
-            <span className="text-xs text-muted">£</span>
-            <NumberInput value={p.value} placeholder="per year" onChange={v => updateGrossIncome(p.owner, v)} ariaLabel={`${p.label} gross annual salary`} className="w-[110px] text-sm border-[1.5px] border-border rounded-lg px-2 py-1.5 outline-none bg-card shrink-0 text-right" />
+            <span className="text-[15px] flex-1 min-w-0 truncate">{p.label}&apos;s gross salary</span>
+            <label className="flex items-center gap-1.5 shrink-0 w-[140px] border border-line-2 rounded-xl bg-panel px-3 min-h-[44px] focus-within:border-ink">
+              <span className="text-[16px] text-muted" aria-hidden="true">£</span>
+              <NumberInput value={p.value} placeholder="per year" onChange={v => updateGrossIncome(p.owner, v)} ariaLabel={`${p.label} gross annual salary`} className="flex-1 min-w-0 text-[16px] bg-transparent border-0 outline-none text-right num focus-visible:!outline-none" />
+            </label>
           </div>
         ))}
 
@@ -210,13 +210,13 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
         ]).map(p => (
           <div key={`payday-${p.owner}`} className="flex items-center gap-2 py-2.5 border-b border-border">
             <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${p.colour}`} />
-            <span className="text-sm flex-1 min-w-0 truncate">{p.label}&apos;s payday <span className="text-muted">(day of month)</span></span>
+            <span className="text-[15px] flex-1 min-w-0 truncate">{p.label}&apos;s payday</span>
             <NumberInput
               value={paydayFor(data, p.owner)}
-              placeholder="e.g. 25"
+              placeholder="Day, e.g. 25"
               onChange={v => updatePayday(p.owner, v)}
               ariaLabel={`${p.label}'s payday, day of the month`}
-              className="w-[90px] text-sm border border-line-2 rounded-xl px-3 py-2 outline-none bg-panel shrink-0 text-right min-h-[44px]"
+              className={`${inputClass} w-[140px] shrink-0 text-right num`}
             />
           </div>
         ))}
@@ -231,20 +231,16 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
                 placeholder={`Child ${i + 1}`}
                 onSave={name => renameDependant(d.id, name)}
               />
-              <input
-                type="month"
-                value={d.born}
-                onChange={e => updateDependant(d.id, e.target.value)}
-                aria-label={`${d.name || `Child ${i + 1}`} born`}
-                className="flex-1 min-w-0 text-xs border-[1.5px] border-border rounded-lg px-2 py-1 outline-none bg-card"
-              />
-              <span className="text-label text-muted tabular-nums shrink-0 w-8 text-right">
+              <div className="flex-1 min-w-0">
+                <MonthInput value={d.born} onChange={v => updateDependant(d.id, v)} ariaLabel={`${d.name || `Child ${i + 1}`} born`} />
+              </div>
+              <span className="text-label text-muted tabular-nums shrink-0 w-9 text-right">
                 {months == null ? '' : months < 24 ? `${months}m` : `${Math.floor(months / 12)}y`}
               </span>
               <button
                 onClick={() => removeDependant(d.id)}
                 aria-label={`Remove ${d.name || `child ${i + 1}`}`}
-                className="bg-transparent border-0 cursor-pointer text-muted text-sm shrink-0 w-11 h-11 -my-2 -mr-2 flex items-center justify-center"
+                className="bg-transparent border-0 cursor-pointer text-muted text-sm shrink-0 w-[44px] h-[44px] -my-2 -mr-2 flex items-center justify-center"
               >
                 ✕
               </button>
@@ -254,9 +250,9 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
 
         <button
           onClick={addDependant}
-          className="flex items-center gap-1 mt-1 bg-transparent border-0 cursor-pointer text-muted text-xs min-h-[40px] px-0"
+          className="flex items-center gap-1.5 mt-1 bg-transparent border-0 cursor-pointer text-ink-2 text-[15px] min-h-[44px] px-0"
         >
-          <Plus size={12} /> Add a child
+          <Plus size={16} /> Add a child
         </button>
 
         <p className="text-xs text-muted my-2 leading-relaxed">
@@ -269,24 +265,23 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
 
       <div className="card py-1 px-4 mb-3">
         <div className="text-label font-semibold uppercase tracking-label text-muted py-2.5 pb-1">Appearance</div>
-        <div className="flex justify-between items-center py-2.5">
-          <span className="text-sm">Dark mode</span>
+        <div className="flex justify-between items-center py-2.5 min-h-[56px]">
+          <span className="text-[15px]">Dark mode</span>
           <button
             onClick={toggleDarkMode}
             role="switch"
             aria-checked={darkMode}
             aria-label="Dark mode"
-            className="w-12 h-[26px] rounded-full border-0 cursor-pointer relative transition-colors duration-200"
-            style={{ background: darkMode ? 'var(--ink)' : 'var(--border)' }}
+            className={`hit-44 w-[51px] h-[31px] rounded-full border-0 cursor-pointer relative transition-colors duration-200 ${darkMode ? 'bg-ink' : 'bg-fill-2'}`}
           >
-            <div
-              className="w-5 h-5 rounded-full bg-white absolute top-[3px] transition-[left] duration-200"
-              style={{ left: darkMode ? 24 : 4 }}
+            <span
+              className="absolute top-[2px] w-[27px] h-[27px] rounded-full bg-panel shadow transition-[left] duration-200"
+              style={{ left: darkMode ? 22 : 2 }}
             />
           </button>
         </div>
         <div className="py-2.5 border-t border-border">
-          <span className="text-sm">Colours</span>
+          <span className="text-[15px]">Colours</span>
           <div className="grid grid-cols-4 gap-2 mt-2" role="radiogroup" aria-label="Colours">
             {PALETTES.map(p => (
               <button
@@ -312,28 +307,28 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
         <div className="text-label font-semibold uppercase tracking-label text-muted py-2.5 pb-1">Export / Import</div>
         <button
           onClick={handleExport}
-          className="w-full mt-2 bg-ink text-on-ink border-0 rounded-lg py-2.5 px-4 cursor-pointer text-sm font-medium"
+          className="w-full mt-2 bg-ink text-on-ink border-0 rounded-xl min-h-[48px] px-4 cursor-pointer text-[15px] font-semibold"
         >
           Download backup (.json)
         </button>
         <div className="mt-2.5">
-          <label className="block w-full bg-transparent text-ink border-[1.5px] border-border rounded-xl py-2.5 px-4 cursor-pointer text-sm font-medium text-center">
+          <label className="flex items-center justify-center w-full bg-transparent text-ink border border-line-2 rounded-xl min-h-[48px] px-4 cursor-pointer text-[15px] font-semibold">
             Upload backup (.json)
             <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
           </label>
         </div>
         <div className="mt-2.5">
-          <div className="text-xs text-muted mb-1.5">Or paste JSON directly:</div>
+          <div className="text-label text-muted mb-1.5">Or paste a backup here</div>
           <textarea
             value={importText}
             onChange={e => setImportText(e.target.value)}
-            placeholder="Paste exported JSON here..."
-            className="w-full h-20 text-xs border-[1.5px] border-border rounded-lg p-2 outline-none resize-y font-mono"
+            placeholder="Paste backup text"
+            className={`${inputClass} w-full h-24 resize-y py-2.5 text-[14px]`}
           />
           <button
             onClick={handleImport}
             disabled={!importText.trim()}
-            className={`w-full mt-1.5 border-0 rounded-lg py-2.5 px-4 text-sm font-medium text-on-ink ${importText.trim() ? 'bg-ink text-on-ink cursor-pointer' : 'bg-border cursor-default'}`}
+            className={`w-full mt-2 border-0 rounded-xl min-h-[48px] px-4 text-[15px] font-semibold text-on-ink ${importText.trim() ? 'bg-ink cursor-pointer' : 'bg-fill-2 text-muted cursor-default'}`}
           >
             Import from text
           </button>
@@ -364,13 +359,13 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
               <div className="flex gap-1.5">
                 <button
                   onClick={() => { setKeyDraft(''); setEditingKey(true) }}
-                  className="text-xs bg-transparent border-[1.5px] border-border rounded-lg px-2.5 py-1 cursor-pointer"
+                  className="text-[15px] bg-transparent border border-line-2 rounded-xl px-3.5 min-h-[44px] cursor-pointer"
                 >
                   Replace
                 </button>
                 <button
                   onClick={handleRemoveKey}
-                  className="text-xs bg-transparent text-negative border-[1.5px] border-negative rounded-lg px-2.5 py-1 cursor-pointer"
+                  className="text-[15px] bg-transparent text-negative border border-negative rounded-xl px-3.5 min-h-[44px] cursor-pointer"
                 >
                   Remove
                 </button>
@@ -397,20 +392,20 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
               autoCorrect="off"
               autoCapitalize="none"
               spellCheck={false}
-              className="w-full text-sm border-[1.5px] border-border rounded-lg px-3 py-2 outline-none font-mono"
+              className={`${inputClass} w-full font-mono text-[15px]`}
             />
             <div className="flex gap-1.5 mt-2">
               <button
                 onClick={handleSaveKey}
                 disabled={!keyDraft.trim() || savingKey}
-                className={`flex-1 border-0 rounded-lg py-2 text-sm font-medium text-on-ink ${keyDraft.trim() && !savingKey ? 'bg-ink cursor-pointer' : 'bg-border cursor-default'}`}
+                className={`flex-1 border-0 rounded-xl min-h-[48px] text-[15px] font-semibold text-on-ink ${keyDraft.trim() && !savingKey ? 'bg-ink cursor-pointer' : 'bg-fill-2 text-muted cursor-default'}`}
               >
                 {savingKey ? 'Saving…' : 'Save key'}
               </button>
               {hasKey && (
                 <button
                   onClick={() => setEditingKey(false)}
-                  className="px-3 bg-transparent border-[1.5px] border-border rounded-lg py-2 text-sm cursor-pointer"
+                  className="px-4 bg-transparent border border-line-2 rounded-xl min-h-[48px] text-[15px] cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -434,6 +429,7 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
         <p className="text-body text-muted m-0 leading-relaxed">
           Budge syncs your household budget across devices in real time via Firebase. Sign in with Google to enable sync.
         </p>
+      </div>
       </div>
     </div>
   )

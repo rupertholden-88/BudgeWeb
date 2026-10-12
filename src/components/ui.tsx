@@ -23,11 +23,11 @@ export function ConfirmDelete({ label, detail, onConfirm, onCancel }: {
 }) {
   // Portalled to <body> so it always sits above the tab bar and any open sheet.
   return createPortal(
-    <div className="fixed inset-0 z-[1000] bg-black/45 flex items-end justify-center" onClick={onCancel}>
+    <div className="fixed inset-0 z-[1000] bg-black/45 flex items-end sm:items-center justify-center sm:p-6" onClick={onCancel}>
       <div
         role="dialog"
         aria-modal="true"
-        className="bg-card rounded-t-2xl px-5 pt-5 pb-[calc(2rem+env(safe-area-inset-bottom))] w-full max-w-[480px]"
+        className="bg-card rounded-t-2xl sm:rounded-[22px] px-5 sm:px-6 pt-5 pb-[calc(2rem+env(safe-area-inset-bottom))] sm:pb-6 w-full max-w-[480px] sm:max-w-[420px]"
         onClick={e => e.stopPropagation()}
       >
         <div className="text-lead font-semibold mb-1 break-words">Delete &ldquo;{label}&rdquo;?</div>
@@ -53,8 +53,8 @@ export function StatCard({ label, value, sub, intent }: {
 }) {
   const valueClass = intent === 'positive' ? 'text-positive' : intent === 'negative' ? 'text-negative' : 'text-ink'
   return (
-    <div className="card p-3 flex-1 min-w-0">
-      <div className="section-label text-caption mb-1 truncate">{label}</div>
+    <div className="card p-3 min-w-0">
+      <div className="section-label text-caption mb-1 leading-tight break-words">{label}</div>
       <div className={`font-serif text-xl font-bold tabular-nums leading-none ${valueClass}`}>{value}</div>
       {sub && <div className="text-caption text-muted mt-1">{sub}</div>}
     </div>
@@ -77,7 +77,8 @@ export function AmountCell({ value, onChange, className }: { value: number; onCh
       onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Tab') commit() }}
       onMouseDown={e => e.stopPropagation()}
       onTouchStart={e => e.stopPropagation()}
-      className="w-24 text-right text-sm border-[1.5px] border-accent rounded-lg px-2 py-1.5 outline-none bg-accent-light font-semibold"
+      aria-label="Amount"
+      className={`${inputClass} w-[110px] text-right font-semibold num`}
       inputMode="decimal"
       autoFocus
     />
@@ -137,7 +138,7 @@ export function ExpandButton({ expanded, onClick, label, active, icon }: {
       onTouchStart={e => e.stopPropagation()}
       aria-label={label}
       aria-expanded={expanded}
-      className={`border-0 cursor-pointer flex items-center justify-center shrink-0 w-11 h-11 -my-1.5 -mr-1.5 rounded-xl ${
+      className={`border-0 cursor-pointer flex items-center justify-center shrink-0 w-[44px] h-[44px] -my-1.5 -mr-1.5 rounded-xl ${
         active ? 'bg-accent-light text-accent' : expanded ? 'bg-surface text-ink' : 'bg-transparent text-muted'
       }`}
     >
@@ -162,7 +163,7 @@ export function DeleteAction({ label, onClick }: { label: string; onClick: () =>
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-1.5 bg-transparent border-0 cursor-pointer text-negative text-xs font-medium min-h-[36px] px-0"
+      className="flex items-center gap-1.5 bg-transparent border-0 cursor-pointer text-negative text-[15px] font-medium min-h-[44px] px-0"
     >
       <Trash2 size={13} /> {label}
     </button>
@@ -171,14 +172,14 @@ export function DeleteAction({ label, onClick }: { label: string; onClick: () =>
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="flex flex-col gap-0.5">
+    <label className="flex flex-col gap-1 min-w-0">
       <span className="text-caption text-muted uppercase tracking-label">{label}</span>
       {children}
     </label>
   )
 }
 
-export const inputClass = 'text-[15px] text-ink border border-line-2 rounded-xl px-3 py-2 outline-none bg-panel min-h-[44px]'
+export const inputClass = 'text-[16px] text-ink border border-line-2 rounded-xl px-3 py-2 outline-none bg-panel min-h-[44px]'
 
 /** Long press as a shortcut only — every delete also has a visible button. */
 export function useLongPress(onLongPress: () => void, disabled = false) {
@@ -231,6 +232,37 @@ export function NumberInput({ value, onChange, placeholder = '0', className, ari
         else { const n = parseFloat(raw); if (Number.isFinite(n)) onChange(n) }
       }}
       className={className ?? inputClass}
+    />
+  )
+}
+
+/**
+ * A month field that reads "Not set" when empty. An empty native month input
+ * shows dashes, which looks broken; tapping this opens the real picker.
+ */
+export function MonthInput({ value, onChange, ariaLabel, className, min }: {
+  value: string | undefined; onChange: (v: string) => void; ariaLabel: string; className?: string; min?: string
+}) {
+  const [editing, setEditing] = useState(false)
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (!editing) return
+    const el = ref.current
+    el?.focus()
+    try { el?.showPicker?.() } catch {}
+  }, [editing])
+  const cls = className ?? `${inputClass} w-full`
+  if (!value && !editing) return (
+    <button type="button" onClick={() => setEditing(true)} aria-label={`${ariaLabel}: not set`} className={`${cls} text-left text-muted cursor-pointer`}>
+      Not set
+    </button>
+  )
+  return (
+    <input
+      ref={ref} type="month" value={value ?? ''} min={min}
+      onChange={e => onChange(e.target.value)}
+      onBlur={() => setEditing(false)}
+      aria-label={ariaLabel} className={cls}
     />
   )
 }

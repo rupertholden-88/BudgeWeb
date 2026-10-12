@@ -114,80 +114,80 @@ function AssetRow({ asset, owner, today, updateAsset, updateAssetFields, deleteA
           <ExpandButton expanded={expanded} onClick={() => setExpanded(e => !e)} label={expanded ? `Collapse ${asset.label}` : `Details for ${asset.label}`} />
         </div>
         {expanded && (
-          <div className="pb-2 flex flex-wrap gap-2">
+          <div className="pb-3 grid grid-cols-2 gap-x-3 gap-y-3">
             {!lockType && (
-              <div className="flex flex-col gap-0.5">
-                <label className="text-caption text-muted uppercase tracking-label">Type</label>
+              <label className="flex flex-col gap-1 min-w-0 col-span-2">
+                <span className="text-caption text-muted uppercase tracking-label">Type</span>
                 <select
                   value={asset.type}
                   onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, asset.institution, undefined, e.target.value as AssetType)}
-                  className="text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 bg-card"
+                  className={`${inputClass} w-full`}
                 >
                   {Object.entries(ASSET_LABELS).filter(([k]) => k !== 'PENSION').map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
-              </div>
+              </label>
             )}
-            <div className="flex flex-col gap-0.5">
-              <label className="text-caption text-muted uppercase tracking-label">{showCap ? 'Rate % (to cap)' : 'Rate %'}</label>
-              <NumberInput value={asset.interestRate} onChange={v => updateAsset(owner, today, asset.id, asset.amount, v, asset.institution)} className="w-[70px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none" />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <label className="text-caption text-muted uppercase tracking-label">Institution</label>
+            <label className="flex flex-col gap-1 min-w-0">
+              <span className="text-caption text-muted uppercase tracking-label">{showCap ? 'Rate % (to cap)' : 'Rate %'}</span>
+              <NumberInput value={asset.interestRate} onChange={v => updateAsset(owner, today, asset.id, asset.amount, v, asset.institution)} className={`${inputClass} w-full`} />
+            </label>
+            <label className="flex flex-col gap-1 min-w-0">
+              <span className="text-caption text-muted uppercase tracking-label">Institution</span>
               <input
                 value={asset.institution || ''}
                 placeholder="e.g. Monzo"
                 onChange={e => updateAsset(owner, today, asset.id, asset.amount, asset.interestRate, e.target.value)}
-                className="w-[110px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none"
+                className={`${inputClass} w-full`}
               />
-            </div>
+            </label>
             {asset.type !== 'PENSION' && (
-              <div className="w-full">
-                <label className="flex items-start gap-2 cursor-pointer min-h-[32px]">
+              <div className="col-span-2">
+                <label className="flex items-start gap-3 cursor-pointer min-h-[44px] py-1">
                   <input
                     type="checkbox"
-                    className="mt-0.5 w-4 h-4 shrink-0"
+                    className="mt-0.5 w-5 h-5 shrink-0"
                     checked={showCap}
                     onChange={e => {
                       setShowCap(e.target.checked)
                       if (!e.target.checked) updateAssetFields(owner, today, asset.id, { rateCap: undefined, rateAboveCap: undefined })
                     }}
                   />
-                  <span className="text-xs leading-snug">
+                  <span className="text-[15px] leading-snug">
                     Rate only applies up to a limit
                     <span className="block text-caption text-muted mt-0.5">For regular savers and capped accounts, e.g. 5.25% on the first £5,000 then 1%.</span>
                   </span>
                 </label>
                 {showCap && (
-                  <div className="flex gap-2 flex-wrap mt-1.5">
-                    <div className="flex flex-col gap-0.5">
-                      <label className="text-caption text-muted uppercase tracking-label">Up to £</label>
-                      <NumberInput value={asset.rateCap} placeholder="5000" onChange={v => updateAssetFields(owner, today, asset.id, { rateCap: v })} className="w-[90px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none" />
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <label className="text-caption text-muted uppercase tracking-label">Then %</label>
-                      <NumberInput value={asset.rateAboveCap} placeholder="0" onChange={v => updateAssetFields(owner, today, asset.id, { rateAboveCap: v })} className="w-[70px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none" />
-                    </div>
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    <label className="flex flex-col gap-1 min-w-0">
+                      <span className="text-caption text-muted uppercase tracking-label">Up to £</span>
+                      <NumberInput value={asset.rateCap} placeholder="5000" onChange={v => updateAssetFields(owner, today, asset.id, { rateCap: v })} className={`${inputClass} w-full`} />
+                    </label>
+                    <label className="flex flex-col gap-1 min-w-0">
+                      <span className="text-caption text-muted uppercase tracking-label">Then %</span>
+                      <NumberInput value={asset.rateAboveCap} placeholder="0" onChange={v => updateAssetFields(owner, today, asset.id, { rateAboveCap: v })} className={`${inputClass} w-full`} />
+                    </label>
                   </div>
                 )}
               </div>
             )}
             {asset.type === 'PENSION' && (
               <>
-                <div className="flex flex-col gap-0.5">
-                  <label className="text-caption text-muted uppercase tracking-label">You £/mo</label>
-                  <NumberInput value={asset.monthlyContribution} placeholder="0" onChange={v => updateAssetFields(owner, today, asset.id, { monthlyContribution: v })} className="w-[80px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none" />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <label className="text-caption text-muted uppercase tracking-label">Employer £/mo</label>
-                  <NumberInput value={asset.employerContribution} placeholder="0" onChange={v => updateAssetFields(owner, today, asset.id, { employerContribution: v })} className="w-[80px] text-xs border-[1.5px] border-border rounded-lg px-1.5 py-1 outline-none" />
-                </div>
-                <p className="text-caption text-muted w-full m-0 leading-snug">
+                <label className="flex flex-col gap-1 min-w-0">
+                  <span className="text-caption text-muted uppercase tracking-label">You £/mo</span>
+                  <NumberInput value={asset.monthlyContribution} placeholder="0" onChange={v => updateAssetFields(owner, today, asset.id, { monthlyContribution: v })} className={`${inputClass} w-full`} />
+                </label>
+                <label className="flex flex-col gap-1 min-w-0">
+                  <span className="text-caption text-muted uppercase tracking-label">Employer £/mo</span>
+                  <NumberInput value={asset.employerContribution} placeholder="0" onChange={v => updateAssetFields(owner, today, asset.id, { employerContribution: v })} className={`${inputClass} w-full`} />
+                </label>
+                <p className="text-caption text-muted col-span-2 m-0 leading-snug">
                   For the health check only — workplace pensions usually come out before your
                   take-home pay, so these aren&apos;t added to your budget as outgoings.
                 </p>
               </>
             )}
-            <div className="w-full pt-1 border-t border-border">
+            <div className="col-span-2 pt-1 border-t border-border">
               <DeleteAction label={asset.type === 'PENSION' ? 'Delete pension' : 'Delete asset'} onClick={() => setDeleteModal(true)} />
             </div>
           </div>
@@ -223,28 +223,32 @@ function OwnerPanel({ owner, name, budget, addAsset, updateAsset, updateAssetFie
           <AssetRow key={asset.id} asset={asset as any} owner={owner} today={today} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
         ))}
         {adding ? (
-          <div className="flex gap-1.5 mt-2 flex-wrap">
+          <div className="flex flex-col gap-2 mt-2">
             <input
               value={newLabel}
               onChange={e => setNewLabel(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') submit() }}
-              placeholder="Account name..."
+              placeholder="Account name, e.g. Monzo savings"
               autoFocus
-              className="flex-1 min-w-[120px] text-body border-[1.5px] border-border rounded-lg px-2 py-1 outline-none"
+              aria-label="Name"
+              className={`${inputClass} w-full`}
             />
             <select
               value={newType}
               onChange={e => setNewType(e.target.value as AssetType)}
-              className="text-body border-[1.5px] border-border rounded-lg px-2 py-1 bg-card cursor-pointer"
+              aria-label="Type"
+              className={`${inputClass} w-full cursor-pointer`}
             >
               {REGULAR_ASSET_TYPES.map(t => <option key={t} value={t}>{ASSET_LABELS[t]}</option>)}
             </select>
-            <button onClick={submit} className="bg-ink text-on-ink border-0 rounded-lg px-3 py-1 cursor-pointer text-body">Add</button>
-            <button onClick={() => setAdding(false)} className="bg-transparent border-[1.5px] border-border rounded-lg px-3 py-1 cursor-pointer text-body">Cancel</button>
+            <div className="flex gap-2">
+              <button onClick={submit} className="flex-1 bg-ink text-on-ink border-0 rounded-xl min-h-[48px] cursor-pointer text-[15px] font-semibold">Add</button>
+              <button onClick={() => setAdding(false)} className="px-5 bg-fill border-0 rounded-xl min-h-[48px] cursor-pointer text-[15px]">Cancel</button>
+            </div>
           </div>
         ) : (
-          <button onClick={() => setAdding(true)} className="flex items-center gap-1 mt-2 bg-transparent border-0 cursor-pointer text-muted text-xs">
-            <Plus size={12} /> Add asset
+          <button onClick={() => setAdding(true)} className="flex items-center gap-2 mt-1 bg-transparent border-0 cursor-pointer text-ink-2 text-[15px] min-h-[44px]">
+            <Plus size={16} /> Add asset
           </button>
         )}
       </div>
@@ -277,21 +281,24 @@ function PensionOwnerPanel({ owner, name, budget, addAsset, updateAsset, updateA
           <AssetRow key={asset.id} asset={asset as any} owner={owner} today={today} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} lockType />
         ))}
         {adding ? (
-          <div className="flex gap-1.5 mt-2 flex-wrap">
+          <div className="flex flex-col gap-2 mt-2">
             <input
               value={newLabel}
               onChange={e => setNewLabel(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') submit() }}
               placeholder="e.g. Workplace Pension"
               autoFocus
-              className="flex-1 min-w-[120px] text-body border-[1.5px] border-border rounded-lg px-2 py-1 outline-none"
+              aria-label="Name"
+              className={`${inputClass} w-full`}
             />
-            <button onClick={submit} className="bg-pension text-on-ink border-0 rounded-lg px-3 py-1 cursor-pointer text-body">Add</button>
-            <button onClick={() => setAdding(false)} className="bg-transparent border-[1.5px] border-border rounded-lg px-3 py-1 cursor-pointer text-body">Cancel</button>
+            <div className="flex gap-2">
+              <button onClick={submit} className="flex-1 bg-ink text-on-ink border-0 rounded-xl min-h-[48px] cursor-pointer text-[15px] font-semibold">Add</button>
+              <button onClick={() => setAdding(false)} className="px-5 bg-fill border-0 rounded-xl min-h-[48px] cursor-pointer text-[15px]">Cancel</button>
+            </div>
           </div>
         ) : (
-          <button onClick={() => setAdding(true)} className="flex items-center gap-1 mt-2 bg-transparent border-0 cursor-pointer text-muted text-xs">
-            <Plus size={12} /> Add pension
+          <button onClick={() => setAdding(true)} className="flex items-center gap-2 mt-1 bg-transparent border-0 cursor-pointer text-ink-2 text-[15px] min-h-[44px]">
+            <Plus size={16} /> Add pension
           </button>
         )}
       </div>
@@ -393,10 +400,10 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled 
   const totalMonthly = byOwner.reduce((a, o) => a + o.monthly, 0)
 
   return (
-    <div className="h-full overflow-y-auto p-4">
+    <div className="h-full overflow-y-auto px-5 pt-1 pb-[calc(32px+env(safe-area-inset-bottom))]">
 
       {/* Summary stat cards */}
-      <div className="grid grid-cols-2 gap-2 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
         <StatCard
           label="Savings"
           value={fmtK(totalAll)}
@@ -418,6 +425,7 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled 
         />
       </div>
 
+      <div className="lg:columns-2 lg:gap-5 [&>*]:break-inside-avoid">
       {/* Portfolio chart */}
       {(totalAll > 0 || activeTypes.length > 0) && (
         <div className="card p-4 mb-4">
@@ -608,6 +616,7 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled 
         <PensionOwnerPanel owner="NIAMH"  name={n1} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
         <PensionOwnerPanel owner="RUPERT" name={n2} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
         <PensionOwnerPanel owner="JOINT"  name={n3} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
+      </div>
       </div>
     </div>
   )

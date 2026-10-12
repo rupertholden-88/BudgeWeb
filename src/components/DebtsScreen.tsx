@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Owner, DebtType, Debt, Property, fmt, debtPayoff } from '@/lib/models'
 import { Plus, Home } from 'lucide-react'
-import { ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, NumberInput, inputClass, useLongPress, ownerBorderClass } from './ui'
+import { ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, NumberInput, inputClass, useLongPress, ownerBorderClass, MonthInput } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -43,7 +43,8 @@ function DebtCard({ debt, ownerName, properties, onUpdate, onDelete }: {
                 onKeyDown={e => { if (e.key === 'Enter') commitLabel() }}
                 onBlur={commitLabel}
                 onTouchStart={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
-                className="w-full min-w-0 text-sm font-semibold border-[1.5px] border-accent rounded-lg px-1.5 py-1 bg-accent-light outline-none"
+                aria-label="Debt name"
+                className={`${inputClass} w-full min-w-0 font-semibold text-[17px]`}
                 autoFocus
               />
             ) : (
@@ -52,7 +53,7 @@ function DebtCard({ debt, ownerName, properties, onUpdate, onDelete }: {
                 onTouchStart={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
                 role="button" tabIndex={0}
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { setLabelDraft(debt.label); setEditingLabel(true) } }}
-                className="font-semibold text-sm cursor-text py-0.5 rounded break-words"
+                className="inline-block font-semibold text-[16px] cursor-text py-1 rounded break-words min-h-[32px]"
               >
                 {debt.label}
               </span>
@@ -79,7 +80,7 @@ function DebtCard({ debt, ownerName, properties, onUpdate, onDelete }: {
         {expanded && (
           <div className="px-3 pb-2 border-t border-border">
             <PanelSection title="Figures">
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {([
                   { label: 'Balance £', value: debt.currentBalance, key: 'currentBalance' },
                   { label: 'Monthly £', value: debt.monthlyPayment, key: 'monthlyPayment' },
@@ -90,24 +91,24 @@ function DebtCard({ debt, ownerName, properties, onUpdate, onDelete }: {
                       value={value || undefined}
                       onChange={v => onUpdate(debt.id, { [key]: v ?? 0 })}
                       ariaLabel={label}
-                      className={`${inputClass} w-[100px]`}
+                      className={`${inputClass} w-full min-w-0`}
                     />
                   </Field>
                 ))}
               </div>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <label className="flex items-center gap-1.5 text-body cursor-pointer min-h-[36px]">
-                  <input type="checkbox" className="w-4 h-4" checked={debt.isZeroPercent} onChange={e => onUpdate(debt.id, { isZeroPercent: e.target.checked })} />
+              <div className="flex items-center gap-3 mt-2">
+                <label className="flex items-center gap-2 text-[15px] cursor-pointer min-h-[44px] shrink-0">
+                  <input type="checkbox" className="w-5 h-5" checked={debt.isZeroPercent} onChange={e => onUpdate(debt.id, { isZeroPercent: e.target.checked })} />
                   0% deal
                 </label>
                 {debt.isZeroPercent && (
-                  <input
-                    type="month"
-                    aria-label="0% deal ends"
-                    value={debt.zeroPercentExpiryDate ?? ''}
-                    onChange={e => onUpdate(debt.id, { zeroPercentExpiryDate: e.target.value })}
-                    className={inputClass}
-                  />
+                  <div className="flex-1 min-w-0">
+                    <MonthInput
+                      ariaLabel="0% deal ends"
+                      value={debt.zeroPercentExpiryDate}
+                      onChange={v => onUpdate(debt.id, { zeroPercentExpiryDate: v })}
+                    />
+                  </div>
                 )}
               </div>
               <input
@@ -134,14 +135,14 @@ function DebtCard({ debt, ownerName, properties, onUpdate, onDelete }: {
 
             {debt.owner !== 'JOINT' && (
               <PanelSection title="Who it's for">
-                <label className="flex items-start gap-2 cursor-pointer">
+                <label className="flex items-start gap-3 cursor-pointer min-h-[44px] py-1">
                   <input
                     type="checkbox"
                     checked={!!debt.sharedContribution}
                     onChange={e => onUpdate(debt.id, { sharedContribution: e.target.checked || undefined })}
-                    className="mt-0.5 shrink-0 w-4 h-4"
+                    className="mt-0.5 shrink-0 w-5 h-5"
                   />
-                  <span className="text-xs text-ink leading-snug">
+                  <span className="text-[15px] text-ink leading-snug">
                     {ownerName} pays this, but it&apos;s for the household
                     <span className="block text-caption text-muted mt-0.5">Counts the repayment towards their share of household costs on Fair Share.</span>
                   </span>
@@ -172,10 +173,10 @@ export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
   const properties = data.properties ?? []
 
   return (
-    <div className="h-full overflow-y-auto p-4">
+    <div className="h-full overflow-y-auto px-5 pt-1 pb-[calc(32px+env(safe-area-inset-bottom))]">
       <div className="flex justify-between items-baseline mb-4">
-        <h2 className="font-serif text-xl m-0">Debts</h2>
-        <div className={`font-serif text-xl font-bold tabular-nums ${totalBalance > 0 ? 'text-negative' : 'text-muted'}`}>{fmt(totalBalance)}</div>
+        <h2 className="text-[22px] leading-7 font-semibold tracking-[-0.01em] m-0">Total owed</h2>
+        <div className={`text-[22px] font-bold tabular-nums ${totalBalance > 0 ? 'text-negative' : 'text-muted'}`}>{fmt(totalBalance)}</div>
       </div>
 
       {data.debts.length > 0 && (
@@ -193,9 +194,11 @@ export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
         </div>
       )}
 
-      {data.debts.map(d => (
-        <DebtCard key={d.id} debt={d} ownerName={ownerName(d.owner)} properties={properties} onUpdate={updateDebt} onDelete={deleteDebt} />
-      ))}
+      <div className="lg:columns-2 lg:gap-5 [&>*]:break-inside-avoid">
+        {data.debts.map(d => (
+          <DebtCard key={d.id} debt={d} ownerName={ownerName(d.owner)} properties={properties} onUpdate={updateDebt} onDelete={deleteDebt} />
+        ))}
+      </div>
 
       {data.debts.length === 0 && !adding && (
         <div className="text-center text-muted mt-8 text-sm">No debts added yet.</div>
@@ -222,14 +225,14 @@ export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
             </select>
           </div>
           <div className="flex gap-2">
-            <button onClick={submit} className="flex-1 bg-ink text-on-ink border-0 rounded-xl py-2.5 cursor-pointer text-sm font-semibold">Add debt</button>
-            <button onClick={() => setAdding(false)} className="px-4 bg-transparent border-[1.5px] border-border rounded-xl py-2.5 cursor-pointer text-sm">Cancel</button>
+            <button onClick={submit} className="flex-1 bg-ink text-on-ink border-0 rounded-xl min-h-[48px] cursor-pointer text-[15px] font-semibold">Add debt</button>
+            <button onClick={() => setAdding(false)} className="px-5 bg-fill border-0 rounded-xl min-h-[48px] cursor-pointer text-[15px]">Cancel</button>
           </div>
         </div>
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="flex items-center justify-center gap-2 mt-3 w-full py-3.5 border-2 border-dashed border-border rounded-xl text-muted text-sm cursor-pointer bg-transparent"
+          className="flex items-center justify-center gap-2 mt-3 w-full min-h-[52px] border-2 border-dashed border-line-2 rounded-xl text-ink-2 text-[15px] cursor-pointer bg-transparent"
         >
           <Plus size={14} /> Add debt
         </button>
