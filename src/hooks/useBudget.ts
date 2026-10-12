@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore'
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth'
 import { db, auth, provider } from '@/lib/firebase'
-import { BudgetData, Debt, Owner, EntryType, AssetType, Asset, DebtType, Property, Fuel, EnergyTariff, defaultBudgetData, calcTotals, monthlyInterest, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
+import { BudgetData, OneOff, Debt, Owner, EntryType, AssetType, Asset, DebtType, Property, Fuel, EnergyTariff, defaultBudgetData, calcTotals, monthlyInterest, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
 
 function uuid() { return crypto.randomUUID() }
 
@@ -295,6 +295,42 @@ export function useBudget() {
     }))
   }
 
+  const addOneOff = (fields: Omit<OneOff, 'id'>): string => {
+    const id = uuid()
+    mutate(b => ({ ...b, oneOffs: [...(b.oneOffs ?? []), { ...fields, id }] }))
+    return id
+  }
+
+  const updateOneOff = (id: string, fields: Partial<OneOff>) => {
+    mutate(b => ({ ...b, oneOffs: (b.oneOffs ?? []).map(o => o.id === id ? { ...o, ...fields } : o) }))
+  }
+
+  /**
+   * Tick off a top-up, or a cost paid from savings. Paying from savings takes
+   * the amount off that pot's current balance (and puts it back if unticked).
+   */
+  const setOneOffDone = (id: string, done: boolean) => {
+    mutate(b => {
+      const o = (b.oneOffs ?? []).find(x => x.id === id)
+      if (!o || !!o.done === done) return b
+      let next: BudgetData = { ...b, oneOffs: (b.oneOffs ?? []).map(x => x.id === id ? { ...x, done: done || undefined } : x) }
+      if (o.fromSavings && o.savingsFrom && o.amount > 0) {
+        const { owner, label } = o.savingsFrom
+        const date = new Date().toISOString().slice(0, 10)
+        const snap = getOrCopySnapshot(next, owner, date)
+        if (snap.assets.some(a => a.label === label)) {
+          const updated = { ...snap, assets: snap.assets.map(a => a.label !== label ? a : { ...a, amount: Math.max(0, a.amount + (done ? -o.amount : o.amount)) }) }
+          next = { ...next, savingsHistory: [...next.savingsHistory.filter(s => !(s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7))), updated].sort((a, z) => a.date.localeCompare(z.date)) }
+        }
+      }
+      return next
+    })
+  }
+
+  const deleteOneOff = (id: string) => {
+    mutate(b => ({ ...b, oneOffs: (b.oneOffs ?? []).filter(o => o.id !== id) }))
+  }
+
   const deleteProperty = (id: string) => {
     mutate(b => ({
       ...b,
@@ -445,6 +481,8 @@ export function useBudget() {
   }
 
   const totals: Totals = calcTotals(data)
+  // A typical month, without this month's one-offs: for averages and the health check.
+  const regularTotals: Totals = calcTotals(data, { oneOffs: false })
 
   // Auto-snapshot current month's spend whenever budget changes
   useEffect(() => {
@@ -456,7 +494,7 @@ export function useBudget() {
       const snap: SpendSnapshot = { date: today, totalInc: totals.totalInc, totalExp: totals.totalExp, totalSav: totals.totalSav }
       return { ...b, spendHistory: [...(b.spendHistory || []).filter((s: SpendSnapshot) => s.date !== today), snap].sort((a, z) => a.date.localeCompare(z.date)) }
     })
-  }, [data.categories, data.debts]) // eslint-disable-line
+  }, [data.categories, data.debts, data.oneOffs]) // eslint-disable-line
 
   // Carry last month's balances into a new month as soon as the app has loaded,
   // not only when Assets is opened — otherwise on the 1st, Analysis, net worth
@@ -475,12 +513,13 @@ export function useBudget() {
   }, [authLoading, cloudLoading, localLoading, data.savingsHistory]) // eslint-disable-line
 
   return {
-    data, user, authLoading, cloudLoading, localLoading, savedAt, isRefreshing, totals,
+    data, user, authLoading, cloudLoading, localLoading, savedAt, isRefreshing, totals, regularTotals,
     signIn, signOutUser, refreshFromCloud,
     updateOwnerName, updateBirthMonth, addDependant, updateDependant, removeDependant,
     addCategory, renameCategory, deleteCategory,
     updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, toggleItemAutoRenew, updateItemInsurance, toggleItemShared, updateItemProperty, recordFinancialHealthRun,
     updateGrossIncome, updatePayday, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,
+    addOneOff, updateOneOff, deleteOneOff, setOneOffDone,
     addAsset, updateAsset, updateAssetFields, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,
