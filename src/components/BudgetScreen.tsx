@@ -269,17 +269,17 @@ function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose }:
         onChange={e => setLabel(e.target.value)}
         onBlur={() => { if (label.trim() && label !== item.label) renameItem(cat.key, item.id, label) }}
         aria-label="Name"
-        className="w-full bg-transparent text-[22px] font-semibold tracking-[-0.02em] outline-none border-0 p-0 min-h-[44px] text-ink"
+        className="title-input w-full bg-transparent outline-none border-0 p-0 min-h-[44px] text-ink"
       />
-      <label className="flex items-baseline gap-1 mt-1 mb-3">
-        <span className="text-[34px] font-semibold text-muted" aria-hidden="true">£</span>
+      <label className="amount-field mt-2 mb-3">
+        <span className="cur-big" aria-hidden="true">£</span>
         <NumberInput
           value={item.amount || undefined}
           onChange={v => updateItemAmount(cat.key, item.id, v ?? 0)}
           ariaLabel={`Amount per month for ${item.label}`}
-          className="flex-1 min-w-0 bg-transparent text-[34px] font-semibold tracking-[-0.02em] num outline-none border-0 px-1 rounded-lg text-ink"
+          className="amount-input num"
         />
-        <span className="text-[17px] text-muted shrink-0">/mo</span>
+        <span className="suffix">a month</span>
       </label>
       {focus === 'amount' && <AutoFocus selector='input[aria-label^="Amount per month"]' />}
 
@@ -574,15 +574,15 @@ function OneOffSheet({ initial, budget, properties, ownerName, onClose }: {
           onCancel={() => setConfirmDelete(false)}
         />
       )}
-      <label className="flex items-baseline gap-1 mt-1">
-        <span className="text-[34px] font-semibold text-muted" aria-hidden="true">£</span>
+      <label className="amount-field mt-2 mb-1">
+        <span className="cur-big" aria-hidden="true">£</span>
         <NumberInput
           value={d.amount || undefined}
           onChange={v => set({ amount: v ?? 0 })}
           ariaLabel="One-off amount"
-          className="flex-1 min-w-0 bg-transparent text-[34px] font-semibold tracking-[-0.02em] num outline-none border-0 px-1 rounded-lg text-ink"
+          className="amount-input num"
         />
-        <span className="text-[17px] text-muted shrink-0">once</span>
+        <span className="suffix">once</span>
       </label>
       {isNew && <AutoFocus selector='input[aria-label="One-off amount"]' />}
       <input
@@ -591,7 +591,7 @@ function OneOffSheet({ initial, budget, properties, ownerName, onClose }: {
         onBlur={() => { if (!isNew && d.label.trim() && d.label !== initial.label) updateOneOff(initial.id!, { label: d.label.trim() }) }}
         aria-label="What it’s for"
         placeholder="What’s it for? e.g. Palmer Maintenance"
-        className="w-full bg-transparent text-[19px] font-semibold tracking-[-0.01em] outline-none border-0 p-0 min-h-[44px] mb-2 text-ink placeholder:text-faint placeholder:font-normal"
+        className="title-input w-full bg-transparent outline-none border-0 p-0 min-h-[44px] mt-2 text-ink placeholder:text-faint placeholder:font-normal"
       />
 
       <div className="py-2.5 border-t border-line">
@@ -611,7 +611,7 @@ function OneOffSheet({ initial, budget, properties, ownerName, onClose }: {
 
       <div className="py-2.5 border-t border-line">
         <div className="text-[15px] text-ink mb-2">When’s it due?</div>
-        <div className="seg" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }} role="group" aria-label="When it’s due">
+        <div className="seg" style={{ gridTemplateColumns: '1.3fr 1.2fr .75fr' }} role="group" aria-label="When it’s due">
           {(['now', 'next', 'later'] as const).map(v => (
             <button key={v} aria-pressed={due === v} onClick={() => setDue(v)}><span className="lbl">{dueLabels[v]}</span></button>
           ))}
