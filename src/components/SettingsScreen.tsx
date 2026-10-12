@@ -42,11 +42,21 @@ function NameRow({ label, value, onSave, colorClass }: { label: string; value: s
   )
 }
 
+/** Colour palettes, defined as token sets in globals.css. Stored per device, like dark mode. */
+const PALETTES = [
+  { id: 'classic', label: 'Classic', swatch: ['#1F1A17', '#BDB2A3', '#0F8B8D'] },
+  { id: 'sun', label: 'Sunshine', swatch: ['#5B4FD9', '#FFB627', '#22B07D'] },
+  { id: 'sea', label: 'Seaside', swatch: ['#16697A', '#F4A261', '#2BB39B'] },
+  { id: 'berry', label: 'Berry', swatch: ['#3A2470', '#FF8FB1', '#5EE3B0'] },
+] as const
+type PaletteId = typeof PALETTES[number]['id']
+
 export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook; onToast?: (msg: string) => void }) {
   const { data, user, updateOwnerName, getJsonString, importFromJson, updateBirthMonth, addDependant, updateDependant, removeDependant, updateGrossIncome, updatePayday } = budget
   const [importText, setImportText] = useState('')
   const [importResult, setImportResult] = useState<{ ok: boolean; text: string } | null>(null)
   const [darkMode, setDarkMode] = useState(false)
+  const [palette, setPalette] = useState<PaletteId>('classic')
 
   const { hasKey, last4, keyLength, loading: keyLoading, saveKey, removeKey } = useApiKey(user)
   const [keyDraft, setKeyDraft] = useState('')
@@ -77,7 +87,18 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
   useEffect(() => {
     const saved = localStorage.getItem('budge-dark-mode')
     if (saved === 'true') { setDarkMode(true); document.documentElement.setAttribute('data-theme', 'dark') }
+    try {
+      const p = localStorage.getItem('budge-palette')
+      if (p && PALETTES.some(x => x.id === p)) setPalette(p as PaletteId)
+    } catch {}
   }, [])
+
+  const choosePalette = (id: PaletteId) => {
+    setPalette(id)
+    if (id === 'classic') document.documentElement.removeAttribute('data-palette')
+    else document.documentElement.setAttribute('data-palette', id)
+    try { localStorage.setItem('budge-palette', id) } catch {}
+  }
 
   const toggleDarkMode = () => {
     const next = !darkMode
@@ -140,13 +161,13 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
         ]).map(p => (
           <div key={p.owner} className="flex items-center gap-2 py-2.5 border-b border-border">
             <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${p.colour}`} />
-            <span className="text-sm flex-1 min-w-0 truncate">{p.label}</span>
+            <span className="text-sm w-[72px] shrink-0 truncate">{p.label}</span>
             <input
               type="month"
               value={p.value ?? ''}
               onChange={e => updateBirthMonth(p.owner, e.target.value)}
               aria-label={`${p.label} born`}
-              className="text-xs border-[1.5px] border-border rounded-lg px-2 py-1 outline-none bg-card shrink-0"
+              className="flex-1 min-w-0 text-xs border-[1.5px] border-border rounded-lg px-2 py-1 outline-none bg-card"
             />
             {p.value && (
               <span className="text-label text-muted tabular-nums shrink-0 w-8 text-right">{ageInYears(p.value)}y</span>
@@ -182,13 +203,13 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
           return (
             <div key={d.id} className="flex items-center gap-2 py-2.5 border-b border-border">
               <div className="w-2.5 h-2.5 rounded-full shrink-0 bg-joint" />
-              <span className="text-sm flex-1 min-w-0 truncate">Child {i + 1}</span>
+              <span className="text-sm w-[72px] shrink-0 truncate">Child {i + 1}</span>
               <input
                 type="month"
                 value={d.born}
                 onChange={e => updateDependant(d.id, e.target.value)}
                 aria-label={`Child ${i + 1} born`}
-                className="text-xs border-[1.5px] border-border rounded-lg px-2 py-1 outline-none bg-card shrink-0"
+                className="flex-1 min-w-0 text-xs border-[1.5px] border-border rounded-lg px-2 py-1 outline-none bg-card"
               />
               <span className="text-label text-muted tabular-nums shrink-0 w-8 text-right">
                 {months == null ? '' : months < 24 ? `${months}m` : `${Math.floor(months / 12)}y`}
@@ -236,6 +257,27 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
               style={{ left: darkMode ? 24 : 4 }}
             />
           </button>
+        </div>
+        <div className="py-2.5 border-t border-border">
+          <span className="text-sm">Colours</span>
+          <div className="grid grid-cols-4 gap-2 mt-2" role="radiogroup" aria-label="Colours">
+            {PALETTES.map(p => (
+              <button
+                key={p.id}
+                role="radio"
+                aria-checked={palette === p.id}
+                onClick={() => choosePalette(p.id)}
+                className={`flex flex-col items-center gap-1.5 rounded-xl py-2.5 min-h-[64px] cursor-pointer border-[1.5px] ${palette === p.id ? 'border-ink bg-fill' : 'border-transparent'}`}
+              >
+                <span className="flex" aria-hidden="true">
+                  {p.swatch.map((c, i) => (
+                    <span key={c} className="w-4 h-4 rounded-full ring-2 ring-[var(--panel)]" style={{ background: c, marginLeft: i ? -5 : 0 }} />
+                  ))}
+                </span>
+                <span className={`text-caption ${palette === p.id ? 'text-ink font-semibold' : 'text-muted'}`}>{p.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

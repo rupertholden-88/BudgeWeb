@@ -25,6 +25,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             if (localStorage.getItem('budge-dark-mode') === 'true') {
               document.documentElement.setAttribute('data-theme', 'dark')
             }
+            var palette = localStorage.getItem('budge-palette')
+            if (palette && palette !== 'classic') document.documentElement.setAttribute('data-palette', palette)
           } catch(e) {}
         `}} />
         {children}
