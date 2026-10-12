@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import {
   Category, LineItem, TabFilter, Owner, EntryType, Debt, Property, fmt, daysUntil, isInsuranceItem,
   debtPayoff, isMortgage, propertySummaries, nextPayday, energySwitchReminders, householdCostSplit,
+  OneOff, monthKey,
 } from '@/lib/models'
 import { needsAttention } from '@/lib/attention'
 import { Plus, ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, X } from 'lucide-react'
@@ -86,7 +87,7 @@ function Hero({ label, value, suffix, negative, pair, segments, legendEnd, note,
           <div className="flex h-1.5 gap-[2px] rounded-[3px] overflow-hidden mt-4" aria-hidden="true">
             {shown.map(s => <div key={s.label} className="h-full" style={{ flexGrow: s.value, background: s.color }} />)}
           </div>
-          <div className="grid gap-2 mt-2.5 num" style={{ gridTemplateColumns: `repeat(${shown.length + (legendEnd ? 1 : 0)}, minmax(0, 1fr))` }}>
+          <div className={`flex gap-2 mt-2.5 num ${shown.length + (legendEnd ? 1 : 0) > 4 ? 'justify-between' : '[&>*]:flex-1'}`}>
             {[...shown.map(s => ({ key: s.label, label: s.label, color: s.color as string | undefined, value: fmt(s.value) as React.ReactNode })),
               ...(legendEnd ? [{ key: '_end', label: legendEnd.label, color: undefined, value: legendEnd.value }] : [])]
               .map((e, i, all) => {
@@ -476,6 +477,151 @@ function DebtGroup({ title, debts, sub, onOpen }: { title: string; debts: Debt[]
   )
 }
 
+// ─── one-off payments ─────────────────────────────────────────────────────────
+
+const monthName = (key: string, withYear = false) => {
+  const [y, m] = key.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-GB', withYear ? { month: 'long', year: 'numeric' } : { month: 'long' })
+}
+
+function OneOffSheet({ item, properties, budget, ownerName, onClose }: {
+  item: OneOff; properties: Property[]; budget: BudgetHook; ownerName: (o: Owner) => string; onClose: () => void
+}) {
+  const { updateOneOff, deleteOneOff } = budget
+  const [label, setLabel] = useState(item.label)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const isThisMonth = item.month === monthKey()
+  return (
+    <Sheet title="One-off payment" onClose={onClose}>
+      {confirmDelete && (
+        <ConfirmDelete
+          label={item.label}
+          detail="Removes it from that month's budget. This can't be undone."
+          onConfirm={() => { deleteOneOff(item.id); setConfirmDelete(false); onClose() }}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
+      <input
+        value={label}
+        onChange={e => setLabel(e.target.value)}
+        onBlur={() => { if (label.trim() && label !== item.label) updateOneOff(item.id, { label: label.trim() }) }}
+        aria-label="Name"
+        placeholder="What's it for?"
+        className="w-full bg-transparent text-[22px] font-semibold tracking-[-0.02em] outline-none border-0 p-0 min-h-[44px] text-ink placeholder:text-faint"
+      />
+      <label className="flex items-baseline gap-1 mt-1 mb-3">
+        <span className="text-[34px] font-semibold text-muted" aria-hidden="true">£</span>
+        <NumberInput
+          value={item.amount || undefined}
+          onChange={v => updateOneOff(item.id, { amount: v ?? 0 })}
+          ariaLabel={`One-off amount for ${item.label}`}
+          className="flex-1 min-w-0 bg-transparent text-[34px] font-semibold tracking-[-0.03em] num outline-none border-0 px-1 rounded-lg text-ink"
+        />
+        <span className="text-[17px] text-muted shrink-0">once</span>
+      </label>
+      <AutoFocus selector='input[aria-label^="One-off amount"]' />
+
+      <div className="py-2.5 border-t border-line">
+        <div className="text-[15px] text-ink mb-2">Who pays</div>
+        <div className="seg" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }} role="group" aria-label="Who pays">
+          {(['JOINT', 'NIAMH', 'RUPERT'] as const).map(o => (
+            <button key={o} aria-pressed={item.owner === o} onClick={() => updateOneOff(item.id, { owner: o })}>
+              <OwnerDot owner={o} label={ownerName(o)} /><span className="lbl">{ownerName(o)}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <SheetRow label="Month">
+        <input
+          type="month"
+          value={item.month}
+          min={monthKey()}
+          onChange={e => { if (e.target.value) updateOneOff(item.id, { month: e.target.value }) }}
+          aria-label="Month"
+          className={inputClass}
+        />
+      </SheetRow>
+
+      {properties.length > 0 && (
+        <SheetRow label="Home">
+          <select value={item.propertyId ?? ''} onChange={e => updateOneOff(item.id, { propertyId: e.target.value || undefined })} className={`${inputClass} max-w-[190px]`} aria-label="Home">
+            <option value="">Not tied to a home</option>
+            {properties.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
+        </SheetRow>
+      )}
+
+      <SheetRow
+        label="Paying from savings"
+        hint={item.fromSavings
+          ? 'Kept out of the month’s budget. Remember to lower the savings balance on Wealth once it’s paid.'
+          : item.owner === 'JOINT'
+            ? `Comes out of ${isThisMonth ? 'this' : 'that'} month’s money, so you each put ${fmt(item.amount / 2)} more into the joint account.`
+            : `Comes out of ${ownerName(item.owner)}’s money ${isThisMonth ? 'this' : 'that'} month.`}
+      >
+        <Toggle checked={!!item.fromSavings} onChange={v => updateOneOff(item.id, { fromSavings: v || undefined })} label="Paying from savings" />
+      </SheetRow>
+
+      <div className="pt-2 border-t border-line">
+        <button onClick={() => setConfirmDelete(true)} className="min-h-[44px] text-[15px] font-medium text-ink-2 underline underline-offset-2 cursor-pointer">Delete payment</button>
+      </div>
+    </Sheet>
+  )
+}
+
+/** This month's one-offs, with what's coming up in later months underneath. */
+function OneOffGroup({ now, upcoming, ownerName, onOpen, onAdd }: {
+  now: OneOff[]; upcoming: OneOff[]; ownerName: (o: Owner) => string; onOpen: (id: string) => void; onAdd: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const counted = now.filter(o => !o.fromSavings).reduce((a, o) => a + o.amount, 0)
+  const owners = new Set(now.map(o => o.owner))
+  const owner: Owner = owners.size === 1 ? now[0].owner : 'JOINT'
+  const next = upcoming[0]
+  const sub = now.length > 0
+    ? `${now.length} this month · ${now.map(o => o.label).slice(0, 2).join(', ')}`
+    : next ? `Next: ${next.label}, ${monthName(next.month)}` : ''
+  const row = (o: OneOff, when?: string) => (
+    <button key={o.id} onClick={() => onOpen(o.id)} className="w-full flex items-center gap-3 pl-5 min-h-[52px] py-2 text-left border-t border-line cursor-pointer">
+      <OwnerDot owner={o.owner} label={ownerName(o.owner)} />
+      <span className="flex-1 min-w-0">
+        <span className="block text-[15px] text-ink truncate">{o.label}</span>
+        {(when || o.fromSavings) && (
+          <span className="block text-caption text-muted truncate">{[when, o.fromSavings ? 'From savings' : null].filter(Boolean).join(' · ')}</span>
+        )}
+      </span>
+      <span className={`text-[15px] ${o.amount > 0 ? 'text-ink' : 'text-faint'}`}>{o.amount > 0 ? <Money value={o.amount} /> : '—'}</span>
+      <ChevronRight size={16} className="text-faint shrink-0" aria-hidden="true" />
+    </button>
+  )
+  return (
+    <div className="border-t border-line">
+      <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="w-full flex items-center gap-3 min-h-[64px] py-2.5 text-left cursor-pointer">
+        <OwnerDot owner={owner} />
+        <span className="flex-1 min-w-0">
+          <span className="block text-[17px] font-medium text-ink truncate">One-offs</span>
+          <span className="block text-label text-muted truncate">{sub}</span>
+        </span>
+        <span className={`text-[17px] font-semibold ${counted > 0 ? 'text-ink' : 'text-faint'}`}>{counted > 0 ? <Money value={counted} /> : '—'}</span>
+        {chevron(open)}
+      </button>
+      {open && (
+        <div className="pb-2">
+          {now.map(o => row(o))}
+          {upcoming.length > 0 && (
+            <div className="pl-5 pt-3 pb-1 border-t border-line text-caption font-semibold uppercase tracking-label text-muted">Coming up</div>
+          )}
+          {upcoming.map(o => row(o, monthName(o.month, o.month.slice(0, 4) !== monthKey().slice(0, 4))))}
+          <button onClick={onAdd} className="w-full flex items-center gap-2 pl-5 min-h-[48px] text-label text-ink-2 cursor-pointer border-t border-line">
+            <Plus size={16} aria-hidden="true" /> Add a one-off payment
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── main screen ──────────────────────────────────────────────────────────────
 
 const OWNER_ORDER: Owner[] = ['JOINT', 'NIAMH', 'RUPERT']
@@ -489,6 +635,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
   const [newCatOwner, setNewCatOwner] = useState<Owner>('JOINT')
   const [newCatType, setNewCatType] = useState<EntryType>('EXPENSE')
   const [sheet, setSheet] = useState<{ catKey: string; itemId: string; focus: 'amount' | 'date' } | null>(null)
+  const [oneOffId, setOneOffId] = useState<string | null>(null)
 
   const properties = data.properties ?? []
   const propertyId = tab.startsWith('property:') ? tab.slice('property:'.length) : null
@@ -545,11 +692,25 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
   const otherDebts = visibleDebts.filter(d => !isMortgage(d))
   const debtTotal = visibleDebts.reduce((a, d) => a + d.monthlyPayment, 0)
 
+  const thisMonth = monthKey()
+  const oneOffsShown = (data.oneOffs ?? [])
+    .filter(o => propertyId ? o.propertyId === propertyId : !ownerTab || o.owner === ownerTab)
+    .filter(o => o.month >= thisMonth)
+    .sort((a, b) => a.month.localeCompare(b.month))
+  const oneOffsNow = oneOffsShown.filter(o => o.month === thisMonth)
+  const oneOffsLater = oneOffsShown.filter(o => o.month > thisMonth)
+  const oneOffTotal = oneOffsNow.filter(o => !o.fromSavings).reduce((a, o) => a + o.amount, 0)
+  const openOneOff = (data.oneOffs ?? []).find(o => o.id === oneOffId) ?? null
+  const addOneOff = () => {
+    const owner: Owner = ownerTab ?? (propertySummary?.property.owner ?? 'JOINT')
+    setOneOffId(budget.addOneOff({ label: 'One-off payment', amount: 0, owner, month: thisMonth, propertyId: propertyId ?? undefined }))
+  }
+
   const spendGroups = byType('EXPENSE')
   const saveGroups = byType('SAVINGS')
   const incomeGroups = byType('INCOME')
-  const spendTotal = sum(spendGroups) + debtTotal
-  const spendGroupCount = spendGroups.length + (mortgages.length > 0 ? 1 : 0) + (otherDebts.length > 0 ? 1 : 0)
+  const spendTotal = sum(spendGroups) + debtTotal + oneOffTotal
+  const spendGroupCount = spendGroups.length + (mortgages.length > 0 ? 1 : 0) + (otherDebts.length > 0 ? 1 : 0) + (oneOffsShown.length > 0 ? 1 : 0)
 
   const openCat = sheet ? data.categories.find(c => c.key === sheet.catKey) : null
   const openItem = openCat?.items.find(i => i.id === sheet?.itemId) ?? null
@@ -567,7 +728,9 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
     { label: 'Bills', value: totals.expJoint, color: 'var(--ink)' },
     { label: 'Debts', value: totals.debtJoint, color: 'var(--spend)' },
     { label: 'Saving', value: totals.savJoint, color: 'var(--save)' },
+    { label: 'One-off', value: totals.oneOffJoint, color: 'var(--warn)' },
   ]
+  jointSegments[0].value -= totals.oneOffJoint
   // Household costs one person pays straight from their own account.
   const directOwner: Owner | undefined = split.sharedByR > 0 && split.sharedByN === 0 ? 'RUPERT' : split.sharedByN > 0 && split.sharedByR === 0 ? 'NIAMH' : undefined
   const directNote = split.sharedByN > 0 || split.sharedByR > 0 ? {
@@ -641,6 +804,9 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
 
   return (
     <div className="h-full overflow-y-auto px-5 pb-[calc(32px+env(safe-area-inset-bottom))]">
+      {openOneOff && (
+        <OneOffSheet item={openOneOff} properties={properties} budget={budget} ownerName={ownerName} onClose={() => setOneOffId(null)} />
+      )}
       {openCat && openItem && sheet && (
         <ItemSheet cat={openCat} item={openItem} properties={properties} budget={budget} ownerName={ownerName} focus={sheet.focus} onClose={() => setSheet(null)} />
       )}
@@ -727,6 +893,9 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
           />
         )
       })}
+      {oneOffsShown.length > 0 && (
+        <OneOffGroup now={oneOffsNow} upcoming={oneOffsLater} ownerName={ownerName} onOpen={setOneOffId} onAdd={addOneOff} />
+      )}
       {otherDebts.length > 0 && (
         <DebtGroup
           title="Debt repayments" debts={otherDebts} onOpen={onNavigateToDebts}
@@ -755,9 +924,14 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
             </div>
           </div>
         ) : (
-          <button onClick={() => setAddingCat(true)} className="w-full flex items-center gap-3 min-h-[52px] border-t border-line text-[15px] text-ink-2 cursor-pointer">
-            <Plus size={18} aria-hidden="true" /> Add a group
-          </button>
+          <div className="flex border-t border-line">
+            <button onClick={() => setAddingCat(true)} className="flex-1 flex items-center gap-3 min-h-[52px] text-[15px] text-ink-2 cursor-pointer">
+              <Plus size={18} aria-hidden="true" /> Add a group
+            </button>
+            <button onClick={addOneOff} className="flex-1 flex items-center justify-end gap-2 min-h-[52px] text-[15px] text-ink-2 cursor-pointer">
+              <Plus size={18} aria-hidden="true" /> One-off payment
+            </button>
+          </div>
         )
       )}
       {propertyId && spendGroups.length === 0 && visibleDebts.length === 0 && (

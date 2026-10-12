@@ -369,7 +369,8 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
 }
 
 export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth }: { budget: BudgetHook; onOpenProperty?: (propertyId: string) => void; onOpenWealth?: () => void }) {
-  const { data, totals, user, recordFinancialHealthRun } = budget
+  // Judge a typical month; the trend line shows this month as it actually is, one-offs included.
+  const { data, regularTotals: totals, totals: monthTotals, user, recordFinancialHealthRun } = budget
   const today = new Date().toISOString().slice(0, 7)
 
   const n1 = data.nameNiamh || 'Person 1'
@@ -467,13 +468,13 @@ export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth }: {
     return Array.from(months).sort().map(month => {
       const snap = (data.spendHistory || []).find((s: any) => s.date === month)
       const isNow = month === today
-      const inc = isNow ? totals.totalInc : (snap?.totalInc ?? null)
-      const exp = isNow ? totals.totalExp : (snap?.totalExp ?? null)
-      const sav = isNow ? totals.totalSav : (snap?.totalSav ?? null)
+      const inc = isNow ? monthTotals.totalInc : (snap?.totalInc ?? null)
+      const exp = isNow ? monthTotals.totalExp : (snap?.totalExp ?? null)
+      const sav = isNow ? monthTotals.totalSav : (snap?.totalSav ?? null)
       const outgoings = (exp != null && sav != null) ? exp + sav : null
       return { month: formatMonth(month), Income: inc, Outgoings: outgoings }
     })
-  }, [data.spendHistory, totals, today])
+  }, [data.spendHistory, monthTotals, today])
 
   const hasHistory = monthlyData.length > 1
 

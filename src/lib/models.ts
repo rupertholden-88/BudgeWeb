@@ -150,6 +150,22 @@ export interface Property {
   isMainResidence?: boolean; isLet?: boolean; monthlyRent?: number
   purchasePrice?: number; purchaseDate?: string; stampDutyPaid?: number; improvementCosts?: number
 }
+/** A cost that lands in a single month: a repair, an annual bill, a deposit. */
+export interface OneOff {
+  id: string; label: string; amount: number; owner: Owner
+  /** YYYY-MM, in local time. */
+  month: string
+  propertyId?: string
+  /** Paid from savings rather than the month's income, so it doesn't reduce what's left to spend. */
+  fromSavings?: boolean
+}
+/** This month as YYYY-MM in local time (toISOString would flip a day early or late around midnight). */
+export function monthKey(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+export function oneOffsFor(data: BudgetData, month = monthKey()): OneOff[] {
+  return (data.oneOffs ?? []).filter(o => o.month === month)
+}
 export interface SpendSnapshot { date: string; totalInc: number; totalExp: number; totalSav: number }
 /** Birth month as YYYY-MM — stored rather than an age so it never goes stale. */
 export interface Dependant { id: string; born: string }
@@ -176,8 +192,11 @@ export interface BudgetData { categories: Category[]; savingsHistory: SavingsSna
   /** Annual gross salary — optional, lets pension contributions be judged against the gross-based 8% minimum. */
   grossNiamh?: number; grossRupert?: number
   /** Day of the month take-home pay lands (1-31), for the "days to payday" line. */
-  payday?: number }
-export interface Totals { incN: number; incR: number; expN: number; expR: number; savN: number; savR: number; debtN: number; debtR: number; expJoint: number; savJoint: number; debtJoint: number; halfJointExp: number; halfJointSav: number; halfJointDebt: number; netN: number; netR: number; totalInc: number; totalExp: number; totalSav: number; totalDebt: number; net: number }
+  payday?: number
+  oneOffs?: OneOff[] }
+export interface Totals { incN: number; incR: number; expN: number; expR: number; savN: number; savR: number; debtN: number; debtR: number; expJoint: number; savJoint: number; debtJoint: number; halfJointExp: number; halfJointSav: number; halfJointDebt: number; netN: number; netR: number; totalInc: number; totalExp: number; totalSav: number; totalDebt: number; net: number
+  /** This month's one-offs counted in the totals above (any paid from savings are left out). */
+  oneOff: number; oneOffJoint: number }
 
 export function defaultBudgetData(): BudgetData {
   return {
@@ -226,18 +245,26 @@ export function defaultBudgetData(): BudgetData {
   }
 }
 
-export function calcTotals(budget: BudgetData): Totals {
+/**
+ * The month's totals. One-offs due this month count as spending unless paid
+ * from savings; pass `{ oneOffs: false }` for a typical month, which is what
+ * averages and the health check should judge.
+ */
+export function calcTotals(budget: BudgetData, opts: { oneOffs?: boolean } = {}): Totals {
   const sum = (cats: Category[]) => cats.reduce((acc, c) => acc + c.items.reduce((a, i) => a + i.amount, 0), 0)
+  const oneOffs = opts.oneOffs === false ? [] : oneOffsFor(budget).filter(o => !o.fromSavings && o.amount > 0)
+  const oneOffFor = (owner: Owner) => oneOffs.filter(o => o.owner === owner).reduce((a, o) => a + o.amount, 0)
   const incN = sum(budget.categories.filter(c => c.owner === 'NIAMH' && c.type === 'INCOME'))
   const incR = sum(budget.categories.filter(c => c.owner === 'RUPERT' && c.type === 'INCOME'))
-  const expN = sum(budget.categories.filter(c => c.owner === 'NIAMH' && c.type === 'EXPENSE'))
-  const expR = sum(budget.categories.filter(c => c.owner === 'RUPERT' && c.type === 'EXPENSE'))
+  const expN = sum(budget.categories.filter(c => c.owner === 'NIAMH' && c.type === 'EXPENSE')) + oneOffFor('NIAMH')
+  const expR = sum(budget.categories.filter(c => c.owner === 'RUPERT' && c.type === 'EXPENSE')) + oneOffFor('RUPERT')
   const savN = sum(budget.categories.filter(c => c.owner === 'NIAMH' && c.type === 'SAVINGS'))
   const savR = sum(budget.categories.filter(c => c.owner === 'RUPERT' && c.type === 'SAVINGS'))
   const debtN = budget.debts.filter(d => d.owner === 'NIAMH').reduce((a, d) => a + d.monthlyPayment, 0)
   const debtR = budget.debts.filter(d => d.owner === 'RUPERT').reduce((a, d) => a + d.monthlyPayment, 0)
   const debtJoint = budget.debts.filter(d => d.owner === 'JOINT').reduce((a, d) => a + d.monthlyPayment, 0)
-  const expJoint = sum(budget.categories.filter(c => c.owner === 'JOINT' && c.type === 'EXPENSE'))
+  const oneOffJoint = oneOffFor('JOINT')
+  const expJoint = sum(budget.categories.filter(c => c.owner === 'JOINT' && c.type === 'EXPENSE')) + oneOffJoint
   const savJoint = sum(budget.categories.filter(c => c.owner === 'JOINT' && c.type === 'SAVINGS'))
   const hjExp = expJoint / 2; const hjSav = savJoint / 2; const hjDebt = debtJoint / 2
   const totalInc = incN + incR
@@ -252,6 +279,7 @@ export function calcTotals(budget: BudgetData): Totals {
     netR: incR - expR - savR - debtR - hjExp - hjSav - hjDebt,
     totalInc, totalExp, totalSav, totalDebt,
     net: totalInc - totalExp - totalSav,
+    oneOff: oneOffs.reduce((a, o) => a + o.amount, 0), oneOffJoint,
   }
 }
 
