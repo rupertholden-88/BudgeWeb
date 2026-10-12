@@ -43,6 +43,12 @@
   --save-tint: #DDF0F0;
   --free: #1F1A17;
 
+  /* The top card's bar: bills or what goes to joint, debts or what's free, saving, one-offs. */
+  --chart-1: var(--ink);
+  --chart-2: var(--spend);
+  --chart-3: var(--save);
+  --chart-4: var(--faint);
+
   --panel-shadow: 0 1px 2px rgba(31, 26, 23, .05), 0 10px 28px -14px rgba(31, 26, 23, .22);
   --panel-border: rgba(31, 26, 23, .05);
   --seg-thumb: #FFFFFF;
@@ -124,6 +130,231 @@
   --score-3: #EBB264;
   --score-4: #F0915A;
   --score-5: #F28C80;
+}
+
+/*
+ * Colour palettes, chosen in Settings and stored on this device. Classic is the
+ * :root / [data-theme="dark"] palette above; each option redefines the same
+ * tokens for light and dark. --chart-1..4 colour the top card's bar.
+ */
+[data-palette="sun"] {
+  --bg: #FFF8EC;
+  --panel: #FFFFFF;
+  --fill: #FBEBCF;
+  --fill-2: #F5DFB8;
+  --line: #F2E6D3;
+  --line-2: #E6D5B8;
+  --ink: #2A2140;
+  --ink-2: #4A4160;
+  --muted: #736A84;
+  --faint: #ADA4BC;
+  --niamh: #FF6B57;
+  --niamh-text: #C2402D;
+  --niamh-light: #FFE1DB;
+  --rupert: #3D84F5;
+  --rupert-text: #2160C4;
+  --rupert-light: #DCE9FF;
+  --pos: #14855A;
+  --pos-tint: #DDF5EA;
+  --spend: #FFB89E;
+  --save: #14916A;
+  --save-tint: #DDF5EA;
+  --free: #2A2140;
+  --chart-1: #5B4FD9;
+  --chart-2: #FF9F8A;
+  --chart-3: #22B07D;
+  --chart-4: #FFB627;
+  --seg-thumb: #FFFFFF;
+  --on-ink: #FFF8EC;
+  --scrim: rgba(42, 33, 64, .42);
+  --panel-shadow: 0 1px 2px rgba(42, 33, 64, .05), 0 14px 30px -16px rgba(91, 79, 217, .30);
+  --panel-border: rgba(42, 33, 64, .04);
+}
+[data-palette="sun"][data-theme="dark"] {
+  --bg: #1A1626;
+  --panel: #262036;
+  --fill: #2B2440;
+  --fill-2: #352D4D;
+  --line: #2F2842;
+  --line-2: #42395A;
+  --ink: #F6F1FF;
+  --ink-2: #D9D1EA;
+  --muted: #A79FBC;
+  --faint: #6F6787;
+  --niamh: #FF8A78;
+  --niamh-text: #FFB3A7;
+  --niamh-light: #45241F;
+  --rupert: #6FA6FF;
+  --rupert-text: #A9C8FF;
+  --rupert-light: #1E2C47;
+  --pos: #6EE0A8;
+  --pos-tint: #17352B;
+  --spend: #6B4F5C;
+  --save: #3DD39B;
+  --save-tint: #17352B;
+  --free: #F6F1FF;
+  --chart-1: #8F86FF;
+  --chart-2: #FF9F8A;
+  --chart-3: #3DD39B;
+  --chart-4: #FFC845;
+  --seg-thumb: #3A3252;
+  --on-ink: #1A1626;
+  --scrim: rgba(0, 0, 0, .55);
+  --panel-shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 12px 30px -16px rgba(0, 0, 0, .7);
+  --panel-border: rgba(246, 241, 255, .08);
+}
+[data-palette="sea"] {
+  --bg: #EFF7F7;
+  --panel: #FFFFFF;
+  --fill: #DCEEEF;
+  --fill-2: #CBE4E6;
+  --line: #D6E8EA;
+  --line-2: #BFD8DB;
+  --ink: #0F2E3A;
+  --ink-2: #2F4D59;
+  --muted: #557280;
+  --faint: #93ADB6;
+  --niamh: #F2705B;
+  --niamh-text: #B9412D;
+  --niamh-light: #FDE2DC;
+  --rupert: #2F7FE0;
+  --rupert-text: #1E5FAF;
+  --rupert-light: #DBEAFB;
+  --pos: #0E7F64;
+  --pos-tint: #D7F2EC;
+  --spend: #F4C08F;
+  --save: #12806F;
+  --save-tint: #D7F2EC;
+  --free: #0F2E3A;
+  --chart-1: #16697A;
+  --chart-2: #F4A261;
+  --chart-3: #2BB39B;
+  --chart-4: #E9C46A;
+  --seg-thumb: #FFFFFF;
+  --on-ink: #EFF7F7;
+  --scrim: rgba(15, 46, 58, .42);
+  --panel-shadow: 0 1px 2px rgba(15, 46, 58, .05), 0 14px 30px -16px rgba(22, 105, 122, .30);
+  --panel-border: rgba(15, 46, 58, .04);
+}
+[data-palette="sea"][data-theme="dark"] {
+  --bg: #0D1E24;
+  --panel: #15303A;
+  --fill: #183641;
+  --fill-2: #1F434F;
+  --line: #1C3A45;
+  --line-2: #2A5360;
+  --ink: #E8F6F7;
+  --ink-2: #C3DDE1;
+  --muted: #8FB0B8;
+  --faint: #5A7C86;
+  --niamh: #F5917F;
+  --niamh-text: #F9B9AC;
+  --niamh-light: #43251F;
+  --rupert: #66A6F0;
+  --rupert-text: #A4CBF7;
+  --rupert-light: #1B3350;
+  --pos: #6FD9B5;
+  --pos-tint: #143B36;
+  --spend: #8A6A4E;
+  --save: #4FD1B8;
+  --save-tint: #143B36;
+  --free: #E8F6F7;
+  --chart-1: #4FB3C8;
+  --chart-2: #F4A261;
+  --chart-3: #4FD1B8;
+  --chart-4: #E9C46A;
+  --seg-thumb: #24505E;
+  --on-ink: #0D1E24;
+  --scrim: rgba(0, 0, 0, .55);
+  --panel-shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 12px 30px -16px rgba(0, 0, 0, .7);
+  --panel-border: rgba(232, 246, 247, .08);
+}
+[data-palette="berry"] {
+  --bg: #FAF5FA;
+  --panel: #FFFFFF;
+  --fill: #F0E6F4;
+  --fill-2: #E6D8EC;
+  --line: #EDE3F0;
+  --line-2: #DCCDE2;
+  --ink: #2B1F45;
+  --ink-2: #4B3F66;
+  --muted: #73678A;
+  --faint: #A99DBB;
+  --niamh: #FF7A66;
+  --niamh-text: #C2402D;
+  --niamh-light: #FFE2DC;
+  --rupert: #4B8DF8;
+  --rupert-text: #2160C4;
+  --rupert-light: #DDE9FF;
+  --pos: #1E8A5F;
+  --pos-tint: #DDF3EA;
+  --spend: #F2B8CB;
+  --save: #1E9C73;
+  --save-tint: #DDF3EA;
+  --free: #2B1F45;
+  --chart-1: #7B5CD6;
+  --chart-2: #FF8FB1;
+  --chart-3: #2FB98A;
+  --chart-4: #F5B82E;
+  --seg-thumb: #FFFFFF;
+  --on-ink: #FAF5FA;
+  --scrim: rgba(43, 31, 69, .42);
+  --panel-shadow: 0 1px 2px rgba(43, 31, 69, .05), 0 14px 30px -16px rgba(58, 36, 112, .30);
+  --panel-border: rgba(43, 31, 69, .04);
+}
+[data-palette="berry"][data-theme="dark"] {
+  --bg: #150F22;
+  --panel: #221A35;
+  --fill: #2A2140;
+  --fill-2: #34294F;
+  --line: #2A2140;
+  --line-2: #3E325C;
+  --ink: #F3EEFF;
+  --ink-2: #D6CCEE;
+  --muted: #A698C4;
+  --faint: #6E6290;
+  --niamh: #FF8F7D;
+  --niamh-text: #FFB6AA;
+  --niamh-light: #45241F;
+  --rupert: #74A8FF;
+  --rupert-text: #AACBFF;
+  --rupert-light: #1E2C47;
+  --pos: #7DF0BF;
+  --pos-tint: #173A2F;
+  --spend: #6A4A63;
+  --save: #5EE3B0;
+  --save-tint: #173A2F;
+  --free: #F3EEFF;
+  --chart-1: #A68BFF;
+  --chart-2: #FF9EC0;
+  --chart-3: #5EE3B0;
+  --chart-4: #FFD45C;
+  --seg-thumb: #3A2F55;
+  --on-ink: #150F22;
+  --scrim: rgba(0, 0, 0, .55);
+  --panel-shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 12px 30px -16px rgba(0, 0, 0, .7);
+  --panel-border: rgba(243, 238, 255, .08);
+}
+[data-palette="berry"] .hero {
+  --panel: #3A2470;
+  --ink: #FFFFFF;
+  --ink-2: #E6DEFA;
+  --muted: #D2C7F0;
+  --faint: #A595DA;
+  --line: rgba(255, 255, 255, .16);
+  --on-ink: #3A2470;
+  --pos: #7DF0BF;
+  --warn: #FFD45C;
+  --neg: #FFB0A3;
+  --chart-1: #FF8FB1;
+  --chart-2: #8FD3FF;
+  --chart-3: #5EE3B0;
+  --chart-4: #FFD45C;
+  --panel-border: transparent;
+  --panel-shadow: 0 18px 36px -18px rgba(58, 36, 112, .55);
+}
+[data-palette="berry"][data-theme="dark"] .hero {
+  --panel: #432A80;
 }
 
 * { box-sizing: border-box; }

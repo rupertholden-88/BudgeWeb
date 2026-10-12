@@ -72,7 +72,7 @@ function Hero({ label, value, suffix, negative, headNote, pair, segments, legend
   const shown = segments.filter(s => s.value > 0)
   const delta = secondary?.delta
   return (
-    <section className="panel p-5 mt-3.5" aria-label={label}>
+    <section className="panel hero p-5 mt-3.5" aria-label={label}>
       <div className="text-label font-medium text-muted">{label}</div>
       <div className={`figure mt-2 flex items-baseline flex-wrap gap-x-2 text-[44px] leading-none font-bold tracking-[-0.035em] ${negative ? 'text-neg' : 'text-ink'}`}>
         <Money value={value} />
@@ -846,10 +846,10 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
   const plannedJoint = totals.oneOffJoint - totals.oneOffTopUpJoint
   const split = householdCostSplit(data, totals)
   const jointSegments: Segment[] = [
-    { label: 'Bills', value: totals.expJoint - totals.oneOffJoint, color: 'var(--ink)' },
-    { label: 'Debts', value: totals.debtJoint, color: 'var(--spend)' },
-    { label: 'Saving', value: totals.savJoint, color: 'var(--save)' },
-    { label: 'One-off', value: plannedJoint, color: 'var(--faint)' },
+    { label: 'Bills', value: totals.expJoint - totals.oneOffJoint, color: 'var(--chart-1)' },
+    { label: 'Debts', value: totals.debtJoint, color: 'var(--chart-2)' },
+    { label: 'Saving', value: totals.savJoint, color: 'var(--chart-3)' },
+    { label: 'One-off', value: plannedJoint, color: 'var(--chart-4)' },
   ]
   const periodOneOffs = (data.oneOffs ?? []).filter(o => o.month === period.key && !o.fromSavings && o.amount > 0)
   const topUps: TopUp[] = periodOneOffs.filter(o => o.owner === 'JOINT' && o.topUp)
@@ -883,7 +883,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
       const s = propertySummary
       return <Hero
         label={`${s.property.label} costs`} value={s.monthlyTotal} suffix="a month"
-        segments={[{ label: 'Mortgage', value: s.mortgagePayment, color: 'var(--ink)' }, { label: 'Running costs', value: s.runningCosts, color: 'var(--spend)' }]}
+        segments={[{ label: 'Mortgage', value: s.mortgagePayment, color: 'var(--chart-1)' }, { label: 'Running costs', value: s.runningCosts, color: 'var(--chart-2)' }]}
         note={{ text: s.property.estimatedValue > 0
           ? <>Equity <b className="text-ink font-semibold num">{fmt(s.equity)}</b>{s.ltvPct != null && s.mortgageBalance > 0 ? ` · ${s.ltvPct.toFixed(0)}% loan-to-value` : ''}</>
           : 'Add its value on Wealth to see equity' }}
@@ -907,9 +907,9 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
       return <Hero
         label={left < 0 ? `${ownerName(ownerTab)} is over by` : `${ownerName(ownerTab)}’s spending money`} value={Math.abs(left)} negative={left < 0} suffix="this month"
         segments={[
-          { label: 'To joint', value: jointPot / 2, color: 'var(--ink)' },
-          { label: 'Own & saving', value: own + save, color: 'var(--save)' },
-          { label: 'Free', value: Math.max(0, left), color: 'var(--spend)' },
+          { label: 'To joint', value: jointPot / 2, color: 'var(--chart-1)' },
+          { label: 'Own & saving', value: own + save, color: 'var(--chart-3)' },
+          { label: 'Free', value: Math.max(0, left), color: 'var(--chart-2)' },
         ]}
         note={direct > 0 ? { owner: ownerTab, text: <>Includes <b className="text-ink font-semibold num">{fmt(direct)}</b> of household costs paid directly</> } : undefined}
         secondary={{ label: 'Take-home', value: inc, sub: 'after tax, each month' }}
@@ -918,7 +918,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
     if (jointPot <= 0) {
       return <Hero
         label={leftToSpend.label} value={leftToSpend.value} negative={leftToSpend.negative}
-        segments={[{ label: 'Spending', value: totals.totalExp, color: 'var(--ink)' }, { label: 'Saving', value: totals.totalSav, color: 'var(--save)' }, { label: 'Free', value: Math.max(0, totals.net), color: 'var(--spend)' }]}
+        segments={[{ label: 'Spending', value: totals.totalExp, color: 'var(--chart-1)' }, { label: 'Saving', value: totals.totalSav, color: 'var(--chart-3)' }, { label: 'Free', value: Math.max(0, totals.net), color: 'var(--chart-2)' }]}
         secondary={{ label: 'Take-home', value: totals.totalInc, sub: 'after bills and saving', delta: leftToSpend.delta }}
       />
     }
