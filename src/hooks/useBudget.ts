@@ -171,6 +171,10 @@ export function useBudget() {
     mutate(b => ({ ...b, dependants: (b.dependants ?? []).map(d => d.id === id ? { ...d, born } : d) }))
   }
 
+  const renameDependant = (id: string, name: string) => {
+    mutate(b => ({ ...b, dependants: (b.dependants ?? []).map(d => d.id === id ? { ...d, name: name.trim() || undefined } : d) }))
+  }
+
   const removeDependant = (id: string) => {
     mutate(b => ({ ...b, dependants: (b.dependants ?? []).filter(d => d.id !== id) }))
   }
@@ -515,7 +519,7 @@ export function useBudget() {
   return {
     data, user, authLoading, cloudLoading, localLoading, savedAt, isRefreshing, totals, regularTotals,
     signIn, signOutUser, refreshFromCloud,
-    updateOwnerName, updateBirthMonth, addDependant, updateDependant, removeDependant,
+    updateOwnerName, updateBirthMonth, addDependant, updateDependant, renameDependant, removeDependant,
     addCategory, renameCategory, deleteCategory,
     updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, toggleItemAutoRenew, updateItemInsurance, toggleItemShared, updateItemProperty, recordFinancialHealthRun,
     updateGrossIncome, updatePayday, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,

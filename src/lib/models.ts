@@ -202,7 +202,7 @@ export function payPeriod(payday?: number, now = new Date()): PayPeriod {
 }
 export interface SpendSnapshot { date: string; totalInc: number; totalExp: number; totalSav: number }
 /** Birth month as YYYY-MM — stored rather than an age so it never goes stale. */
-export interface Dependant { id: string; born: string }
+export interface Dependant { id: string; born: string; name?: string }
 export type FinancialHealthStatus = 'strong' | 'solid' | 'attention' | 'at_risk'
 export interface FinancialHealthResult {
   headline: string
