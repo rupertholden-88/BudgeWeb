@@ -189,16 +189,17 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
   }, [onClose])
   // Portalled to <body> so it sits above the tab bar, outside the screen's stacking context.
   return createPortal(
-    <div className="fixed inset-0 z-[900] flex items-end justify-center" style={{ background: 'var(--scrim)' }} onClick={onClose}>
+    <div className="fixed inset-0 z-[900] flex items-end sm:items-center justify-center sm:p-6" style={{ background: 'var(--scrim)' }} onClick={onClose}>
+      {/* A bottom sheet on phones; a centred dialog on tablets and desktop. */}
       <div
         role="dialog" aria-modal="true" aria-label={title}
-        className="sheet-enter w-full max-w-[480px] max-h-[88dvh] overflow-y-auto bg-bg rounded-t-[22px] px-5 pt-2 pb-[calc(24px+env(safe-area-inset-bottom))]"
+        className="sheet-enter w-full max-w-[480px] sm:max-w-[520px] max-h-[88dvh] sm:max-h-[85dvh] overflow-y-auto bg-bg rounded-t-[22px] sm:rounded-[22px] px-5 sm:px-6 pt-2 sm:pt-3 pb-[calc(24px+env(safe-area-inset-bottom))] sm:pb-6 sm:shadow-[0_24px_60px_-20px_rgba(0,0,0,.45)]"
         onClick={e => e.stopPropagation()}
       >
-        <div className="w-10 h-1 rounded-full bg-line-2 mx-auto mb-1" aria-hidden="true" />
+        <div className="w-10 h-1 rounded-full bg-line-2 mx-auto mb-1 sm:hidden" aria-hidden="true" />
         <div className="flex items-center justify-between min-h-[44px]">
           <span className="text-label text-muted truncate">{title}</span>
-          <button onClick={onClose} aria-label="Close" className="w-11 h-11 -mr-3 grid place-items-center text-muted cursor-pointer"><X size={20} /></button>
+          <button onClick={onClose} aria-label="Close" className="w-[44px] h-[44px] -mr-3 grid place-items-center text-muted cursor-pointer"><X size={20} /></button>
         </div>
         {children}
       </div>
@@ -212,7 +213,7 @@ function SheetRow({ label, children, hint }: { label: string; children: React.Re
     <div className="py-2.5 border-t border-line">
       <div className="flex items-center justify-between gap-3 min-h-[44px]">
         <span className="text-[15px] text-ink">{label}</span>
-        <div className="shrink-0">{children}</div>
+        <div className="w-[180px] shrink-0 flex justify-end">{children}</div>
       </div>
       {hint && <p className="text-caption text-muted mt-1 mb-0 leading-snug">{hint}</p>}
     </div>
@@ -223,7 +224,7 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
   return (
     <button
       role="switch" aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)}
-      className={`w-[51px] h-[31px] rounded-full relative cursor-pointer ${checked ? 'bg-ink' : 'bg-fill-2'}`}
+      className={`hit-44 w-[51px] h-[31px] rounded-full relative cursor-pointer ${checked ? 'bg-ink' : 'bg-fill-2'}`}
     >
       <span className="absolute top-[2px] w-[27px] h-[27px] rounded-full bg-panel shadow" style={{ left: checked ? 22 : 2 }} />
     </button>
@@ -291,7 +292,7 @@ function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose }:
 
       {isExpense && properties.length > 0 && (
         <SheetRow label="Home">
-          <select value={item.propertyId ?? ''} onChange={e => updateItemProperty(cat.key, item.id, e.target.value)} className={`${inputClass} max-w-[190px]`} aria-label="Home">
+          <select value={item.propertyId ?? ''} onChange={e => updateItemProperty(cat.key, item.id, e.target.value)} className={`${inputClass} w-full`} aria-label="Home">
             <option value="">Not tied to a home</option>
             {properties.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
           </select>
@@ -308,7 +309,7 @@ function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose }:
             value={item.renewalDate ?? ''}
             onChange={e => updateItemRenewal(cat.key, item.id, e.target.value)}
             aria-label="Renewal date"
-            className={`${inputClass} ${days != null && days < 0 ? 'text-neg' : ''}`}
+            className={`${inputClass} w-full ${days != null && days < 0 ? 'text-neg' : ''}`}
           />
           {focus === 'date' && <AutoFocus selector='input[aria-label="Renewal date"]' />}
         </SheetRow>
@@ -325,12 +326,12 @@ function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose }:
 
       {isInsurance && (
         <SheetRow label="Provider">
-          <input value={item.insuranceProvider ?? ''} placeholder="e.g. Aviva" onChange={e => updateItemInsurance(cat.key, item.id, { provider: e.target.value })} className={`${inputClass} w-[160px]`} aria-label="Provider" />
+          <input value={item.insuranceProvider ?? ''} placeholder="e.g. Aviva" onChange={e => updateItemInsurance(cat.key, item.id, { provider: e.target.value })} className={`${inputClass} w-full`} aria-label="Provider" />
         </SheetRow>
       )}
       {isInsurance && (
         <SheetRow label="Cover (£)">
-          <NumberInput value={item.insuranceCoverAmount} onChange={v => updateItemInsurance(cat.key, item.id, { coverAmount: v })} ariaLabel="Cover amount in pounds" className={`${inputClass} w-[160px] text-right`} />
+          <NumberInput value={item.insuranceCoverAmount} onChange={v => updateItemInsurance(cat.key, item.id, { coverAmount: v })} ariaLabel="Cover amount in pounds" className={`${inputClass} w-full text-right`} />
         </SheetRow>
       )}
 
@@ -654,7 +655,7 @@ function OneOffSheet({ initial, budget, properties, ownerName, onClose }: {
 
       {properties.length > 0 && (
         <SheetRow label="Home">
-          <select value={d.propertyId ?? ''} onChange={e => set({ propertyId: e.target.value || undefined })} className={`${inputClass} max-w-[190px]`} aria-label="Home">
+          <select value={d.propertyId ?? ''} onChange={e => set({ propertyId: e.target.value || undefined })} className={`${inputClass} w-full`} aria-label="Home">
             <option value="">Not tied to a home</option>
             {properties.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
           </select>
@@ -966,6 +967,9 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
         <ItemSheet cat={openCat} item={openItem} properties={properties} budget={budget} ownerName={ownerName} focus={sheet.focus} onClose={() => setSheet(null)} />
       )}
 
+      {/* Two columns on wide screens: the month's summary stays put on the left while the groups scroll. */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:gap-10 lg:items-start">
+      <div className="lg:sticky lg:top-0 lg:pb-8">
       {/* greeting + homes */}
       <div className="flex items-center justify-between gap-3 pt-2">
         <h1 className="text-[24px] leading-[30px] font-semibold tracking-[-0.02em] m-0 truncate min-w-0">{greeting}</h1>
@@ -975,7 +979,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
             <select
               value={propertyId ?? ''}
               onChange={e => onTabChange(e.target.value ? (`property:${e.target.value}` as TabFilter) : 'ALL')}
-              className={`appearance-none min-h-[44px] rounded-xl pl-3.5 pr-9 text-[15px] font-medium cursor-pointer border-0 ${propertyId ? 'bg-ink text-on-ink' : 'bg-fill text-ink'}`}
+              className={`appearance-none min-h-[44px] rounded-xl pl-3.5 pr-9 text-[16px] font-medium cursor-pointer border-0 ${propertyId ? 'bg-ink text-on-ink' : 'bg-fill text-ink'}`}
             >
               <option value="">{properties.length === 2 ? 'Both homes' : 'All homes'}</option>
               {properties.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
@@ -1041,6 +1045,8 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
         </button>
       )}
 
+      </div>
+      <div className="min-w-0 lg:pt-1 lg:[&>div:first-child]:mt-0">
       {/* spending */}
       <SectionHead title="Spending" meta={<>{spendGroupCount} {spendGroupCount === 1 ? 'group' : 'groups'} · <b className="text-ink font-semibold"><Money value={spendTotal} /></b></>} />
       {oneOffsNow.length > 0 && (
@@ -1124,6 +1130,8 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
           <div className="border-t border-line" />
         </>
       )}
+      </div>
+      </div>
     </div>
   )
 }

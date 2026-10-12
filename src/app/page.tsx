@@ -159,70 +159,112 @@ export default function HomePage() {
 
   const initial = (name: string, fallback: string) => (name.trim()[0] || fallback).toUpperCase()
 
+  const account = user ? (
+    <button
+      onClick={confirmSignOut}
+      title={`${user.email} — tap to sign out`}
+      aria-label={`Signed in as ${user.email}. Tap to sign out.`}
+      className="flex items-center min-h-[44px] min-w-[44px] justify-end cursor-pointer"
+    >
+      <span className="w-[30px] h-[30px] rounded-full grid place-items-center text-caption font-semibold bg-niamh-light text-niamh-text ring-2 ring-bg">{initial(data.nameNiamh, 'N')}</span>
+      <span className="w-[30px] h-[30px] rounded-full grid place-items-center text-caption font-semibold bg-rupert-light text-rupert-text ring-2 ring-bg -ml-[9px]">{initial(data.nameRupert, 'R')}</span>
+    </button>
+  ) : (
+    <button onClick={signIn} className="flex items-center gap-1.5 min-h-[44px] text-label text-muted cursor-pointer text-left">
+      <User size={14} aria-hidden="true" className="shrink-0" />
+      <span>On this phone only · <span className="font-semibold text-ink underline underline-offset-2">Back up</span></span>
+    </button>
+  )
+
+  const badge = (id: Screen) => id === 'charts' && attentionCount > 0 && (
+    <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 rounded-full bg-neg text-on-ink text-caption leading-[18px] font-bold text-center ring-2 ring-bg">
+      {attentionCount}<span className="sr-only"> things need attention</span>
+    </span>
+  )
+
   return (
-    <div className="flex flex-col h-[100dvh] bg-bg">
+    <div className="flex h-[100dvh] bg-bg">
 
       {toast && (
-        <div role="status" aria-live="polite" className="fixed bottom-24 inset-x-0 z-[100] flex justify-center pointer-events-none px-4">
+        <div role="status" aria-live="polite" className="fixed bottom-24 lg:bottom-8 inset-x-0 lg:left-[220px] z-[100] flex justify-center pointer-events-none px-4">
           <div className="bg-ink text-on-ink px-5 py-2.5 rounded-full text-label font-medium flex items-center gap-1.5 shadow-[0_4px_12px_rgba(0,0,0,0.2)] fade-up">
             <CheckCircle size={14} /> {toast}
           </div>
         </div>
       )}
 
-      <header className="px-5 pt-[max(12px,env(safe-area-inset-top))] pb-1 flex items-center justify-between shrink-0 min-h-[56px]">
-        <Brand />
-        {user ? (
-          <button
-            onClick={confirmSignOut}
-            title={`${user.email} — tap to sign out`}
-            aria-label={`Signed in as ${user.email}. Tap to sign out.`}
-            className="flex items-center min-h-[44px] min-w-[44px] justify-end cursor-pointer"
-          >
-            <span className="w-[30px] h-[30px] rounded-full grid place-items-center text-caption font-semibold bg-niamh-light text-niamh-text ring-2 ring-bg">{initial(data.nameNiamh, 'N')}</span>
-            <span className="w-[30px] h-[30px] rounded-full grid place-items-center text-caption font-semibold bg-rupert-light text-rupert-text ring-2 ring-bg -ml-[9px]">{initial(data.nameRupert, 'R')}</span>
-          </button>
-        ) : (
-          <button onClick={signIn} className="flex items-center gap-1.5 min-h-[44px] text-label text-muted cursor-pointer">
-            <User size={14} aria-hidden="true" />
-            <span>On this phone only · <span className="font-semibold text-ink underline underline-offset-2">Back up</span></span>
-          </button>
-        )}
-      </header>
-
-      <main
-        className="flex-1 overflow-hidden touch-pan-y"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        <div key={screen} className="h-full screen-enter">
-          {screen === 'budget'   && <BudgetScreen   budget={budget} tab={activeTab} onTabChange={setTab} onNavigateToDebts={() => setScreen('wealth')} />}
-          {screen === 'charts'   && <ChartsScreen   budget={budget} onOpenProperty={id => { setFocusPropertyId(id); setScreen('wealth') }} onOpenWealth={() => setScreen('wealth')} />}
-          {screen === 'wealth'   && <WealthScreen   budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={() => setFocusPropertyId(null)} />}
-          {screen === 'settings' && <SettingsScreen budget={budget} onToast={showToast} />}
-        </div>
-      </main>
-
-      <nav aria-label="Main navigation" className="bg-bg border-t border-line flex shrink-0 pb-[env(safe-area-inset-bottom)]">
-        {NAV.map(({ id, label, Icon }) => (
-          <button
-            key={id}
-            onClick={() => setScreen(id)}
-            aria-current={screen === id ? 'page' : undefined}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 pt-2 pb-1.5 min-h-[56px] cursor-pointer text-caption ${screen === id ? 'text-ink font-semibold' : 'text-muted font-medium'}`}
-          >
-            <span className="relative flex">
-              <Icon size={22} strokeWidth={screen === id ? 2.1 : 1.75} aria-hidden="true" />
+      {/* Landscape tablets and desktop: a side rail replaces the header and bottom bar. */}
+      <aside className="hidden lg:flex flex-col w-[220px] shrink-0 border-r border-line px-4 pt-6 pb-5">
+        <div className="px-2"><Brand /></div>
+        <nav aria-label="Main navigation" className="mt-8 flex flex-col gap-1">
+          {NAV.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              onClick={() => setScreen(id)}
+              aria-current={screen === id ? 'page' : undefined}
+              className={`flex items-center gap-3 px-3 min-h-[44px] rounded-xl cursor-pointer text-[15px] text-left ${screen === id ? 'bg-fill text-ink font-semibold' : 'text-muted font-medium hover:bg-fill'}`}
+            >
+              <Icon size={20} strokeWidth={screen === id ? 2.1 : 1.75} aria-hidden="true" />
+              <span className="flex-1">{label}</span>
               {id === 'charts' && attentionCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 rounded-full bg-neg text-on-ink text-caption leading-[18px] font-bold text-center ring-2 ring-bg">
+                <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-neg text-on-ink text-caption leading-[22px] font-bold text-center">
                   {attentionCount}<span className="sr-only"> things need attention</span>
                 </span>
               )}
-            </span>
-            {label}
-          </button>
-        ))}
-      </nav>
+            </button>
+          ))}
+        </nav>
+        <div className="mt-auto px-2">
+          {user ? account : (
+            <button onClick={signIn} className="w-full text-left min-h-[44px] rounded-xl cursor-pointer">
+              <span className="flex items-center gap-1.5 text-label text-muted"><User size={14} aria-hidden="true" /> On this device only</span>
+              <span className="block text-[15px] font-semibold text-ink underline underline-offset-2 mt-0.5">Back up with Google</span>
+            </button>
+          )}
+        </div>
+      </aside>
+
+      <div className="flex flex-col flex-1 min-w-0">
+        <header className="lg:hidden shrink-0 px-5 pt-[max(12px,env(safe-area-inset-top))] pb-1">
+          <div className="mx-auto w-full max-w-[600px] flex items-center justify-between min-h-[56px]">
+            <Brand />
+            {account}
+          </div>
+        </header>
+
+        <main
+          className="flex-1 overflow-hidden touch-pan-y"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* A comfortable column on tablets; wider, two-column screens on desktop. */}
+          <div key={screen} className="h-full mx-auto w-full max-w-[640px] lg:max-w-[1080px] lg:pt-6 screen-enter">
+            {screen === 'budget'   && <BudgetScreen   budget={budget} tab={activeTab} onTabChange={setTab} onNavigateToDebts={() => setScreen('wealth')} />}
+            {screen === 'charts'   && <ChartsScreen   budget={budget} onOpenProperty={id => { setFocusPropertyId(id); setScreen('wealth') }} onOpenWealth={() => setScreen('wealth')} />}
+            {screen === 'wealth'   && <WealthScreen   budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={() => setFocusPropertyId(null)} />}
+            {screen === 'settings' && <SettingsScreen budget={budget} onToast={showToast} />}
+          </div>
+        </main>
+
+        <nav aria-label="Main navigation" className="lg:hidden bg-bg border-t border-line shrink-0 pb-[env(safe-area-inset-bottom)]">
+          <div className="mx-auto w-full max-w-[640px] flex">
+            {NAV.map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                onClick={() => setScreen(id)}
+                aria-current={screen === id ? 'page' : undefined}
+                className={`flex-1 flex flex-col items-center justify-center gap-1 pt-2 pb-1.5 min-h-[56px] cursor-pointer text-caption ${screen === id ? 'text-ink font-semibold' : 'text-muted font-medium'}`}
+              >
+                <span className="relative flex">
+                  <Icon size={22} strokeWidth={screen === id ? 2.1 : 1.75} aria-hidden="true" />
+                  {badge(id)}
+                </span>
+                {label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      </div>
     </div>
   )
 }

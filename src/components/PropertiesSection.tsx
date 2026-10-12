@@ -5,12 +5,12 @@ import { Owner, Fuel, EnergyTariff, TariffOption, fmt, propertySummaries, tariff
 import type { TariffSearchRequest } from '@/app/api/energy-tariffs/route'
 import { useApiKey } from '@/hooks/useApiKey'
 import { Plus, Home, Zap, Flame, Search, ExternalLink, KeyRound } from 'lucide-react'
-import { AmountCell, ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, TapToEdit, NumberInput, inputClass, ownerBorderClass } from './ui'
+import { AmountCell, ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, TapToEdit, NumberInput, inputClass, ownerBorderClass, MonthInput } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 type Summary = ReturnType<typeof propertySummaries>[number]
 
-function numberInput(value: number | undefined, onChange: (v: number | undefined) => void, placeholder = '0', width = 'w-[120px]') {
+function numberInput(value: number | undefined, onChange: (v: number | undefined) => void, placeholder = '0', width = 'w-full') {
   return <NumberInput value={value} onChange={onChange} placeholder={placeholder} className={`${inputClass} ${width}`} />
 }
 
@@ -36,7 +36,7 @@ function FuelTariff({ fuel, tariff, onChange }: { fuel: Fuel; tariff: EnergyTari
         {annual != null && (
           <span className="text-sm font-bold tabular-nums">{fmt(annual / 12)}<span className="text-caption text-muted font-normal">/mo</span></span>
         )}
-        <button onClick={() => setEditing(e => !e)} className="text-xs text-muted bg-transparent border-0 cursor-pointer underline min-h-[36px] px-1">
+        <button onClick={() => setEditing(e => !e)} className="text-[15px] text-ink-2 bg-transparent border-0 cursor-pointer underline underline-offset-2 min-h-[44px] min-w-[44px] px-2 -mr-2">
           {editing ? 'Done' : annual == null ? 'Add' : 'Edit'}
         </button>
       </div>
@@ -59,24 +59,24 @@ function FuelTariff({ fuel, tariff, onChange }: { fuel: Fuel; tariff: EnergyTari
 
       {editing && (
         <div className="mt-2 space-y-2">
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Supplier">
-              <input value={t.supplier ?? ''} placeholder="e.g. EDF" onChange={e => onChange({ supplier: e.target.value || undefined })} className={`${inputClass} w-[120px]`} />
+              <input value={t.supplier ?? ''} placeholder="e.g. EDF" onChange={e => onChange({ supplier: e.target.value || undefined })} className={`${inputClass} w-full`} />
             </Field>
             <Field label="Tariff name">
-              <input value={t.name ?? ''} placeholder="optional" onChange={e => onChange({ name: e.target.value || undefined })} className={`${inputClass} w-[170px]`} />
+              <input value={t.name ?? ''} placeholder="optional" onChange={e => onChange({ name: e.target.value || undefined })} className={`${inputClass} w-full`} />
             </Field>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Field label={twoRate ? 'Day rate p/kWh' : 'Unit rate p/kWh'}>{numberInput(t.unitRateP, v => onChange({ unitRateP: v }), '0', 'w-[110px]')}</Field>
-            <Field label="Standing p/day">{numberInput(t.standingChargeP, v => onChange({ standingChargeP: v }), '0', 'w-[110px]')}</Field>
-            <Field label={twoRate ? 'Day usage kWh/yr' : 'Usage kWh/yr'}>{numberInput(t.annualUsageKwh, v => onChange({ annualUsageKwh: v }), '0', 'w-[110px]')}</Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={twoRate ? 'Day rate p/kWh' : 'Unit rate p/kWh'}>{numberInput(t.unitRateP, v => onChange({ unitRateP: v }), '0', 'w-full')}</Field>
+            <Field label="Standing p/day">{numberInput(t.standingChargeP, v => onChange({ standingChargeP: v }), '0', 'w-full')}</Field>
+            <Field label={twoRate ? 'Day usage kWh/yr' : 'Usage kWh/yr'}>{numberInput(t.annualUsageKwh, v => onChange({ annualUsageKwh: v }), '0', 'w-full')}</Field>
           </div>
           {fuel === 'electricity' && (
-            <label className="flex items-center gap-2 cursor-pointer text-xs min-h-[32px]">
+            <label className="flex items-center gap-3 cursor-pointer text-[15px] min-h-[44px]">
               <input
                 type="checkbox"
-                className="w-4 h-4"
+                className="w-5 h-5"
                 checked={twoRate}
                 onChange={e => {
                   setTwoRate(e.target.checked)
@@ -87,21 +87,21 @@ function FuelTariff({ fuel, tariff, onChange }: { fuel: Fuel; tariff: EnergyTari
             </label>
           )}
           {twoRate && (
-            <div className="flex flex-wrap gap-2">
-              <Field label="Night rate p/kWh">{numberInput(t.nightRateP, v => onChange({ nightRateP: v }), '0', 'w-[110px]')}</Field>
-              <Field label="Night usage kWh/yr">{numberInput(t.nightUsageKwh, v => onChange({ nightUsageKwh: v }), '0', 'w-[110px]')}</Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Night rate p/kWh">{numberInput(t.nightRateP, v => onChange({ nightRateP: v }), '0', 'w-full')}</Field>
+              <Field label="Night usage kWh/yr">{numberInput(t.nightUsageKwh, v => onChange({ nightUsageKwh: v }), '0', 'w-full')}</Field>
             </div>
           )}
-          <label className="flex items-center gap-2 cursor-pointer text-xs min-h-[32px]">
-            <input type="checkbox" className="w-4 h-4" checked={!!t.fixed} onChange={e => onChange({ fixed: e.target.checked })} />
+          <label className="flex items-center gap-3 cursor-pointer text-[15px] min-h-[44px]">
+            <input type="checkbox" className="w-5 h-5" checked={!!t.fixed} onChange={e => onChange({ fixed: e.target.checked })} />
             Fixed price
           </label>
           {t.fixed && (
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 gap-3">
               <Field label="Fixed until">
-                <input type="date" value={t.fixedUntil ?? ''} onChange={e => onChange({ fixedUntil: e.target.value || undefined })} className={inputClass} />
+                <input type="date" value={t.fixedUntil ?? ''} onChange={e => onChange({ fixedUntil: e.target.value || undefined })} className={`${inputClass} w-full`} />
               </Field>
-              <Field label="Exit fee £">{numberInput(t.exitFee, v => onChange({ exitFee: v }), '0', 'w-[90px]')}</Field>
+              <Field label="Exit fee £">{numberInput(t.exitFee, v => onChange({ exitFee: v }), '0', 'w-full')}</Field>
             </div>
           )}
           <p className="text-caption text-muted m-0 leading-snug">
@@ -245,7 +245,7 @@ function TariffFinder({ summary, budget }: { summary: Summary; budget: BudgetHoo
           <button
             onClick={run}
             disabled={loading || !areaOk}
-            className={`border-0 rounded-xl px-4 min-h-[36px] text-sm font-semibold ${loading || !areaOk ? 'bg-border text-muted cursor-default' : 'bg-ink text-on-ink cursor-pointer'}`}
+            className={`border-0 rounded-xl px-4 min-h-[44px] text-[15px] font-semibold ${loading || !areaOk ? 'bg-border text-muted cursor-default' : 'bg-ink text-on-ink cursor-pointer'}`}
           >
             {loading ? 'Searching… (up to a minute)' : result ? 'Search again' : 'Search'}
           </button>
@@ -357,7 +357,7 @@ function EnergySection({ summary, budget }: { summary: Summary; budget: BudgetHo
               {energyItems.length === 1 && (
                 <button
                   onClick={() => updateItemAmount(energyItems[0].catKey, energyItems[0].id, Math.round(monthly))}
-                  className="text-caption font-semibold text-accent bg-accent-light border-0 rounded-full px-2.5 min-h-[28px] cursor-pointer"
+                  className="hit-44 text-label font-semibold text-ink bg-fill border-0 rounded-full px-3 min-h-[32px] cursor-pointer"
                 >
                   Set to {fmt(monthly)}
                 </button>
@@ -437,18 +437,18 @@ function PropertyCard({ summary, ownerName, budget, focused, onFocusHandled }: {
         {expanded && (
           <div className="px-3 pb-2 border-t border-border">
             <PanelSection title="Status">
-              <label className="flex items-start gap-2 cursor-pointer mb-2">
-                <input type="checkbox" className="mt-0.5 w-4 h-4 shrink-0" checked={!!p.isMainResidence} onChange={e => set({ isMainResidence: e.target.checked || undefined })} />
-                <span className="text-xs leading-snug">
+              <label className="flex items-start gap-3 cursor-pointer min-h-[44px] py-1 mb-1">
+                <input type="checkbox" className="mt-0.5 w-5 h-5 shrink-0" checked={!!p.isMainResidence} onChange={e => set({ isMainResidence: e.target.checked || undefined })} />
+                <span className="text-[15px] leading-snug">
                   Main residence
                   <span className="block text-caption text-muted mt-0.5">
                     Only one home can be your main residence for tax. With two, you can nominate which in writing to HMRC within two years of having both — worth checking you did.
                   </span>
                 </span>
               </label>
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" className="mt-0.5 w-4 h-4 shrink-0" checked={!!p.isLet} onChange={e => set({ isLet: e.target.checked || undefined })} />
-                <span className="text-xs leading-snug">
+              <label className="flex items-start gap-3 cursor-pointer min-h-[44px] py-1">
+                <input type="checkbox" className="mt-0.5 w-5 h-5 shrink-0" checked={!!p.isLet} onChange={e => set({ isLet: e.target.checked || undefined })} />
+                <span className="text-[15px] leading-snug">
                   Let out (including holiday lets)
                   <span className="block text-caption text-muted mt-0.5">
                     Rental profit is taxable, and mortgage interest only earns a 20% tax credit rather than being deducted.
@@ -512,13 +512,13 @@ function PropertyCard({ summary, ownerName, budget, focused, onFocusHandled }: {
                   ? 'Usually exempt while it’s your main residence, but worth keeping in case that changes.'
                   : 'A gain on a home that isn’t your main residence is taxable on sale. These figures set the base it’s measured from — much easier to record now than reconstruct later.'}
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <Field label="Bought for £">{numberInput(p.purchasePrice, v => set({ purchasePrice: v }))}</Field>
                 <Field label="Bought">
-                  <input type="month" value={p.purchaseDate ?? ''} onChange={e => set({ purchaseDate: e.target.value || undefined })} className={inputClass} />
+                  <MonthInput value={p.purchaseDate} onChange={v => set({ purchaseDate: v || undefined })} ariaLabel="Bought" />
                 </Field>
-                <Field label="Stamp duty £">{numberInput(p.stampDutyPaid, v => set({ stampDutyPaid: v }), '0', 'w-[110px]')}</Field>
-                <Field label="Improvements £">{numberInput(p.improvementCosts, v => set({ improvementCosts: v }), '0', 'w-[110px]')}</Field>
+                <Field label="Stamp duty £">{numberInput(p.stampDutyPaid, v => set({ stampDutyPaid: v }), '0', 'w-full')}</Field>
+                <Field label="Improvements £">{numberInput(p.improvementCosts, v => set({ improvementCosts: v }), '0', 'w-full')}</Field>
               </div>
               {paperGain != null && p.estimatedValue > 0 && (
                 <div className="flex justify-between text-xs mt-2 pt-2 border-t border-border">
@@ -583,14 +583,14 @@ export default function PropertiesSection({ budget, focusPropertyId, onFocusHand
             {(['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(o => <option key={o} value={o}>{ownerName(o)}</option>)}
           </select>
           <div className="flex gap-2">
-            <button onClick={submit} className="flex-1 bg-ink text-on-ink border-0 rounded-xl py-2.5 cursor-pointer text-sm font-semibold">Add property</button>
-            <button onClick={() => setAdding(false)} className="px-4 bg-transparent border-[1.5px] border-border rounded-xl py-2.5 cursor-pointer text-sm">Cancel</button>
+            <button onClick={submit} className="flex-1 bg-ink text-on-ink border-0 rounded-xl min-h-[48px] cursor-pointer text-[15px] font-semibold">Add property</button>
+            <button onClick={() => setAdding(false)} className="px-5 bg-fill border-0 rounded-xl min-h-[48px] cursor-pointer text-[15px]">Cancel</button>
           </div>
         </div>
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="flex items-center justify-center gap-2 w-full py-3.5 border-2 border-dashed border-border rounded-xl text-muted text-sm cursor-pointer bg-transparent"
+          className="flex items-center justify-center gap-2 w-full min-h-[52px] border-2 border-dashed border-line-2 rounded-xl text-ink-2 text-[15px] cursor-pointer bg-transparent"
         >
           <Plus size={14} /> Add property
         </button>
