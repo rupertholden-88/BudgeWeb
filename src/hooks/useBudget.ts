@@ -305,6 +305,28 @@ export function useBudget() {
     mutate(b => ({ ...b, oneOffs: (b.oneOffs ?? []).map(o => o.id === id ? { ...o, ...fields } : o) }))
   }
 
+  /**
+   * Tick off a top-up, or a cost paid from savings. Paying from savings takes
+   * the amount off that pot's current balance (and puts it back if unticked).
+   */
+  const setOneOffDone = (id: string, done: boolean) => {
+    mutate(b => {
+      const o = (b.oneOffs ?? []).find(x => x.id === id)
+      if (!o || !!o.done === done) return b
+      let next: BudgetData = { ...b, oneOffs: (b.oneOffs ?? []).map(x => x.id === id ? { ...x, done: done || undefined } : x) }
+      if (o.fromSavings && o.savingsFrom && o.amount > 0) {
+        const { owner, label } = o.savingsFrom
+        const date = new Date().toISOString().slice(0, 10)
+        const snap = getOrCopySnapshot(next, owner, date)
+        if (snap.assets.some(a => a.label === label)) {
+          const updated = { ...snap, assets: snap.assets.map(a => a.label !== label ? a : { ...a, amount: Math.max(0, a.amount + (done ? -o.amount : o.amount)) }) }
+          next = { ...next, savingsHistory: [...next.savingsHistory.filter(s => !(s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7))), updated].sort((a, z) => a.date.localeCompare(z.date)) }
+        }
+      }
+      return next
+    })
+  }
+
   const deleteOneOff = (id: string) => {
     mutate(b => ({ ...b, oneOffs: (b.oneOffs ?? []).filter(o => o.id !== id) }))
   }
@@ -497,7 +519,7 @@ export function useBudget() {
     addCategory, renameCategory, deleteCategory,
     updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, toggleItemAutoRenew, updateItemInsurance, toggleItemShared, updateItemProperty, recordFinancialHealthRun,
     updateGrossIncome, updatePayday, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,
-    addOneOff, updateOneOff, deleteOneOff,
+    addOneOff, updateOneOff, deleteOneOff, setOneOffDone,
     addAsset, updateAsset, updateAssetFields, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,

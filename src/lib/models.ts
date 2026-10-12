@@ -150,21 +150,55 @@ export interface Property {
   isMainResidence?: boolean; isLet?: boolean; monthlyRent?: number
   purchasePrice?: number; purchaseDate?: string; stampDutyPaid?: number; improvementCosts?: number
 }
-/** A cost that lands in a single month: a repair, an annual bill, a deposit. */
+/** A cost that lands once: a repair, an annual bill, a deposit. */
 export interface OneOff {
   id: string; label: string; amount: number; owner: Owner
-  /** YYYY-MM, in local time. */
+  /** The pay period it belongs to, keyed by the month of the payday that starts it (see payPeriod). */
   month: string
+  /**
+   * Due before the next payday, after this period's transfer has already gone
+   * in, so joint ones need a top-up transfer now rather than a bigger one later.
+   */
+  topUp?: boolean
   propertyId?: string
-  /** Paid from savings rather than the month's income, so it doesn't reduce what's left to spend. */
+  /** Paid from savings rather than income, so it doesn't reduce what's left to spend. */
   fromSavings?: boolean
+  /** Which savings pot it comes out of, by owner and name (asset ids change each month). */
+  savingsFrom?: { owner: Owner; label: string }
+  /** Topped up, or paid from savings. */
+  done?: boolean
 }
 /** This month as YYYY-MM in local time (toISOString would flip a day early or late around midnight). */
 export function monthKey(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
-export function oneOffsFor(data: BudgetData, month = monthKey()): OneOff[] {
+export function oneOffsFor(data: BudgetData, month = payPeriod(data.payday).key): OneOff[] {
   return (data.oneOffs ?? []).filter(o => o.month === month)
+}
+
+export interface PayPeriod {
+  /** YYYY-MM of the payday that started this period (or the calendar month without a payday). */
+  key: string; nextKey: string
+  start: Date; next: Date
+  byPayday: boolean
+}
+
+/** The stretch between one payday and the next, which is what a month's budget really covers. */
+export function payPeriod(payday?: number, now = new Date()): PayPeriod {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  if (!payday || payday < 1 || payday > 31) {
+    const start = new Date(today.getFullYear(), today.getMonth(), 1)
+    const next = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+    return { key: monthKey(start), nextKey: monthKey(next), start, next, byPayday: false }
+  }
+  const y = today.getFullYear()
+  let m = today.getMonth()
+  if (payDateFor(payday, y, m) > today) m -= 1
+  return {
+    key: monthKey(new Date(y, m, 1)), nextKey: monthKey(new Date(y, m + 1, 1)),
+    start: payDateFor(payday, y, m), next: payDateFor(payday, y, m + 1),
+    byPayday: true,
+  }
 }
 export interface SpendSnapshot { date: string; totalInc: number; totalExp: number; totalSav: number }
 /** Birth month as YYYY-MM — stored rather than an age so it never goes stale. */
@@ -196,7 +230,9 @@ export interface BudgetData { categories: Category[]; savingsHistory: SavingsSna
   oneOffs?: OneOff[] }
 export interface Totals { incN: number; incR: number; expN: number; expR: number; savN: number; savR: number; debtN: number; debtR: number; expJoint: number; savJoint: number; debtJoint: number; halfJointExp: number; halfJointSav: number; halfJointDebt: number; netN: number; netR: number; totalInc: number; totalExp: number; totalSav: number; totalDebt: number; net: number
   /** This month's one-offs counted in the totals above (any paid from savings are left out). */
-  oneOff: number; oneOffJoint: number }
+  oneOff: number; oneOffJoint: number
+  /** Joint one-offs due before payday: a top-up on top of the transfer already made. */
+  oneOffTopUpJoint: number }
 
 export function defaultBudgetData(): BudgetData {
   return {
@@ -280,6 +316,7 @@ export function calcTotals(budget: BudgetData, opts: { oneOffs?: boolean } = {})
     totalInc, totalExp, totalSav, totalDebt,
     net: totalInc - totalExp - totalSav,
     oneOff: oneOffs.reduce((a, o) => a + o.amount, 0), oneOffJoint,
+    oneOffTopUpJoint: oneOffs.filter(o => o.owner === 'JOINT' && o.topUp).reduce((a, o) => a + o.amount, 0),
   }
 }
 
