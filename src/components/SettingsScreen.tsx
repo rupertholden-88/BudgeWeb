@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Check, KeyRound, Plus } from 'lucide-react'
 import { useApiKey } from '@/hooks/useApiKey'
 import { NumberInput } from './ui'
-import { ageInYears, ageInMonths } from '@/lib/models'
+import { ageInYears, ageInMonths, paydayFor } from '@/lib/models'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -204,16 +204,22 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
           </div>
         ))}
 
-        <div className="flex items-center gap-2 py-2.5 border-b border-border">
-          <span className="text-sm flex-1 min-w-0">Payday <span className="text-muted">(day of the month)</span></span>
-          <NumberInput
-            value={data.payday}
-            placeholder="e.g. 25"
-            onChange={v => updatePayday(v)}
-            ariaLabel="Payday, day of the month"
-            className="w-[90px] text-sm border border-line-2 rounded-xl px-3 py-2 outline-none bg-panel shrink-0 text-right min-h-[44px]"
-          />
-        </div>
+        {([
+          { owner: 'NIAMH' as const, label: data.nameNiamh || 'Person 1', colour: 'bg-niamh' },
+          { owner: 'RUPERT' as const, label: data.nameRupert || 'Person 2', colour: 'bg-rupert' },
+        ]).map(p => (
+          <div key={`payday-${p.owner}`} className="flex items-center gap-2 py-2.5 border-b border-border">
+            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${p.colour}`} />
+            <span className="text-sm flex-1 min-w-0 truncate">{p.label}&apos;s payday <span className="text-muted">(day of month)</span></span>
+            <NumberInput
+              value={paydayFor(data, p.owner)}
+              placeholder="e.g. 25"
+              onChange={v => updatePayday(p.owner, v)}
+              ariaLabel={`${p.label}'s payday, day of the month`}
+              className="w-[90px] text-sm border border-line-2 rounded-xl px-3 py-2 outline-none bg-panel shrink-0 text-right min-h-[44px]"
+            />
+          </div>
+        ))}
 
         {(data.dependants ?? []).map((d, i) => {
           const months = ageInMonths(d.born)
