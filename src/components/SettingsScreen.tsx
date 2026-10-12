@@ -161,13 +161,13 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
         ]).map(p => (
           <div key={p.owner} className="flex items-center gap-2 py-2.5 border-b border-border">
             <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${p.colour}`} />
-            <span className="text-sm flex-1 min-w-0 truncate">{p.label}</span>
+            <span className="text-sm w-[72px] shrink-0 truncate">{p.label}</span>
             <input
               type="month"
               value={p.value ?? ''}
               onChange={e => updateBirthMonth(p.owner, e.target.value)}
               aria-label={`${p.label} born`}
-              className="text-xs border-[1.5px] border-border rounded-lg px-2 py-1 outline-none bg-card shrink-0"
+              className="flex-1 min-w-0 text-xs border-[1.5px] border-border rounded-lg px-2 py-1 outline-none bg-card"
             />
             {p.value && (
               <span className="text-label text-muted tabular-nums shrink-0 w-8 text-right">{ageInYears(p.value)}y</span>
@@ -203,13 +203,13 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
           return (
             <div key={d.id} className="flex items-center gap-2 py-2.5 border-b border-border">
               <div className="w-2.5 h-2.5 rounded-full shrink-0 bg-joint" />
-              <span className="text-sm flex-1 min-w-0 truncate">Child {i + 1}</span>
+              <span className="text-sm w-[72px] shrink-0 truncate">Child {i + 1}</span>
               <input
                 type="month"
                 value={d.born}
                 onChange={e => updateDependant(d.id, e.target.value)}
                 aria-label={`Child ${i + 1} born`}
-                className="text-xs border-[1.5px] border-border rounded-lg px-2 py-1 outline-none bg-card shrink-0"
+                className="flex-1 min-w-0 text-xs border-[1.5px] border-border rounded-lg px-2 py-1 outline-none bg-card"
               />
               <span className="text-label text-muted tabular-nums shrink-0 w-8 text-right">
                 {months == null ? '' : months < 24 ? `${months}m` : `${Math.floor(months / 12)}y`}
