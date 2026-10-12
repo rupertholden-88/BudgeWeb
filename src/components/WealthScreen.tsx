@@ -14,7 +14,7 @@ export default function WealthScreen({ budget, focusPropertyId, onFocusHandled }
   return (
     <div className="h-full flex flex-col">
       <div className="px-5 pt-2 pb-3 shrink-0">
-        <h1 className="text-[30px] leading-[36px] font-semibold tracking-[-0.025em] m-0">Wealth</h1>
+        <h1 className="text-[30px] leading-[36px] font-semibold tracking-[-0.02em] m-0">Wealth</h1>
         <div className="seg grid-cols-2 mt-3" role="group" aria-label="Show">
           <button aria-pressed={view === 'own'} onClick={() => setView('own')}><span className="lbl">What you own</span></button>
           <button aria-pressed={view === 'owe'} onClick={() => setView('owe')}><span className="lbl">What you owe</span></button>

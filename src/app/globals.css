@@ -358,12 +358,13 @@
 }
 
 * { box-sizing: border-box; }
+/* Light text on dark reads thinner, so body copy gets a touch more weight. */
+[data-theme="dark"] body { font-weight: 450; }
 
 html, body {
-  font-family: 'Inter Variable', 'Inter', system-ui, sans-serif;
+  font-family: 'Figtree Variable', 'Figtree', system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.45;
-  font-feature-settings: 'cv11', 'ss03';
   font-optical-sizing: auto;
   background: var(--bg);
   color: var(--ink);

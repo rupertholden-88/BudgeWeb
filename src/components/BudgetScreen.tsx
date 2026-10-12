@@ -74,7 +74,7 @@ function Hero({ label, value, suffix, negative, headNote, pair, segments, legend
   return (
     <section className="panel hero p-5 mt-3.5" aria-label={label}>
       <div className="text-label font-medium text-muted">{label}</div>
-      <div className={`figure mt-2 flex items-baseline flex-wrap gap-x-2 text-[44px] leading-none font-bold tracking-[-0.035em] ${negative ? 'text-neg' : 'text-ink'}`}>
+      <div className={`figure mt-2 flex items-baseline flex-wrap gap-x-2 text-[44px] leading-none font-bold tracking-[-0.02em] ${negative ? 'text-neg' : 'text-ink'}`}>
         <Money value={value} />
         {suffix && <span className="text-[17px] font-medium tracking-normal text-muted">{suffix}</span>}
       </div>
@@ -84,7 +84,7 @@ function Hero({ label, value, suffix, negative, headNote, pair, segments, legend
           {pair.map(p => (
             <div key={p.owner} className="min-w-0">
               <div className="flex items-center gap-1.5 text-label text-muted truncate"><OwnerDot owner={p.owner} label={p.label} />{p.label}</div>
-              <div className="figure text-[28px] leading-8 font-bold tracking-[-0.03em] mt-1"><Money value={p.value} /></div>
+              <div className="figure text-[28px] leading-8 font-semibold tracking-[-0.01em] mt-1"><Money value={p.value} /></div>
             </div>
           ))}
         </div>
@@ -137,7 +137,7 @@ function Hero({ label, value, suffix, negative, headNote, pair, segments, legend
         <div className="flex items-end justify-between gap-3 mt-4 pt-4 border-t border-line">
           <div className="min-w-0">
             <div className="text-label font-medium text-muted">{secondary.label}</div>
-            <div className={`figure text-[28px] leading-none font-bold tracking-[-0.03em] mt-1.5 ${secondary.negative ? 'text-neg' : 'text-ink'}`}><Money value={secondary.value} /></div>
+            <div className={`figure text-[28px] leading-none font-semibold tracking-[-0.01em] mt-1.5 ${secondary.negative ? 'text-neg' : 'text-ink'}`}><Money value={secondary.value} /></div>
             <div className="text-caption text-muted mt-1.5">{secondary.sub}</div>
             {secondary.caption && <div className="text-caption text-muted">{secondary.caption}</div>}
           </div>
@@ -277,7 +277,7 @@ function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose }:
           value={item.amount || undefined}
           onChange={v => updateItemAmount(cat.key, item.id, v ?? 0)}
           ariaLabel={`Amount per month for ${item.label}`}
-          className="flex-1 min-w-0 bg-transparent text-[34px] font-semibold tracking-[-0.03em] num outline-none border-0 px-1 rounded-lg text-ink"
+          className="flex-1 min-w-0 bg-transparent text-[34px] font-semibold tracking-[-0.02em] num outline-none border-0 px-1 rounded-lg text-ink"
         />
         <span className="text-[17px] text-muted shrink-0">/mo</span>
       </label>
@@ -580,7 +580,7 @@ function OneOffSheet({ initial, budget, properties, ownerName, onClose }: {
           value={d.amount || undefined}
           onChange={v => set({ amount: v ?? 0 })}
           ariaLabel="One-off amount"
-          className="flex-1 min-w-0 bg-transparent text-[34px] font-semibold tracking-[-0.03em] num outline-none border-0 px-1 rounded-lg text-ink"
+          className="flex-1 min-w-0 bg-transparent text-[34px] font-semibold tracking-[-0.02em] num outline-none border-0 px-1 rounded-lg text-ink"
         />
         <span className="text-[17px] text-muted shrink-0">once</span>
       </label>
