@@ -14,9 +14,9 @@ module.exports = {
         'savings-bg', 'savings-text', 'pension', 'pension-light', 'accent', 'accent-light',
       ].map(n => [n, v(n)])),
       fontFamily: {
-        sans: ['"Inter Variable"', 'Inter', 'system-ui', 'sans-serif'],
-        // Headline figures are Inter now; the serif is reserved for the logo.
-        serif: ['"Inter Variable"', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['"Figtree Variable"', 'Figtree', 'system-ui', 'sans-serif'],
+        // Headline figures use the UI face too; the serif is reserved for the logo.
+        serif: ['"Figtree Variable"', 'Figtree', 'system-ui', 'sans-serif'],
         display: ['"DM Serif Display"', 'serif'],
       },
       // Named steps; nothing under 12px.

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 // Self-hosted fonts: no runtime request to Google, works offline.
-import '@fontsource-variable/inter/opsz.css'
+import '@fontsource-variable/figtree/wght.css'
 import '@fontsource/dm-serif-display/400.css'
 import './globals.css'
 
