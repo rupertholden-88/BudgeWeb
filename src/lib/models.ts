@@ -172,8 +172,26 @@ export interface OneOff {
 export function monthKey(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
-export function oneOffsFor(data: BudgetData, month = payPeriod(data.payday).key): OneOff[] {
-  return (data.oneOffs ?? []).filter(o => o.month === month)
+/** One-offs due in their owner's current pay period. */
+export function oneOffsFor(data: BudgetData, now = new Date()): OneOff[] {
+  return (data.oneOffs ?? []).filter(o => o.month === periodFor(data, o.owner, now).key)
+}
+
+export function paydayFor(data: BudgetData, owner: 'NIAMH' | 'RUPERT'): number | undefined {
+  return (owner === 'NIAMH' ? data.paydayNiamh : data.paydayRupert) ?? data.payday
+}
+
+/**
+ * The pay period that applies to someone's costs. Joint costs follow whoever
+ * was paid most recently, since the joint transfer is only complete once
+ * both have been paid.
+ */
+export function periodFor(data: BudgetData, owner: Owner, now = new Date()): PayPeriod {
+  if (owner !== 'JOINT') return payPeriod(paydayFor(data, owner), now)
+  const n = paydayFor(data, 'NIAMH'), r = paydayFor(data, 'RUPERT')
+  if (!n || !r) return payPeriod(n ?? r, now)
+  const pn = payPeriod(n, now), pr = payPeriod(r, now)
+  return pn.start >= pr.start ? pn : pr
 }
 
 export interface PayPeriod {
@@ -202,7 +220,7 @@ export function payPeriod(payday?: number, now = new Date()): PayPeriod {
 }
 export interface SpendSnapshot { date: string; totalInc: number; totalExp: number; totalSav: number }
 /** Birth month as YYYY-MM — stored rather than an age so it never goes stale. */
-export interface Dependant { id: string; born: string }
+export interface Dependant { id: string; born: string; name?: string }
 export type FinancialHealthStatus = 'strong' | 'solid' | 'attention' | 'at_risk'
 export interface FinancialHealthResult {
   headline: string
@@ -225,8 +243,9 @@ export interface FinancialHealthUsage { totalRuns: number; totalCostUsd: number 
 export interface BudgetData { categories: Category[]; savingsHistory: SavingsSnapshot[]; spendHistory: SpendSnapshot[]; debts: Debt[]; savedAt: string; nameNiamh: string; nameRupert: string; nameJoint: string; financialHealth?: FinancialHealthCache | null; financialHealthUsage?: FinancialHealthUsage | null; bornNiamh?: string; bornRupert?: string; dependants?: Dependant[]; properties?: Property[]
   /** Annual gross salary — optional, lets pension contributions be judged against the gross-based 8% minimum. */
   grossNiamh?: number; grossRupert?: number
-  /** Day of the month take-home pay lands (1-31), for the "days to payday" line. */
+  /** Day of the month take-home pay lands (1-31). Shared fallback from before paydays were per person. */
   payday?: number
+  paydayNiamh?: number; paydayRupert?: number
   oneOffs?: OneOff[] }
 export interface Totals { incN: number; incR: number; expN: number; expR: number; savN: number; savR: number; debtN: number; debtR: number; expJoint: number; savJoint: number; debtJoint: number; halfJointExp: number; halfJointSav: number; halfJointDebt: number; netN: number; netR: number; totalInc: number; totalExp: number; totalSav: number; totalDebt: number; net: number
   /** This month's one-offs counted in the totals above (any paid from savings are left out). */

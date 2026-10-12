@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Check, KeyRound, Plus } from 'lucide-react'
 import { useApiKey } from '@/hooks/useApiKey'
 import { NumberInput } from './ui'
-import { ageInYears, ageInMonths } from '@/lib/models'
+import { ageInYears, ageInMonths, paydayFor } from '@/lib/models'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -51,8 +51,25 @@ const PALETTES = [
 ] as const
 type PaletteId = typeof PALETTES[number]['id']
 
+/** A child's name, typed straight into the row; saved when you leave the field. */
+function ChildName({ value, placeholder, onSave }: { value: string; placeholder: string; onSave: (v: string) => void }) {
+  const [draft, setDraft] = useState(value)
+  useEffect(() => { setDraft(value) }, [value])
+  return (
+    <input
+      value={draft}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={() => { if (draft.trim() !== value) onSave(draft) }}
+      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+      placeholder={placeholder}
+      aria-label={`Name for ${value || placeholder}`}
+      className="text-sm w-[84px] shrink-0 bg-transparent border-0 border-b border-dashed border-line-2 rounded-none px-0 py-1 outline-none text-ink placeholder:text-ink-2"
+    />
+  )
+}
+
 export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook; onToast?: (msg: string) => void }) {
-  const { data, user, updateOwnerName, getJsonString, importFromJson, updateBirthMonth, addDependant, updateDependant, removeDependant, updateGrossIncome, updatePayday } = budget
+  const { data, user, updateOwnerName, getJsonString, importFromJson, updateBirthMonth, addDependant, updateDependant, renameDependant, removeDependant, updateGrossIncome, updatePayday } = budget
   const [importText, setImportText] = useState('')
   const [importResult, setImportResult] = useState<{ ok: boolean; text: string } | null>(null)
   const [darkMode, setDarkMode] = useState(false)
@@ -161,7 +178,7 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
         ]).map(p => (
           <div key={p.owner} className="flex items-center gap-2 py-2.5 border-b border-border">
             <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${p.colour}`} />
-            <span className="text-sm w-[72px] shrink-0 truncate">{p.label}</span>
+            <span className="text-sm w-[84px] shrink-0 truncate">{p.label}</span>
             <input
               type="month"
               value={p.value ?? ''}
@@ -187,28 +204,38 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
           </div>
         ))}
 
-        <div className="flex items-center gap-2 py-2.5 border-b border-border">
-          <span className="text-sm flex-1 min-w-0">Payday <span className="text-muted">(day of the month)</span></span>
-          <NumberInput
-            value={data.payday}
-            placeholder="e.g. 25"
-            onChange={v => updatePayday(v)}
-            ariaLabel="Payday, day of the month"
-            className="w-[90px] text-sm border border-line-2 rounded-xl px-3 py-2 outline-none bg-panel shrink-0 text-right min-h-[44px]"
-          />
-        </div>
+        {([
+          { owner: 'NIAMH' as const, label: data.nameNiamh || 'Person 1', colour: 'bg-niamh' },
+          { owner: 'RUPERT' as const, label: data.nameRupert || 'Person 2', colour: 'bg-rupert' },
+        ]).map(p => (
+          <div key={`payday-${p.owner}`} className="flex items-center gap-2 py-2.5 border-b border-border">
+            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${p.colour}`} />
+            <span className="text-sm flex-1 min-w-0 truncate">{p.label}&apos;s payday <span className="text-muted">(day of month)</span></span>
+            <NumberInput
+              value={paydayFor(data, p.owner)}
+              placeholder="e.g. 25"
+              onChange={v => updatePayday(p.owner, v)}
+              ariaLabel={`${p.label}'s payday, day of the month`}
+              className="w-[90px] text-sm border border-line-2 rounded-xl px-3 py-2 outline-none bg-panel shrink-0 text-right min-h-[44px]"
+            />
+          </div>
+        ))}
 
         {(data.dependants ?? []).map((d, i) => {
           const months = ageInMonths(d.born)
           return (
             <div key={d.id} className="flex items-center gap-2 py-2.5 border-b border-border">
               <div className="w-2.5 h-2.5 rounded-full shrink-0 bg-joint" />
-              <span className="text-sm w-[72px] shrink-0 truncate">Child {i + 1}</span>
+              <ChildName
+                value={d.name ?? ''}
+                placeholder={`Child ${i + 1}`}
+                onSave={name => renameDependant(d.id, name)}
+              />
               <input
                 type="month"
                 value={d.born}
                 onChange={e => updateDependant(d.id, e.target.value)}
-                aria-label={`Child ${i + 1} born`}
+                aria-label={`${d.name || `Child ${i + 1}`} born`}
                 className="flex-1 min-w-0 text-xs border-[1.5px] border-border rounded-lg px-2 py-1 outline-none bg-card"
               />
               <span className="text-label text-muted tabular-nums shrink-0 w-8 text-right">
@@ -216,7 +243,7 @@ export default function SettingsScreen({ budget, onToast }: { budget: BudgetHook
               </span>
               <button
                 onClick={() => removeDependant(d.id)}
-                aria-label={`Remove child ${i + 1}`}
+                aria-label={`Remove ${d.name || `child ${i + 1}`}`}
                 className="bg-transparent border-0 cursor-pointer text-muted text-sm shrink-0 w-11 h-11 -my-2 -mr-2 flex items-center justify-center"
               >
                 ✕

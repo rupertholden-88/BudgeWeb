@@ -171,6 +171,10 @@ export function useBudget() {
     mutate(b => ({ ...b, dependants: (b.dependants ?? []).map(d => d.id === id ? { ...d, born } : d) }))
   }
 
+  const renameDependant = (id: string, name: string) => {
+    mutate(b => ({ ...b, dependants: (b.dependants ?? []).map(d => d.id === id ? { ...d, name: name.trim() || undefined } : d) }))
+  }
+
   const removeDependant = (id: string) => {
     mutate(b => ({ ...b, dependants: (b.dependants ?? []).filter(d => d.id !== id) }))
   }
@@ -253,8 +257,15 @@ export function useBudget() {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.map(i => i.id === itemId ? { ...i, propertyId: propertyId || undefined } : i) }) }))
   }
 
-  const updatePayday = (payday: number | undefined) => {
-    mutate(b => ({ ...b, payday: payday && payday >= 1 && payday <= 31 ? Math.round(payday) : undefined }))
+  /** Each person's payday. The old shared payday is split into both on the first edit. */
+  const updatePayday = (owner: 'NIAMH' | 'RUPERT', payday: number | undefined) => {
+    const v = payday && payday >= 1 && payday <= 31 ? Math.round(payday) : undefined
+    mutate(b => ({
+      ...b,
+      paydayNiamh: owner === 'NIAMH' ? v : (b.paydayNiamh ?? b.payday),
+      paydayRupert: owner === 'RUPERT' ? v : (b.paydayRupert ?? b.payday),
+      payday: undefined,
+    }))
   }
 
   const updateGrossIncome = (owner: Owner, gross: number | undefined) => {
@@ -515,7 +526,7 @@ export function useBudget() {
   return {
     data, user, authLoading, cloudLoading, localLoading, savedAt, isRefreshing, totals, regularTotals,
     signIn, signOutUser, refreshFromCloud,
-    updateOwnerName, updateBirthMonth, addDependant, updateDependant, removeDependant,
+    updateOwnerName, updateBirthMonth, addDependant, updateDependant, renameDependant, removeDependant,
     addCategory, renameCategory, deleteCategory,
     updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, toggleItemAutoRenew, updateItemInsurance, toggleItemShared, updateItemProperty, recordFinancialHealthRun,
     updateGrossIncome, updatePayday, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,

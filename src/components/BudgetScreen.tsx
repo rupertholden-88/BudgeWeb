@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import {
   Category, LineItem, TabFilter, Owner, EntryType, Debt, Property, fmt, daysUntil, isInsuranceItem,
   debtPayoff, isMortgage, propertySummaries, nextPayday, energySwitchReminders, householdCostSplit,
-  OneOff, monthKey, payPeriod, PayPeriod, BudgetData,
+  OneOff, monthKey, PayPeriod, BudgetData, paydayFor, periodFor,
 } from '@/lib/models'
 import { needsAttention } from '@/lib/attention'
 import { Plus, ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, X, Check } from 'lucide-react'
@@ -524,8 +524,8 @@ function savingsPots(data: BudgetData) {
 type OneOffDraft = Omit<OneOff, 'id'> & { id?: string }
 type Due = 'now' | 'next' | 'later'
 
-function OneOffSheet({ initial, period, budget, properties, ownerName, onClose }: {
-  initial: OneOffDraft; period: PayPeriod; budget: BudgetHook; properties: Property[]
+function OneOffSheet({ initial, budget, properties, ownerName, onClose }: {
+  initial: OneOffDraft; budget: BudgetHook; properties: Property[]
   ownerName: (o: Owner) => string; onClose: () => void
 }) {
   const { data, addOneOff, updateOneOff, deleteOneOff, setOneOffDone } = budget
@@ -538,6 +538,7 @@ function OneOffSheet({ initial, period, budget, properties, ownerName, onClose }
     if (!isNew) updateOneOff(initial.id!, fields)
   }
   const pots = savingsPots(data)
+  const period = periodFor(data, d.owner)
   const potKey = (x?: { owner: Owner; label: string }) => x ? `${x.owner}|${x.label}` : ''
   const due: Due = d.month === period.key ? 'now' : d.month === period.nextKey ? 'next' : 'later'
   const setDue = (v: Due) => set(
@@ -597,7 +598,11 @@ function OneOffSheet({ initial, period, budget, properties, ownerName, onClose }
         <div className="text-[15px] text-ink mb-2">Who pays</div>
         <div className="seg" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }} role="group" aria-label="Who pays">
           {(['JOINT', 'NIAMH', 'RUPERT'] as const).map(o => (
-            <button key={o} aria-pressed={d.owner === o} onClick={() => set({ owner: o })}>
+            <button key={o} aria-pressed={d.owner === o} onClick={() => {
+              // Keep the same "when" against the new payer's payday.
+              const p = periodFor(data, o)
+              set({ owner: o, month: due === 'now' ? p.key : due === 'next' ? p.nextKey : d.month })
+            }}>
               <OwnerDot owner={o} label={ownerName(o)} /><span className="lbl">{ownerName(o)}</span>
             </button>
           ))}
@@ -762,16 +767,31 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
   const now = new Date()
   const hour = now.getHours()
   const greeting = `${hour < 12 ? 'Morning' : hour < 18 ? 'Afternoon' : 'Evening'}${me ? `, ${me}` : ''}`
-  const pay = nextPayday(data.payday)
-  // Name the day when a weekend or bank holiday has moved it earlier.
-  const moved = pay && pay.date.getDate() !== Math.min(data.payday!, new Date(pay.date.getFullYear(), pay.date.getMonth() + 1, 0).getDate())
-  const payWhen = moved ? ` (${pay.date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })})` : ''
-  const payday = pay?.days ?? null
-  const daysLeftInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate()
-  const timing = payday != null
-    ? payday === 0 ? 'Payday today' : `${payday} ${payday === 1 ? 'day' : 'days'} to payday${payWhen}`
-    : `${daysLeftInMonth} ${daysLeftInMonth === 1 ? 'day' : 'days'} left in ${now.toLocaleDateString('en-GB', { month: 'long' })}`
-  const asOf = savedAt ? ` · as of ${new Date(savedAt).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' })}` : ''
+  const pdN = paydayFor(data, 'NIAMH'), pdR = paydayFor(data, 'RUPERT')
+  const inDays = (d: number) => d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`
+  const timing = (() => {
+    const one = (pd: number | undefined) => {
+      const pay = nextPayday(pd)
+      if (!pay || !pd) return null
+      // Name the day when a weekend or bank holiday has moved it earlier.
+      const moved = pay.date.getDate() !== Math.min(pd, new Date(pay.date.getFullYear(), pay.date.getMonth() + 1, 0).getDate())
+      const when = moved ? ` (${pay.date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })})` : ''
+      return pay.days === 0 ? 'Payday today' : `${pay.days} ${pay.days === 1 ? 'day' : 'days'} to payday${when}`
+    }
+    const mine = ownerTab === 'NIAMH' ? one(pdN) : ownerTab === 'RUPERT' ? one(pdR) : null
+    if (mine) return mine
+    if (pdN && pdR && pdN !== pdR) {
+      const n = nextPayday(pdN)!, r = nextPayday(pdR)!
+      return `${ownerName('NIAMH')} paid ${inDays(n.days)}, ${ownerName('RUPERT')} ${inDays(r.days)}`
+    }
+    const shared = one(pdN ?? pdR)
+    if (shared) return shared
+    const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate()
+    return `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left in ${now.toLocaleDateString('en-GB', { month: 'long' })}`
+  })()
+  // Two paydays already fill the line, so the save time is left off then.
+  const twoPaydays = !ownerTab && !!pdN && !!pdR && pdN !== pdR
+  const asOf = savedAt && !twoPaydays ? ` · as of ${new Date(savedAt).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' })}` : ''
 
   // Lapsed renewals pinned above everything.
   const lapsed = useMemo(() => needsAttention(data).filter(a => a.action.type === 'renewal' && a.severity === 'bad'), [data])
@@ -805,13 +825,14 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
   const otherDebts = visibleDebts.filter(d => !isMortgage(d))
   const debtTotal = visibleDebts.reduce((a, d) => a + d.monthlyPayment, 0)
 
-  const period = payPeriod(data.payday)
+  const period = periodFor(data, 'JOINT')
+  const keyFor = (o: OneOff) => periodFor(data, o.owner).key
   const oneOffsShown = (data.oneOffs ?? [])
     .filter(o => propertyId ? o.propertyId === propertyId : !ownerTab || o.owner === ownerTab)
-    .filter(o => o.month >= period.key)
+    .filter(o => o.month >= keyFor(o))
     .sort((a, b) => a.month.localeCompare(b.month))
-  const oneOffsNow = oneOffsShown.filter(o => o.month === period.key)
-  const oneOffsLater = oneOffsShown.filter(o => o.month > period.key)
+  const oneOffsNow = oneOffsShown.filter(o => o.month === keyFor(o))
+  const oneOffsLater = oneOffsShown.filter(o => o.month > keyFor(o))
   const oneOffTotal = oneOffsNow.filter(o => !o.fromSavings).reduce((a, o) => a + o.amount, 0)
   const openOneOff = (id: string) => {
     const o = (data.oneOffs ?? []).find(x => x.id === id)
@@ -820,7 +841,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
   const addOneOff = () => {
     // Whoever owns the home in view pays by default (Rupert for Mulberry Cottage), else the tab, else joint.
     const owner: Owner = propertySummary?.property.owner ?? ownerTab ?? 'JOINT'
-    setOneOffSheet({ label: '', amount: 0, owner, month: period.key, topUp: true, propertyId: propertyId ?? undefined })
+    setOneOffSheet({ label: '', amount: 0, owner, month: periodFor(data, owner).key, topUp: true, propertyId: propertyId ?? undefined })
   }
 
   const spendGroups = byType('EXPENSE')
@@ -851,7 +872,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
     { label: 'Saving', value: totals.savJoint, color: 'var(--chart-3)' },
     { label: 'One-off', value: plannedJoint, color: 'var(--chart-4)' },
   ]
-  const periodOneOffs = (data.oneOffs ?? []).filter(o => o.month === period.key && !o.fromSavings && o.amount > 0)
+  const periodOneOffs = (data.oneOffs ?? []).filter(o => o.month === keyFor(o) && !o.fromSavings && o.amount > 0)
   const topUps: TopUp[] = periodOneOffs.filter(o => o.owner === 'JOINT' && o.topUp)
     .map(o => ({ id: o.id, label: o.label, each: o.amount / 2, done: !!o.done }))
   const plannedNames = periodOneOffs.filter(o => o.owner === 'JOINT' && !o.topUp).map(o => o.label)
@@ -937,7 +958,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
     <div className="h-full overflow-y-auto px-5 pb-[calc(32px+env(safe-area-inset-bottom))]">
       {oneOffSheet && (
         <OneOffSheet
-          key={oneOffSheet.id ?? 'new'} initial={oneOffSheet} period={period} budget={budget}
+          key={oneOffSheet.id ?? 'new'} initial={oneOffSheet} budget={budget}
           properties={properties} ownerName={ownerName} onClose={() => setOneOffSheet(null)}
         />
       )}
