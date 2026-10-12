@@ -387,6 +387,15 @@ h1, h2, h3 { font-family: inherit; font-weight: 650; letter-spacing: -0.02em; }
   input, select, textarea { font-size: max(16px, 1em) !important; }
 }
 
+/* Big amount fields in sheets: the figure itself is large, and the whole box takes the focus ring. */
+.amount-field { display: flex; align-items: center; gap: 6px; min-height: 72px; padding: 0 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line-2); cursor: text; }
+.amount-field:focus-within { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.amount-field .cur-big { font-size: 30px; font-weight: 600; color: var(--faint); line-height: 1; }
+.amount-field input.amount-input { font-size: 32px !important; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; color: var(--ink); background: transparent; border: 0; padding: 0; flex: 1; min-width: 0; }
+.amount-field input.amount-input:focus-visible { outline: none !important; }
+.amount-field .suffix { font-size: 15px; color: var(--muted); flex: none; }
+.title-input { font-size: 21px !important; font-weight: 650; letter-spacing: -0.01em; }
+
 /* The only filled surface on a screen: the hero, sheets, and grouped lists. */
 .panel {
   background: var(--panel);
