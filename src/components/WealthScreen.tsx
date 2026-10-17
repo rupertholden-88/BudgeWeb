@@ -7,8 +7,8 @@ import DebtsScreen from './DebtsScreen'
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
 /** Everything the household owns and owes: savings, property, pensions and debts. */
-export default function WealthScreen({ budget, focusPropertyId, onFocusHandled }: {
-  budget: BudgetHook; focusPropertyId?: string | null; onFocusHandled?: () => void
+export default function WealthScreen({ budget, focusPropertyId, onFocusHandled, onOpenInsurance }: {
+  budget: BudgetHook; focusPropertyId?: string | null; onFocusHandled?: () => void; onOpenInsurance?: (policyId?: string) => void
 }) {
   const [view, setView] = useState<'own' | 'owe'>('own')
   return (
@@ -22,7 +22,7 @@ export default function WealthScreen({ budget, focusPropertyId, onFocusHandled }
       </div>
       <div className="flex-1 min-h-0">
         {view === 'own'
-          ? <SavingsScreen budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={onFocusHandled} />
+          ? <SavingsScreen budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={onFocusHandled} onOpenInsurance={onOpenInsurance} />
           : <DebtsScreen budget={budget} />}
       </div>
     </div>

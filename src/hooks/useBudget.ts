@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore'
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth'
 import { db, auth, provider } from '@/lib/firebase'
-import { BudgetData, OneOff, Debt, Owner, EntryType, AssetType, Asset, DebtType, Property, Fuel, EnergyTariff, defaultBudgetData, calcTotals, monthlyInterest, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
+import { BudgetData, OneOff, PolicyDetails, LineItem, Debt, Owner, EntryType, AssetType, Asset, DebtType, Property, Fuel, EnergyTariff, defaultBudgetData, calcTotals, monthlyInterest, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
 
 function uuid() { return crypto.randomUUID() }
 
@@ -29,6 +29,13 @@ function mergeBudgets(incoming: BudgetData, current: BudgetData): BudgetData {
     savingsHistory: Array.from(savingsMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
     spendHistory:   Array.from(spendMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
   }
+}
+
+/** Put a bill into the payer's insurance group, creating one if there isn't one. */
+function addToInsuranceGroup(categories: BudgetData['categories'], owner: Owner, item: LineItem): BudgetData['categories'] {
+  const group = categories.find(c => c.owner === owner && c.type === 'EXPENSE' && /insur/i.test(c.label))
+  if (group) return categories.map(c => c.key !== group.key ? c : { ...c, items: [...c.items, item] })
+  return [...categories, { key: `insurance_${owner.toLowerCase()}_${uuid().slice(0, 8)}`, owner, type: 'EXPENSE', label: 'Insurance', items: [item] }]
 }
 
 export function useBudget() {
@@ -368,6 +375,60 @@ export function useBudget() {
     }))
   }
 
+  /**
+   * Save an insurance policy: its Budget bill (created in an Insurance group
+   * if it's new) and its details, in one change. Returns the bill's id.
+   */
+  const savePolicy = (p: {
+    itemId?: string; owner: Owner; label: string
+    /** Set to change the bill's monthly amount; leave out to keep it. */
+    monthly?: number
+    provider?: string; coverAmount?: number; renewalDate?: string; autoRenews?: boolean; propertyId?: string | null
+    details?: PolicyDetails
+  }): string => {
+    const id = p.itemId ?? uuid()
+    mutate(b => {
+      let categories = b.categories
+      const exists = categories.some(c => c.items.some(i => i.id === id))
+      const patch = (i: LineItem): LineItem => ({
+        ...i,
+        label: p.label.trim() || i.label,
+        ...(p.monthly != null && { amount: Math.round(p.monthly * 100) / 100 }),
+        ...(p.provider !== undefined && { insuranceProvider: p.provider || undefined }),
+        ...(p.coverAmount !== undefined && { insuranceCoverAmount: p.coverAmount || undefined }),
+        ...(p.renewalDate !== undefined && { renewalDate: p.renewalDate || undefined }),
+        ...(p.autoRenews !== undefined && { autoRenews: p.autoRenews || undefined }),
+        ...(p.propertyId !== undefined && { propertyId: p.propertyId || undefined }),
+      })
+      if (exists) {
+        // Who pays decides the group: move the bill if the payer changed.
+        const from = categories.find(c => c.items.some(i => i.id === id))!
+        const item = patch(from.items.find(i => i.id === id)!)
+        if (from.owner === p.owner) {
+          categories = categories.map(c => c.key !== from.key ? c : { ...c, items: c.items.map(i => i.id === id ? item : i) })
+        } else {
+          categories = categories.map(c => c.key !== from.key ? c : { ...c, items: c.items.filter(i => i.id !== id) })
+          categories = addToInsuranceGroup(categories, p.owner, item)
+        }
+      } else {
+        const item = patch({ id, label: p.label.trim() || 'Insurance', amount: 0, priority: 'NECESSITY' })
+        categories = addToInsuranceGroup(categories, p.owner, item)
+      }
+      const details = p.details ? { ...(b.policyDetails ?? {}), [id]: { ...(b.policyDetails?.[id] ?? {}), ...p.details } } : b.policyDetails
+      return { ...b, categories, policyDetails: details }
+    })
+    return id
+  }
+
+  /** Remove a policy and its bill (a sold car, a cancelled policy). */
+  const removePolicy = (itemId: string) => {
+    mutate(b => {
+      const rest = { ...(b.policyDetails ?? {}) }
+      delete rest[itemId]
+      return { ...b, categories: b.categories.map(c => ({ ...c, items: c.items.filter(i => i.id !== itemId) })), policyDetails: rest }
+    })
+  }
+
   const removeItem = (catKey: string, itemId: string) => {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.filter(i => i.id !== itemId) }) }))
   }
@@ -530,7 +591,7 @@ export function useBudget() {
     addCategory, renameCategory, deleteCategory,
     updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, toggleItemAutoRenew, updateItemInsurance, toggleItemShared, updateItemProperty, recordFinancialHealthRun,
     updateGrossIncome, updatePayday, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,
-    addOneOff, updateOneOff, deleteOneOff, setOneOffDone,
+    addOneOff, updateOneOff, deleteOneOff, setOneOffDone, savePolicy, removePolicy,
     addAsset, updateAsset, updateAssetFields, deleteAsset,
     addDebt, updateDebt, deleteDebt,
     getJsonString, importFromJson,

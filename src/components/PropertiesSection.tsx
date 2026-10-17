@@ -1,10 +1,11 @@
 'use client'
+import { insurancePolicies } from '@/lib/insurance'
 
 import { useState, useEffect, useRef } from 'react'
 import { Owner, Fuel, EnergyTariff, TariffOption, fmt, propertySummaries, tariffAnnualCost, quotedAnnualCost, exitFeeFreeFrom, daysUntil, ENERGY_VAT } from '@/lib/models'
 import type { TariffSearchRequest } from '@/app/api/energy-tariffs/route'
 import { useApiKey } from '@/hooks/useApiKey'
-import { Plus, Home, Zap, Flame, Search, ExternalLink, KeyRound } from 'lucide-react'
+import { Plus, Home, Zap, Flame, Search, ExternalLink, KeyRound, ShieldPlus, ChevronRight } from 'lucide-react'
 import { AmountCell, ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, TapToEdit, NumberInput, inputClass, ownerBorderClass, MonthInput } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
@@ -372,7 +373,7 @@ function EnergySection({ summary, budget }: { summary: Summary; budget: BudgetHo
   )
 }
 
-function PropertyCard({ summary, ownerName, budget, focused, onFocusHandled }: { summary: Summary; ownerName: (o: Owner) => string; budget: BudgetHook; focused?: boolean; onFocusHandled?: () => void }) {
+function PropertyCard({ summary, ownerName, budget, focused, onFocusHandled, onOpenInsurance }: { summary: Summary; ownerName: (o: Owner) => string; budget: BudgetHook; focused?: boolean; onFocusHandled?: () => void; onOpenInsurance?: (policyId?: string) => void }) {
   const { updateProperty, deleteProperty } = budget
   const { property: p, debts, items, mortgageBalance, mortgagePayment, runningCosts, monthlyTotal, equity, ltvPct } = summary
   const [expanded, setExpanded] = useState(!!focused)
@@ -504,6 +505,29 @@ function PropertyCard({ summary, ownerName, budget, focused, onFocusHandled }: {
               )}
             </PanelSection>
 
+            <PanelSection title="Insurance">
+              {(() => {
+                const own = insurancePolicies(budget.data).filter(x => x.propertyId === p.id)
+                if (own.length === 0) return (
+                  <button onClick={() => onOpenInsurance?.()} className="w-full flex items-center gap-2 min-h-[44px] text-[15px] text-ink-2 cursor-pointer text-left">
+                    <ShieldPlus size={16} aria-hidden="true" /> No cover recorded · Add on Insurance
+                  </button>
+                )
+                return own.map(x => (
+                  <button key={x.id} onClick={() => onOpenInsurance?.(x.id)} className="w-full flex items-center gap-3 min-h-[48px] py-1.5 text-left cursor-pointer border-t border-border first:border-t-0">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[15px] font-medium text-ink truncate">{x.label}</span>
+                      <span className={`block text-caption ${x.status === 'lapsed' ? 'text-negative font-semibold' : 'text-muted'}`}>
+                        {[x.provider, x.status === 'lapsed' ? 'Lapsed' : x.renewalDate ? `renews ${new Date(x.renewalDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : null].filter(Boolean).join(' · ')}
+                      </span>
+                    </span>
+                    <span className="text-[15px] tabular-nums">{fmt(x.monthly)}/mo</span>
+                    <ChevronRight size={16} className="text-faint shrink-0" aria-hidden="true" />
+                  </button>
+                ))
+              })()}
+            </PanelSection>
+
             <div ref={finderRef}><EnergySection summary={summary} budget={budget} /></div>
 
             <PanelSection title="Capital gains record">
@@ -539,7 +563,7 @@ function PropertyCard({ summary, ownerName, budget, focused, onFocusHandled }: {
   )
 }
 
-export default function PropertiesSection({ budget, focusPropertyId, onFocusHandled }: { budget: BudgetHook; focusPropertyId?: string | null; onFocusHandled?: () => void }) {
+export default function PropertiesSection({ budget, focusPropertyId, onFocusHandled, onOpenInsurance }: { budget: BudgetHook; focusPropertyId?: string | null; onFocusHandled?: () => void; onOpenInsurance?: (policyId?: string) => void }) {
   const { data, addProperty } = budget
   const [adding, setAdding] = useState(false)
   const [label, setLabel] = useState('')
@@ -561,7 +585,7 @@ export default function PropertiesSection({ budget, focusPropertyId, onFocusHand
         )}
       </div>
 
-      {summaries.map(s => <PropertyCard key={s.property.id} summary={s} ownerName={ownerName} budget={budget} focused={s.property.id === focusPropertyId} onFocusHandled={onFocusHandled} />)}
+      {summaries.map(s => <PropertyCard key={s.property.id} summary={s} ownerName={ownerName} budget={budget} focused={s.property.id === focusPropertyId} onFocusHandled={onFocusHandled} onOpenInsurance={onOpenInsurance} />)}
 
       {summaries.length === 0 && !adding && (
         <p className="text-xs text-muted mt-0 mb-3 leading-relaxed">

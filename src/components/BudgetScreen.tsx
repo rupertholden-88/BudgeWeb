@@ -181,7 +181,7 @@ function LapsedBanner({ title, meta, onOpen, onRenewed, onUpdateDate }: {
 
 // ─── item sheet ───────────────────────────────────────────────────────────────
 
-function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
@@ -208,7 +208,7 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
   )
 }
 
-function SheetRow({ label, children, hint }: { label: string; children: React.ReactNode; hint?: React.ReactNode }) {
+export function SheetRow({ label, children, hint }: { label: string; children: React.ReactNode; hint?: React.ReactNode }) {
   return (
     <div className="py-2.5 border-t border-line">
       <div className="flex items-center justify-between gap-3 min-h-[44px]">
@@ -243,9 +243,9 @@ function AutoFocus({ selector }: { selector: string }) {
   return null
 }
 
-function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose }: {
+function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, onOpenInsurance }: {
   cat: Category; item: LineItem; properties: Property[]; budget: BudgetHook
-  ownerName: (o: Owner) => string; focus: 'amount' | 'date'; onClose: () => void
+  ownerName: (o: Owner) => string; focus: 'amount' | 'date'; onClose: () => void; onOpenInsurance?: (itemId: string) => void
 }) {
   const { updateItemAmount, renameItem, removeItem, updateItemRenewal, toggleItemAutoRenew, toggleItemShared, updateItemInsurance, updateItemProperty } = budget
   const [label, setLabel] = useState(item.label)
@@ -324,6 +324,15 @@ function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose }:
         </SheetRow>
       )}
 
+      {isInsurance && onOpenInsurance && (
+        <button onClick={() => { onClose(); onOpenInsurance(item.id) }} className="w-full flex items-center justify-between gap-3 min-h-[52px] py-2.5 border-t border-line text-left cursor-pointer">
+          <span>
+            <span className="block text-[15px] text-ink">{budget.data.policyDetails?.[item.id] ? 'Linked to a policy' : 'Policy details'}</span>
+            <span className="block text-caption text-muted">Cover, excess and documents on Insurance</span>
+          </span>
+          <span className="flex items-center gap-1 text-[15px] font-semibold text-ink">Open <ChevronRight size={16} aria-hidden="true" /></span>
+        </button>
+      )}
       {isInsurance && (
         <SheetRow label="Provider">
           <input value={item.insuranceProvider ?? ''} placeholder="e.g. Aviva" onChange={e => updateItemInsurance(cat.key, item.id, { provider: e.target.value })} className={`${inputClass} w-full`} aria-label="Provider" />
@@ -745,8 +754,8 @@ function OneOffGroup({ now, upcoming, period, ownerName, onOpen, onAdd }: {
 
 const OWNER_ORDER: Owner[] = ['JOINT', 'NIAMH', 'RUPERT']
 
-export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDebts }: {
-  budget: BudgetHook; tab: TabFilter; onTabChange: (t: TabFilter) => void; onNavigateToDebts: () => void
+export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDebts, onOpenInsurance }: {
+  budget: BudgetHook; tab: TabFilter; onTabChange: (t: TabFilter) => void; onNavigateToDebts: () => void; onOpenInsurance?: (itemId: string) => void
 }) {
   const { data, totals, addCategory, savedAt, user, updateItemRenewal } = budget
   const [addingCat, setAddingCat] = useState(false)
@@ -964,7 +973,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
         />
       )}
       {openCat && openItem && sheet && (
-        <ItemSheet cat={openCat} item={openItem} properties={properties} budget={budget} ownerName={ownerName} focus={sheet.focus} onClose={() => setSheet(null)} />
+        <ItemSheet cat={openCat} item={openItem} properties={properties} budget={budget} ownerName={ownerName} focus={sheet.focus} onClose={() => setSheet(null)} onOpenInsurance={onOpenInsurance} />
       )}
 
       {/* Two columns on wide screens: the month's summary stays put on the left while the groups scroll. */}

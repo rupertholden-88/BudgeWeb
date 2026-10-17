@@ -219,6 +219,35 @@ export function payPeriod(payday?: number, now = new Date()): PayPeriod {
     byPayday: true,
   }
 }
+/**
+ * What an insurance policy covers, beyond what its Budget bill holds
+ * (amount, provider, cover, renewal date, auto-renew and home stay on the
+ * bill). Kept against the bill's id, so the monthly cost lives in one place.
+ */
+export interface PolicyDetails {
+  /** Overrides the type worked out from the bill's name (see insuranceKind). */
+  kind?: string
+  policyNumber?: string; policyholders?: string
+  startDate?: string
+  /** The yearly price, when known; paying monthly can cost more than this ÷ 12. */
+  premiumAnnual?: number; paysMonthly?: boolean
+  covers?: string[]; excluded?: string[]
+  home?: {
+    buildingsSum?: number; buildingsUnlimited?: boolean; contentsSum?: number; contentsUnlimited?: boolean
+    accidentalDamage?: string; unoccupiedDays?: number
+    excessCompulsory?: number; excessVoluntary?: number; escapeOfWaterExcess?: number
+    secondHomeDeclared?: boolean
+  }
+  car?: {
+    reg?: string; makeModel?: string; coverLevel?: string; mainDriver?: string; namedDrivers?: string
+    ncdYears?: number; ncdProtected?: boolean; excessCompulsory?: number; excessVoluntary?: number; breakdown?: string
+  }
+  life?: { livesCovered?: string; sumAssured?: number; termEnd?: string; coverType?: string; inTrust?: boolean }
+  /** Documents the details were read from. The files themselves are never kept. */
+  readFrom?: { name: string; readAt: string }[]
+  lastYearAnnual?: number
+}
+
 export interface SpendSnapshot { date: string; totalInc: number; totalExp: number; totalSav: number }
 /** Birth month as YYYY-MM — stored rather than an age so it never goes stale. */
 export interface Dependant { id: string; born: string; name?: string }
@@ -247,7 +276,9 @@ export interface BudgetData { categories: Category[]; savingsHistory: SavingsSna
   /** Day of the month take-home pay lands (1-31). Shared fallback from before paydays were per person. */
   payday?: number
   paydayNiamh?: number; paydayRupert?: number
-  oneOffs?: OneOff[] }
+  oneOffs?: OneOff[]
+  /** Insurance details by Budget bill id. */
+  policyDetails?: Record<string, PolicyDetails> }
 export interface Totals { incN: number; incR: number; expN: number; expR: number; savN: number; savR: number; debtN: number; debtR: number; expJoint: number; savJoint: number; debtJoint: number; halfJointExp: number; halfJointSav: number; halfJointDebt: number; netN: number; netR: number; totalInc: number; totalExp: number; totalSav: number; totalDebt: number; net: number
   /** This month's one-offs counted in the totals above (any paid from savings are left out). */
   oneOff: number; oneOffJoint: number
