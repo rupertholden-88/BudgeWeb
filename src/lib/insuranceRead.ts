@@ -31,10 +31,24 @@ export interface ReadResult {
 export interface ReadFile { name: string; mediaType: string; data: string }
 
 
+/** A whole money or count value, or undefined. "4g.40" is not 4. */
 const num = (v?: string) => {
   if (!v) return undefined
-  const n = parseFloat(v.replace(/[£,\s]/g, ''))
-  return Number.isFinite(n) ? n : undefined
+  const t = v.replace(/[£,\s]/g, '')
+  return /^\d+(\.\d+)?$/.test(t) ? parseFloat(t) : undefined
+}
+
+/** Why a value typed on the review screen can't be saved, or null if it's fine. */
+export function fieldProblem(key: FieldKey, value: string): string | null {
+  const v = value.trim()
+  if (!v) return null
+  if (['premiumAnnual', 'premiumMonthly', 'buildingsSum', 'contentsSum', 'excessCompulsory', 'excessVoluntary', 'escapeOfWaterExcess', 'sumAssured'].includes(key)) {
+    if (/^unlimited$/i.test(v) && (key === 'buildingsSum' || key === 'contentsSum')) return null
+    return /^£?\s*[\d,]+(\.\d{1,2})?$/.test(v) ? null : 'Enter an amount in pounds, e.g. 49.40'
+  }
+  if (['startDate', 'endDate', 'termEnd'].includes(key)) return /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v).getTime()) ? null : 'Enter a date as YYYY-MM-DD'
+  if (['unoccupiedDays', 'ncdYears'].includes(key)) return /^\d+$/.test(v) ? null : 'Enter a whole number'
+  return null
 }
 const yes = (v?: string) => v == null ? undefined : /^y/i.test(v.trim()) ? true : /^n/i.test(v.trim()) ? false : undefined
 const date = (v?: string) => v && /^\d{4}-\d{2}-\d{2}$/.test(v.trim()) ? v.trim() : undefined

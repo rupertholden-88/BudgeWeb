@@ -399,7 +399,8 @@ function InsuranceCard({ data, onOpen }: { data: BudgetHook['data']; onOpen?: ()
           {top.map(g => (
             <div key={g.id} className="flex items-start gap-2.5">
               <AlertTriangle size={15} className={`mt-0.5 shrink-0 ${g.severity === 'gap' ? 'text-negative' : 'text-muted'}`} aria-hidden="true" />
-              <div className="text-[15px] text-ink leading-snug min-w-0">{g.title}</div>
+              <div className="text-[15px] text-ink leading-snug min-w-0 flex-1">{g.title}</div>
+              <span className={`pill shrink-0 ${g.severity === 'gap' ? 'pill-bad' : ''}`}>{g.severity === 'gap' ? 'Missing' : 'Worth a look'}</span>
             </div>
           ))}
         </div>

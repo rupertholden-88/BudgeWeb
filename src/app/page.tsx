@@ -179,7 +179,7 @@ export default function HomePage() {
   ) : (
     <button onClick={signIn} className="flex items-center gap-1.5 min-h-[44px] text-label text-muted cursor-pointer text-left">
       <User size={14} aria-hidden="true" className="shrink-0" />
-      <span>On this phone only · <span className="font-semibold text-ink underline underline-offset-2">Back up</span></span>
+      <span>On this device only · <span className="font-semibold text-ink underline underline-offset-2">Back up</span></span>
     </button>
   )
 

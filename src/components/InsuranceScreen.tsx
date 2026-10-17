@@ -10,7 +10,7 @@ import {
   insurancePolicies, insuranceGaps, assetOf, statusOf, KIND_LABELS, ALL_KINDS, HOME_KINDS, PEOPLE_KINDS,
   type Policy, type PolicyStatus, type InsuranceGap, type InsuranceKind,
 } from '@/lib/insurance'
-import { readToPolicy, matchRead, type ReadPolicy, type ReadResult, type ReadFile, type ReadField, type FieldKey } from '@/lib/insuranceRead'
+import { readToPolicy, matchRead, fieldProblem, type ReadPolicy, type ReadResult, type ReadFile, type ReadField, type FieldKey } from '@/lib/insuranceRead'
 import { useApiKey } from '@/hooks/useApiKey'
 import { Sheet, SheetRow, Toggle, OwnerDot } from './BudgetScreen'
 import { ConfirmDelete, NumberInput, inputClass } from './ui'
@@ -191,7 +191,6 @@ function AssetCard({ tile, title, titleExtra, sub, policies, gaps, onOpen, onAdd
   const worst: PolicyStatus | 'gap' = policies.some(p => p.status === 'lapsed') ? 'lapsed'
     : policies.some(p => p.status === 'soon') ? 'soon'
     : policies.length === 0 ? 'gap'
-    : gaps.some(g => g.severity === 'gap') ? 'soon'
     : policies.every(p => p.status === 'undated') ? 'undated' : 'covered'
   const monthly = policies.reduce((a, p) => a + p.monthly, 0)
   const yearly = policies.reduce((a, p) => a + p.yearly, 0)
@@ -282,6 +281,8 @@ function PolicySheet({ mode, budget, onClose, onUpload, ownerName }: {
       details: {
         ...d, kind,
         covers: coversText.split(',').map(s => s.trim()).filter(Boolean),
+        // A changed monthly price is the new price; a yearly figure from an old document would be stale.
+        premiumAnnual: existing && monthly != null && monthly !== existing.monthly ? undefined : d.premiumAnnual,
         // A renewal starts where the last policy year ended.
         startDate: mode.type === 'renew' && existing?.renewalDate ? existing.renewalDate : d.startDate,
         lastYearAnnual: mode.type === 'renew' && existing ? existing.yearly : d.lastYearAnnual,
@@ -489,7 +490,7 @@ const FIELD_LABELS: Partial<Record<FieldKey, string>> = {
   covers: 'Covers', exclusions: 'Not covered',
 }
 /** One found detail: shown as read, tap to correct it. Unclear readings say so. */
-function ReviewField({ f, value, onChange }: { f: ReadField; value: string; onChange: (v: string) => void }) {
+function ReviewField({ f, value, onChange, problem }: { f: ReadField; value: string; onChange: (v: string) => void; problem?: string | null }) {
   const [editing, setEditing] = useState(false)
   const low = f.confidence === 'low'
   const label = FIELD_LABELS[f.key] ?? f.key
@@ -500,17 +501,19 @@ function ReviewField({ f, value, onChange }: { f: ReadField; value: string; onCh
         : <CircleCheck size={18} className="text-pos shrink-0" aria-hidden="true" />}
       <span className="flex-1 min-w-0">
         <span className="block text-caption text-muted">{label}{low && <span className="text-warn font-semibold"> · Check this</span>}</span>
-        {editing ? (
+        {editing || problem ? (
           <input
-            autoFocus value={value} onChange={e => onChange(e.target.value)} onBlur={() => setEditing(false)}
+            autoFocus={editing} value={value} onChange={e => onChange(e.target.value)} onBlur={() => setEditing(false)}
             onKeyDown={e => { if (e.key === 'Enter') setEditing(false) }}
-            aria-label={label} className={`${inputClass} w-full mt-1`}
+            aria-label={label} aria-invalid={!!problem} aria-describedby={problem ? `err-${f.key}` : undefined}
+            className={`${inputClass} w-full mt-1 ${problem ? 'border-neg' : ''}`}
           />
         ) : (
           <button onClick={() => setEditing(true)} aria-label={`${label}: ${showValue({ ...f, value })}${low ? ', check this' : ''}. Tap to change`} className="block w-full text-left text-[16px] font-medium text-ink min-h-[28px] cursor-text">
             {showValue({ ...f, value })}
           </button>
         )}
+        {problem && <span id={`err-${f.key}`} className="block text-caption text-neg mt-1">{problem}</span>}
       </span>
       {f.source && <span className="shrink-0 inline-flex items-center gap-1 h-6 px-2 rounded-md border border-line-2 text-caption text-muted"><FileText size={11} aria-hidden="true" />{f.source}</span>}
     </div>
@@ -641,16 +644,17 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName, onOpenSett
       : HOME_KINDS.includes(read.kind) && prop ? `${prop.label} ${read.kind === 'buildings' ? 'buildings' : 'home'} insurance`
       : KIND_LABELS[read.kind])
     const renewed = existing && read.renewalDate && existing.renewalDate && read.renewalDate > existing.renewalDate
+    const older = !!(existing?.renewalDate && read.renewalDate && read.renewalDate < existing.renewalDate)
     savePolicy({
       itemId: existing?.id, owner, label,
       monthly: updateBudget || !existing ? read.monthly ?? existing?.monthly ?? 0 : undefined,
       provider: read.provider ?? existing?.provider ?? '',
-      coverAmount: read.coverAmount, renewalDate: read.renewalDate ?? existing?.renewalDate ?? '',
+      coverAmount: read.coverAmount, renewalDate: (older ? existing!.renewalDate : read.renewalDate) ?? existing?.renewalDate ?? '',
       autoRenews: read.autoRenews ?? existing?.autoRenews ?? false,
       propertyId: HOME_KINDS.includes(read.kind) ? propertyId || null : null,
       details: {
         ...read.details,
-        readFrom: [...(existing?.details.readFrom ?? []), ...(read.details.readFrom ?? [])].slice(-6),
+        readFrom: [...(existing?.details.readFrom ?? []).filter(r => !(read.details.readFrom ?? []).some(n => n.name === r.name)), ...(read.details.readFrom ?? [])].slice(-6),
         lastYearAnnual: renewed ? existing!.yearly : existing?.details.lastYearAnnual,
       },
     })
@@ -741,6 +745,8 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName, onOpenSett
         const yearly = edited.details.paysMonthly && newMonthly != null ? newMonthly * 12 : edited.details.premiumAnnual ?? (newMonthly != null ? newMonthly * 12 : undefined)
         const lastYear = existing?.yearly
         const clearsLapse = existing?.status === 'lapsed' && edited.renewalDate && new Date(edited.renewalDate).getTime() > Date.now()
+        const problems = result.fields.filter(f => fieldProblem(f.key, values[f.key] ?? ''))
+        const olderDoc = existing?.renewalDate && edited.renewalDate && edited.renewalDate < existing.renewalDate
         const isHome = HOME_KINDS.includes(read.kind)
         const exC = parseFloat(values.excessCompulsory ?? ''), exV = parseFloat(values.excessVoluntary ?? '')
         const missing = (EXPECTED[read.kind] ?? []).filter(k => !result.fields.some(f => f.key === k))
@@ -773,6 +779,12 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName, onOpenSett
                       <span className={`font-semibold num ${yearly < lastYear ? 'text-pos' : 'text-warn'}`}>{yearly < lastYear ? '↓' : '↑'} {fmt(Math.abs(yearly - lastYear))}</span><br />{yearly < lastYear ? 'less' : 'more'} a year than before
                     </div>
                   )}
+                </div>
+              )}
+              {olderDoc && (
+                <div className="mt-3 flex items-start gap-2 rounded-xl bg-warn-tint px-3 py-2.5 text-label text-warn font-medium">
+                  <AlertTriangle size={16} className="shrink-0 mt-px" aria-hidden="true" />
+                  <span>These documents end on {fmtDate(edited.renewalDate!)}, before the saved renewal date. Budge will keep {fmtDate(existing!.renewalDate!)}.</span>
                 </div>
               )}
               {clearsLapse && (
@@ -817,7 +829,7 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName, onOpenSett
 
             <div className="section-label text-caption mt-2 mb-1">What we found</div>
             {shown.map(f => (
-              <ReviewField key={f.key} f={f} value={values[f.key] ?? ''} onChange={v => setValues(x => ({ ...x, [f.key]: v }))} />
+              <ReviewField key={f.key} f={f} value={values[f.key] ?? ''} problem={fieldProblem(f.key, values[f.key] ?? '')} onChange={v => setValues(x => ({ ...x, [f.key]: v }))} />
             ))}
             {(Number.isFinite(exC) || Number.isFinite(exV)) && (
               <div className="flex items-center gap-3 py-2.5 border-t border-line min-h-[60px]">
@@ -852,7 +864,8 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName, onOpenSett
               </SheetRow>
             )}
             <p className="text-caption text-muted mt-1 mb-0">Read for about {Math.max(1, Math.round(state.costUsd * USD_TO_GBP * 100))}p. Nothing is saved until you do.</p>
-            <button onClick={save} disabled={isHome && !propertyId && props.length > 0} className="w-full mt-3 bg-ink text-on-ink rounded-xl min-h-[52px] text-[16px] font-semibold cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-default">
+            {problems.length > 0 && <p className="text-label text-neg text-center mt-3 mb-0">Fix {problems.length === 1 ? 'the highlighted detail' : `${problems.length} highlighted details`} to save.</p>}
+            <button onClick={save} disabled={problems.length > 0 || (isHome && !propertyId && props.length > 0)} className="w-full mt-3 bg-ink text-on-ink rounded-xl min-h-[52px] text-[16px] font-semibold cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-default">
               <Check size={18} aria-hidden="true" /> Save policy
             </button>
             {isHome && !propertyId && props.length > 0 && <p className="text-caption text-muted text-center mt-1.5 mb-0">Choose which home it&apos;s for first.</p>}
@@ -900,6 +913,7 @@ export default function InsuranceScreen({ budget, backLabel, onBack, focusPolicy
   const other = by('other')
   const unlinkedHomes = by('homes')
   const addForGap = (g: InsuranceGap) => {
+    if (g.id.startsWith('link:') && unlinkedHomes[0]) { setSheet({ type: 'edit', id: unlinkedHomes[0].id }); return }
     if (g.severity === 'check') {
       const pol = policies.find(p => g.id.endsWith(p.id) || g.id.endsWith(p.propertyId ?? '#'))
       if (pol) { setSheet({ type: 'edit', id: pol.id }); return }
@@ -920,7 +934,7 @@ export default function InsuranceScreen({ budget, backLabel, onBack, focusPolicy
       {sheet && <PolicySheet key={JSON.stringify(sheet)} mode={sheet} budget={budget} onClose={() => setSheet(null)} onUpload={id => { setSheet(null); setUpload({ targetId: id }) }} ownerName={ownerName} />}
       {upload && <UploadSheet budget={budget} targetId={upload.targetId} onClose={() => setUpload(null)} onSaved={m => onToast?.(m)} ownerName={ownerName} onOpenSettings={onOpenSettings} />}
 
-      <button onClick={onBack} className="flex items-center gap-1 min-h-[44px] -ml-1.5 text-[15px] text-ink-2 cursor-pointer"><ChevronLeft size={18} aria-hidden="true" /> {backLabel}</button>
+      <button onClick={onBack} aria-label={`Back to ${backLabel}`} className="flex items-center gap-1 min-h-[44px] -ml-1.5 text-[15px] text-ink-2 cursor-pointer"><ChevronLeft size={18} aria-hidden="true" /> {backLabel}</button>
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-[30px] leading-[36px] font-semibold tracking-[-0.02em] m-0">Insurance</h1>
         <button onClick={() => setSheet({ type: 'new' })} className="flex items-center gap-1.5 min-h-[44px] px-2 -mr-2 text-[15px] font-semibold text-ink cursor-pointer"><Plus size={18} aria-hidden="true" /> Add</button>
@@ -998,7 +1012,7 @@ export default function InsuranceScreen({ budget, backLabel, onBack, focusPolicy
                   />
                 ))}
                 {unlinkedHomes.length > 0 && (
-                  <AssetCard tile="home" title="Not linked to a home" sub="Open a policy and choose its home" policies={unlinkedHomes} gaps={[]} onOpen={p => setSheet({ type: 'edit', id: p.id })} onAddGap={addForGap} ownerName={ownerName} />
+                  <AssetCard tile="home" title={props.length > 0 ? 'Not linked to a home' : 'Home insurance'} sub={props.length > 0 ? 'Open a policy and choose its home' : 'Add your homes on Wealth to link them'} policies={unlinkedHomes} gaps={[]} onOpen={p => setSheet({ type: 'edit', id: p.id })} onAddGap={addForGap} ownerName={ownerName} />
                 )}
               </div>
             </>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Category, LineItem, TabFilter, Owner, EntryType, Debt, Property, fmt, daysUntil, isInsuranceItem,
@@ -9,7 +9,7 @@ import {
 } from '@/lib/models'
 import { needsAttention } from '@/lib/attention'
 import { Plus, ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, X, Check } from 'lucide-react'
-import { ConfirmDelete, NumberInput, inputClass } from './ui'
+import { ConfirmDelete, NumberInput, inputClass, useModal } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -182,18 +182,16 @@ function LapsedBanner({ title, meta, onOpen, onRenewed, onUpdateDate }: {
 // ─── item sheet ───────────────────────────────────────────────────────────────
 
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  const ref = useRef<HTMLDivElement>(null)
+  useModal(ref, onClose)
   // Portalled to <body> so it sits above the tab bar, outside the screen's stacking context.
   return createPortal(
     <div className="fixed inset-0 z-[900] flex items-end sm:items-center justify-center sm:p-6" style={{ background: 'var(--scrim)' }} onClick={onClose}>
       {/* A bottom sheet on phones; a centred dialog on tablets and desktop. */}
       <div
+        ref={ref} tabIndex={-1}
         role="dialog" aria-modal="true" aria-label={title}
-        className="sheet-enter w-full max-w-[480px] sm:max-w-[520px] max-h-[88dvh] sm:max-h-[85dvh] overflow-y-auto bg-bg rounded-t-[22px] sm:rounded-[22px] px-5 sm:px-6 pt-2 sm:pt-3 pb-[calc(24px+env(safe-area-inset-bottom))] sm:pb-6 sm:shadow-[0_24px_60px_-20px_rgba(0,0,0,.45)]"
+        className="sheet-enter outline-none w-full max-w-[480px] sm:max-w-[520px] max-h-[88dvh] sm:max-h-[85dvh] overflow-y-auto bg-bg rounded-t-[22px] sm:rounded-[22px] px-5 sm:px-6 pt-2 sm:pt-3 pb-[calc(24px+env(safe-area-inset-bottom))] sm:pb-6 sm:shadow-[0_24px_60px_-20px_rgba(0,0,0,.45)]"
         onClick={e => e.stopPropagation()}
       >
         <div className="w-10 h-1 rounded-full bg-line-2 mx-auto mb-1 sm:hidden" aria-hidden="true" />
