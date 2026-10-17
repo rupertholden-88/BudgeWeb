@@ -5,7 +5,8 @@ import { fmt, Owner, Debt, upcomingRenewals, householdCostSplit, monthlyInterest
 import { buildFinancialSummary, hashSummary } from '@/lib/financialSummary'
 import { useApiKey } from '@/hooks/useApiKey'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown, CalendarClock, Sparkles, KeyRound, Zap } from 'lucide-react'
+import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown, CalendarClock, Sparkles, KeyRound, Zap, Shield, ChevronRight } from 'lucide-react'
+import { insurancePolicies, insuranceGaps, KIND_LABELS, Policy } from '@/lib/insurance'
 import { StatCard } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
@@ -368,7 +369,86 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
   )
 }
 
-export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth }: { budget: BudgetHook; onOpenProperty?: (propertyId: string) => void; onOpenWealth?: () => void }) {
+/** Every policy in one place: what it covers, what it costs, when it renews, and what looks missing. */
+function InsuranceCard({ data, ownerName, onOpenBudget }: {
+  data: BudgetHook['data']; ownerName: (o: Owner) => string; onOpenBudget?: () => void
+}) {
+  const policies = insurancePolicies(data)
+  const gaps = insuranceGaps(data, policies)
+  if (policies.length === 0 && gaps.length === 0) return null
+  const yearly = policies.reduce((a, p) => a + p.monthly * 12, 0)
+  const homeName = (id?: string) => (data.properties ?? []).find(p => p.id === id)?.label
+  const short = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  const status = (p: Policy) => {
+    if (p.days == null) return { text: 'No renewal date', cls: 'text-muted' }
+    if (p.days < 0) return { text: p.autoRenews ? 'Check new price' : 'Lapsed', cls: 'text-negative' }
+    if (p.days <= 30) return { text: p.days === 0 ? 'Renews today' : `Renews in ${p.days} ${p.days === 1 ? 'day' : 'days'}`, cls: p.autoRenews ? 'text-ink' : 'text-negative' }
+    return { text: `Renews ${short(p.renewalDate!)}`, cls: 'text-muted' }
+  }
+  const dot = (o: Owner) => o === 'NIAMH' ? 'bg-niamh' : o === 'RUPERT' ? 'bg-rupert' : ''
+  return (
+    <SectionCard
+      title="Insurance"
+      sub={policies.length > 0
+        ? `${policies.length} ${policies.length === 1 ? 'policy' : 'policies'} · ${fmt(yearly)} a year`
+        : 'No policies in the budget yet'}
+      icon={<Shield size={14} />}
+    >
+      {policies.length > 0 && (
+        <div className="-mx-1">
+          {policies.map(p => {
+            const st = status(p)
+            const meta = [p.kind !== 'other' && !p.label.toLowerCase().includes(KIND_LABELS[p.kind].toLowerCase()) ? KIND_LABELS[p.kind] : null, ownerName(p.owner), homeName(p.propertyId), p.provider].filter(Boolean).join(' · ')
+            return (
+              <button
+                key={p.id}
+                onClick={onOpenBudget}
+                className="w-full flex items-center gap-3 px-1 min-h-[60px] py-2 text-left border-t border-border first:border-t-0 cursor-pointer"
+              >
+                <span className={`w-2 h-2 rounded-full shrink-0 ${p.owner === 'JOINT' ? 'dot-joint' : dot(p.owner)}`} aria-hidden="true" />
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[15px] font-medium text-ink truncate">{p.label}</span>
+                  <span className="block text-caption text-muted truncate">{meta}{p.cover ? ` · ${fmt(p.cover)} cover` : ''}</span>
+                  <span className={`block text-caption font-medium ${st.cls}`}>
+                    {st.text}{p.days != null && p.days >= 0 ? (p.autoRenews ? ' · auto-renews' : ' · not set to auto-renew') : ''}
+                  </span>
+                </span>
+                <span className="text-right shrink-0">
+                  <span className="block text-[15px] font-semibold tabular-nums">{p.monthly > 0 ? `${fmt(p.monthly)}/mo` : '—'}</span>
+                  {p.monthly > 0 && <span className="block text-caption text-muted tabular-nums">{fmt(p.monthly * 12)}/yr</span>}
+                </span>
+                {onOpenBudget && <ChevronRight size={16} className="text-faint shrink-0" aria-hidden="true" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {gaps.length > 0 && (
+        <div className={policies.length > 0 ? 'mt-3 pt-3 border-t border-border' : ''}>
+          <div className="section-label text-caption mb-2">Worth checking</div>
+          <div className="space-y-2.5">
+            {gaps.map(g => (
+              <div key={g.id} className="flex items-start gap-2.5">
+                <AlertTriangle size={15} className={`mt-0.5 shrink-0 ${g.severity === 'gap' ? 'text-negative' : 'text-muted'}`} aria-hidden="true" />
+                <div className="min-w-0">
+                  <div className="text-[15px] font-medium text-ink leading-snug">{g.title}</div>
+                  <div className="text-label text-muted leading-snug">{g.body}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="text-caption text-muted mt-3 pt-3 border-t border-border mb-0 leading-snug">
+        Policies come from bills with insurance or cover in the name. Add the provider, cover and renewal date by opening the bill on Budget. Prices usually rise at renewal, so compare a month before.
+      </p>
+    </SectionCard>
+  )
+}
+
+export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth, onOpenBudget }: { budget: BudgetHook; onOpenProperty?: (propertyId: string) => void; onOpenWealth?: () => void; onOpenBudget?: () => void }) {
   // Judge a typical month; the trend line shows this month as it actually is, one-offs included.
   const { data, regularTotals: totals, totals: monthTotals, user, recordFinancialHealthRun } = budget
   const today = new Date().toISOString().slice(0, 7)
@@ -666,6 +746,8 @@ export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth }: {
           </p>
         </SectionCard>
       )}
+
+      <InsuranceCard data={data} ownerName={o => o === 'NIAMH' ? n1 : o === 'RUPERT' ? n2 : (data.nameJoint || 'Joint')} onOpenBudget={onOpenBudget} />
 
       {/* Fair share */}
       {fairShare && (

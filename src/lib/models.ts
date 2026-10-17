@@ -14,8 +14,9 @@ export type DebtType = 'CREDIT_CARD' | 'PERSONAL_LOAN' | 'CAR_FINANCE' | 'MORTGA
 export interface LineItem { id: string; label: string; amount: number; priority: SpendingPriority; renewalDate?: string; autoRenews?: boolean; sharedContribution?: boolean; insuranceProvider?: string; insuranceCoverAmount?: number; propertyId?: string }
 /** Detects an insurance line by its label — no separate flag to set, so the
  * extra fields just appear on anything already named as insurance. */
+/** Insurance by name: anything called insurance, plus cover that rarely is ("Life cover"). */
 export function isInsuranceItem(label: string): boolean {
-  return /insur/i.test(label)
+  return /insur|assurance|life cover|income protection|critical illness|breakdown cover|home emergency|boiler cover|\bpet plan\b/i.test(label)
 }
 export interface Category { key: string; owner: Owner; type: EntryType; label: string; shared?: boolean; note?: string; items: LineItem[] }
 /**
