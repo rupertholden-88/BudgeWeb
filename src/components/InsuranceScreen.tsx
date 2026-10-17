@@ -183,8 +183,8 @@ function GapBlock({ g, onAdd, bodyOnly }: { g: InsuranceGap; onAdd: () => void; 
   )
 }
 
-function AssetCard({ tile, title, titleExtra, sub, policies, gaps, onOpen, onAddGap, ownerName, gapBodyOnly }: {
-  tile: TileKind; title: string; titleExtra?: React.ReactNode; sub?: string
+function AssetCard({ tile, title, titleExtra, sub, subAction, policies, gaps, onOpen, onAddGap, ownerName, gapBodyOnly }: {
+  tile: TileKind; title: string; titleExtra?: React.ReactNode; sub?: string; subAction?: React.ReactNode
   policies: Policy[]; gaps: InsuranceGap[]; onOpen: (p: Policy) => void; onAddGap: (g: InsuranceGap) => void
   ownerName: (o: Owner) => string; gapBodyOnly?: boolean
 }) {
@@ -203,7 +203,12 @@ function AssetCard({ tile, title, titleExtra, sub, policies, gaps, onOpen, onAdd
             <span className="text-[17px] font-semibold text-ink">{title}</span>
             {titleExtra}
           </div>
-          {sub && <div className="text-label text-muted">{sub}</div>}
+          {(sub || subAction) && (
+            <div className="flex items-center gap-x-2 flex-wrap text-label text-muted">
+              {sub && <span>{sub}</span>}
+              {subAction}
+            </div>
+          )}
         </div>
         {policies.length > 1 && (
           <div className="text-right shrink-0">
@@ -243,8 +248,9 @@ function HomePicker({ value, onChange, budget, suggestion, owner }: {
   const props = budget.data.properties ?? []
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState(suggestion ?? '')
+  const [main, setMain] = useState(false)
   const add = () => {
-    const id = budget.addProperty(name, owner)
+    const id = budget.addProperty(name, owner, main)
     if (id) { onChange(id); setAdding(false) }
   }
   if (adding || props.length === 0) return (
@@ -253,6 +259,12 @@ function HomePicker({ value, onChange, budget, suggestion, owner }: {
         autoFocus={adding} value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') add() }}
         aria-label="New home's name" placeholder="Name the home, e.g. Bickley" className={`${inputClass} w-full`}
       />
+      {props.length > 0 && (
+        <label className="flex items-center gap-2.5 min-h-[44px] text-[15px] cursor-pointer">
+          <input type="checkbox" checked={main} onChange={e => setMain(e.target.checked)} className="w-5 h-5 accent-[var(--ink)]" />
+          It&apos;s our main home
+        </label>
+      )}
       <div className="flex gap-2">
         <button onClick={add} disabled={!name.trim()} className="flex-1 bg-ink text-on-ink rounded-xl min-h-[44px] text-[15px] font-semibold cursor-pointer disabled:opacity-40">Add home</button>
         {props.length > 0 && <button onClick={() => setAdding(false)} className="px-4 bg-fill rounded-xl min-h-[44px] text-[15px] cursor-pointer">Cancel</button>}
@@ -1046,11 +1058,17 @@ export default function InsuranceScreen({ budget, backLabel, onBack, focusPolicy
             <>
               <h2 className="flex items-baseline justify-between text-[22px] font-semibold tracking-[-0.01em] mt-7 mb-2.5">Homes</h2>
               <div className="flex flex-col gap-3">
-                {props.map((prop, i) => (
+                {[...props].sort((a, b) => Number(!!b.isMainResidence) - Number(!!a.isMainResidence)).map((prop, i) => (
                   <AssetCard
-                    key={prop.id} tile={i === 0 ? 'home' : 'cottage'} title={prop.label}
+                    key={prop.id} tile={prop.isMainResidence || (i === 0 && !props.some(p => p.isMainResidence)) ? 'home' : 'cottage'} title={prop.label}
                     titleExtra={<OwnerDot owner={prop.owner} label={ownerName(prop.owner)} />}
                     sub={!prop.isMainResidence && props.length > 1 && !prop.isLet ? 'Second home' : prop.isLet ? 'Let' : prop.isMainResidence ? 'Main home' : undefined}
+                    subAction={!prop.isMainResidence && !prop.isLet && props.length > 1 ? (
+                      <button
+                        onClick={() => { budget.updateProperty(prop.id, { isMainResidence: true }); onToast?.(`${prop.label} is now your main home`) }}
+                        className="hit-44 font-semibold text-ink underline underline-offset-2 cursor-pointer"
+                      >Make main home</button>
+                    ) : undefined}
                     policies={by(`property:${prop.id}`)} gaps={gapsFor(`property:${prop.id}`)}
                     onOpen={p => setSheet({ type: 'edit', id: p.id })} onAddGap={addForGap} ownerName={ownerName}
                   />
