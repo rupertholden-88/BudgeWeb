@@ -128,10 +128,15 @@ export function matchRead(data: BudgetData, read: ReadPolicy): Match {
     const car = policies.find(p => p.kind === 'car' && normReg(p.details.car?.reg) === reg)
     if (car) return { policy: car, propertyId: null, reason: 'Matched by registration' }
   }
+  const num = (read.details.policyNumber ?? '').replace(/\s+/g, '').toUpperCase()
+  const byNumber = num ? policies.find(p => (p.details.policyNumber ?? '').replace(/\s+/g, '').toUpperCase() === num) : undefined
+  if (byNumber) return { policy: byNumber, propertyId: propertyId ?? byNumber.propertyId ?? null, reason: 'Matched by policy number' }
   const sameKind = policies.filter(p => p.kind === read.kind || (HOME_KINDS.includes(p.kind) && HOME_KINDS.includes(read.kind) && p.kind !== 'emergency' && read.kind !== 'emergency'))
-  const candidates = propertyId ? sameKind.filter(p => p.propertyId === propertyId || !p.propertyId) : sameKind
-  const byInsurer = read.provider ? candidates.filter(p => p.provider && p.provider.toLowerCase().split(' ')[0] === read.provider!.toLowerCase().split(' ')[0]) : []
-  const policy = byInsurer.length === 1 ? byInsurer[0] : candidates.length === 1 ? candidates[0] : null
-  if (policy && !reason) reason = byInsurer.length === 1 ? `Matched by insurer` : 'Matched by policy type'
+  // A home policy for the matched home is the one to update; otherwise the insurer must match too.
+  // Being the only policy of its type isn't enough: a second life policy is common.
+  const forHome = propertyId ? sameKind.filter(p => p.propertyId === propertyId) : []
+  const byInsurer = read.provider ? sameKind.filter(p => p.provider && p.provider.toLowerCase().split(' ')[0] === read.provider!.toLowerCase().split(' ')[0]) : []
+  const policy = forHome.length === 1 ? forHome[0] : byInsurer.length === 1 ? byInsurer[0] : null
+  if (policy && !reason) reason = 'Matched by insurer'
   return { policy, propertyId: propertyId ?? policy?.propertyId ?? null, reason }
 }

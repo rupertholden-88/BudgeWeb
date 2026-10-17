@@ -251,7 +251,7 @@ function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, o
   const [label, setLabel] = useState(item.label)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const isExpense = cat.type === 'EXPENSE'
-  const isInsurance = isExpense && isInsuranceItem(item.label)
+  const isInsurance = isExpense && (isInsuranceItem(item.label) || !!budget.data.policyDetails?.[item.id])
   const canMarkShared = isExpense && cat.owner !== 'JOINT'
   const days = item.renewalDate ? daysUntil(item.renewalDate) : null
 

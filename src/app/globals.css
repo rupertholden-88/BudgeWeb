@@ -447,12 +447,14 @@ button:active { opacity: .7; }
 .section-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
 
 /* Small status flag on a row — one shape for every kind of flag. */
-.pill { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 6px; font-size: 12px; font-weight: 550; line-height: 18px; white-space: nowrap; background: var(--fill); color: var(--ink-2); }
+.pill { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 6px; font-size: 12px; font-weight: 550; line-height: 18px; white-space: nowrap; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink-2); }
 .pill-warn { background: var(--warn-tint); color: var(--warn); }
 .pill-bad { background: var(--neg-tint); color: var(--neg); }
 .pill-good { background: var(--pos-tint); color: var(--pos); }
-.pill-joint { background: var(--fill); color: var(--ink-2); }
-.pill-accent { background: var(--fill); color: var(--ink-2); }
+.pill-joint { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink-2); }
+.pill-accent { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink-2); }
+/* Neutral chip that stays visible on panels in every theme. */
+.chip-soft { background: color-mix(in srgb, var(--ink) 7%, transparent); }
 }
 .positive { color: var(--pos); }
 .negative { color: var(--neg); }

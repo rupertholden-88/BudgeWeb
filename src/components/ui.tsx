@@ -18,8 +18,10 @@ export function ownerTextClass(owner: Owner) {
 }
 
 /** Bottom-sheet confirmation, used for every delete in the app. */
-export function ConfirmDelete({ label, detail, onConfirm, onCancel }: {
+export function ConfirmDelete({ label, detail, onConfirm, onCancel, title, confirmLabel }: {
   label: string; detail?: string; onConfirm: () => void; onCancel: () => void
+  /** Overrides "Delete “label”?" and the Delete button, for removals that aren't a plain delete. */
+  title?: string; confirmLabel?: string
 }) {
   // Portalled to <body> so it always sits above the tab bar and any open sheet.
   return createPortal(
@@ -30,11 +32,11 @@ export function ConfirmDelete({ label, detail, onConfirm, onCancel }: {
         className="bg-card rounded-t-2xl sm:rounded-[22px] px-5 sm:px-6 pt-5 pb-[calc(2rem+env(safe-area-inset-bottom))] sm:pb-6 w-full max-w-[480px] sm:max-w-[420px]"
         onClick={e => e.stopPropagation()}
       >
-        <div className="text-lead font-semibold mb-1 break-words">Delete &ldquo;{label}&rdquo;?</div>
+        <div className="text-lead font-semibold mb-1 break-words">{title ?? <>Delete &ldquo;{label}&rdquo;?</>}</div>
         <div className="text-body text-muted mb-5">{detail ?? "This can't be undone."}</div>
         <div className="flex flex-col gap-2">
           <button onClick={onConfirm} className="bg-ink text-on-ink border-0 rounded-xl p-3.5 cursor-pointer text-lead font-semibold min-h-[48px]">
-            Delete
+            {confirmLabel ?? 'Delete'}
           </button>
           <button onClick={onCancel} className="bg-fill text-ink border-0 rounded-xl p-3.5 cursor-pointer text-lead min-h-[48px]">
             Cancel

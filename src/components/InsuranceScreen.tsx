@@ -27,6 +27,8 @@ const plusYear = (d?: string) => {
   return base.toISOString().slice(0, 10)
 }
 const normReg = (r?: string) => (r ?? '').replace(/\s+/g, '').toUpperCase()
+/** Pounds and pence, for prices where rounding to the pound would mislead (£49.40, not £49). */
+const fmt2 = (n: number) => `£${n.toLocaleString('en-GB', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
 
 // ─── small visual pieces ──────────────────────────────────────────────────────
 
@@ -98,13 +100,14 @@ function Plate({ reg }: { reg: string }) {
 
 function Chip({ children, off }: { children: React.ReactNode; off?: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-1 h-6 px-2 rounded-lg text-caption font-medium ${off ? 'border border-line-2 text-muted' : 'bg-fill text-ink-2'}`}>
+    <span className={`inline-flex items-center gap-1 h-6 px-2 rounded-lg text-caption font-medium ${off ? 'border border-line-2 text-muted' : 'chip-soft text-ink-2'}`}>
       {off ? <span aria-hidden="true">–</span> : <Check size={12} aria-hidden="true" />}{children}
     </span>
   )
 }
 
 function renewText(p: Policy) {
+  if (p.coverTo) return `Cover to ${new Date(p.coverTo).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
   if (!p.renewalDate) return 'Add the renewal date'
   if (p.days! < 0) return `Ended ${fmtDay(p.renewalDate)} · ${-p.days!} ${p.days === -1 ? 'day' : 'days'} ago`
   if (p.days === 0) return 'Renews today'
@@ -246,6 +249,8 @@ function PolicySheet({ mode, budget, onClose, onUpload, ownerName }: {
   const [autoRenews, setAutoRenews] = useState(existing?.autoRenews ?? false)
   const [propertyId, setPropertyId] = useState(existing?.propertyId ?? (mode.type === 'new' ? mode.propertyId ?? '' : ''))
   const [d, setD] = useState<PolicyDetails>(existing?.details ?? {})
+  const [coversText, setCoversText] = useState((existing?.details.covers ?? []).join(', '))
+  const [ownerTouched, setOwnerTouched] = useState(!!existing)
   const [confirmRemove, setConfirmRemove] = useState(false)
   const priceRef = useRef<HTMLDivElement>(null)
 
@@ -266,13 +271,22 @@ function PolicySheet({ mode, budget, onClose, onUpload, ownerName }: {
   const status = statusOf(days)
 
   const save = () => {
+    const homeWord: Partial<Record<InsuranceKind, string>> = { buildings: 'buildings', contents: 'contents', emergency: 'home emergency', landlord: 'landlord', home: 'home' }
+    const plain = /insurance|cover|protection/i.test(KIND_LABELS[kind]) ? KIND_LABELS[kind] : `${KIND_LABELS[kind]} insurance`
     const defaultLabel = isCar ? (car.makeModel ? `${car.makeModel} insurance` : 'Car insurance')
-      : isHome && prop ? `${prop.label} ${kind === 'buildings' ? 'buildings' : kind === 'emergency' ? 'home emergency' : 'home'} insurance`
-      : KIND_LABELS[kind]
+      : isHome && prop ? `${prop.label} ${homeWord[kind] ?? 'home'} insurance`
+      : plain
     savePolicy({
       itemId: existing?.id, owner, label: label.trim() || defaultLabel, monthly: monthly ?? 0,
       provider, renewalDate, autoRenews, propertyId: isHome ? propertyId || null : null,
-      details: { ...d, kind, lastYearAnnual: mode.type === 'renew' && existing ? existing.yearly : d.lastYearAnnual },
+      details: {
+        ...d, kind,
+        covers: coversText.split(',').map(s => s.trim()).filter(Boolean),
+        // A renewal starts where the last policy year ended.
+        startDate: mode.type === 'renew' && existing?.renewalDate ? existing.renewalDate : d.startDate,
+        lastYearAnnual: mode.type === 'renew' && existing ? existing.yearly : d.lastYearAnnual,
+      },
+      replaceDetails: true,
     })
     onClose()
   }
@@ -289,6 +303,8 @@ function PolicySheet({ mode, budget, onClose, onUpload, ownerName }: {
       {confirmRemove && existing && (
         <ConfirmDelete
           label={existing.label}
+          title={`Stop tracking ${existing.label}?`}
+          confirmLabel="Remove policy"
           detail="Removes the policy and its bill from the budget. Use this for a sold car or a cancelled policy. You can't undo this."
           onConfirm={() => { removePolicy(existing.id); setConfirmRemove(false); onClose() }}
           onCancel={() => setConfirmRemove(false)}
@@ -318,7 +334,7 @@ function PolicySheet({ mode, budget, onClose, onUpload, ownerName }: {
         <div className="text-[15px] text-ink mb-2">Who pays</div>
         <div className="seg" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }} role="group" aria-label="Who pays">
           {(['JOINT', 'NIAMH', 'RUPERT'] as const).map(o => (
-            <button key={o} aria-pressed={owner === o} onClick={() => setOwner(o)}><OwnerDot owner={o} label={ownerName(o)} /><span className="lbl">{ownerName(o)}</span></button>
+            <button key={o} aria-pressed={owner === o} onClick={() => { setOwner(o); setOwnerTouched(true) }}><OwnerDot owner={o} label={ownerName(o)} /><span className="lbl">{ownerName(o)}</span></button>
           ))}
         </div>
       </div>
@@ -332,7 +348,16 @@ function PolicySheet({ mode, budget, onClose, onUpload, ownerName }: {
         <F label="Insurer">{text(provider, setProvider, 'Insurer', 'e.g. Aviva')}</F>
         {isHome && props.length > 0 && (
           <F label="Home" full>
-            <select value={propertyId} onChange={e => setPropertyId(e.target.value)} aria-label="Home" className={`${inputClass} w-full`}>
+            <select
+              value={propertyId}
+              onChange={e => {
+                setPropertyId(e.target.value)
+                // Whoever owns the home usually pays for its cover.
+                const home = props.find(p => p.id === e.target.value)
+                if (home && !ownerTouched) setOwner(home.owner)
+              }}
+              aria-label="Home" className={`${inputClass} w-full`}
+            >
               <option value="">Choose a home</option>
               {props.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
@@ -417,7 +442,7 @@ function PolicySheet({ mode, budget, onClose, onUpload, ownerName }: {
       <div className={field}>
         <F label="Also covers" full>
           <input
-            value={(d.covers ?? []).join(', ')} onChange={e => setD(x => ({ ...x, covers: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
+            value={coversText} onChange={e => setCoversText(e.target.value)}
             aria-label="Also covers" placeholder="e.g. Accidental damage, Home emergency" className={`${inputClass} w-full`}
           />
         </F>
@@ -463,6 +488,35 @@ const FIELD_LABELS: Partial<Record<FieldKey, string>> = {
   livesCovered: 'Lives covered', sumAssured: 'Pays out', termEnd: 'Cover ends', coverType: 'Cover type', inTrust: 'In trust',
   covers: 'Covers', exclusions: 'Not covered',
 }
+/** One found detail: shown as read, tap to correct it. Unclear readings say so. */
+function ReviewField({ f, value, onChange }: { f: ReadField; value: string; onChange: (v: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const low = f.confidence === 'low'
+  const label = FIELD_LABELS[f.key] ?? f.key
+  return (
+    <div className="flex items-center gap-3 py-2.5 border-t border-line min-h-[60px]">
+      {low
+        ? <AlertTriangle size={18} className="text-warn shrink-0" aria-hidden="true" />
+        : <CircleCheck size={18} className="text-pos shrink-0" aria-hidden="true" />}
+      <span className="flex-1 min-w-0">
+        <span className="block text-caption text-muted">{label}{low && <span className="text-warn font-semibold"> · Check this</span>}</span>
+        {editing ? (
+          <input
+            autoFocus value={value} onChange={e => onChange(e.target.value)} onBlur={() => setEditing(false)}
+            onKeyDown={e => { if (e.key === 'Enter') setEditing(false) }}
+            aria-label={label} className={`${inputClass} w-full mt-1`}
+          />
+        ) : (
+          <button onClick={() => setEditing(true)} aria-label={`${label}: ${showValue({ ...f, value })}${low ? ', check this' : ''}. Tap to change`} className="block w-full text-left text-[16px] font-medium text-ink min-h-[28px] cursor-text">
+            {showValue({ ...f, value })}
+          </button>
+        )}
+      </span>
+      {f.source && <span className="shrink-0 inline-flex items-center gap-1 h-6 px-2 rounded-md border border-line-2 text-caption text-muted"><FileText size={11} aria-hidden="true" />{f.source}</span>}
+    </div>
+  )
+}
+
 const MONEY_KEYS: FieldKey[] = ['premiumAnnual', 'premiumMonthly', 'buildingsSum', 'contentsSum', 'excessCompulsory', 'excessVoluntary', 'escapeOfWaterExcess', 'sumAssured']
 const DATE_KEYS: FieldKey[] = ['startDate', 'endDate', 'termEnd']
 /** Worth saying when the documents don't mention them. */
@@ -507,10 +561,11 @@ type UploadState =
   | { step: 'choose' }
   | { step: 'reading'; done: number; total: number }
   | { step: 'review'; result: ReadResult; read: ReadPolicy; costUsd: number }
-  | { step: 'error'; message: string; costUsd?: number }
+  | { step: 'error'; message: string; costUsd?: number; settings?: boolean }
 
-function UploadSheet({ budget, targetId, onClose, onSaved, ownerName }: {
+function UploadSheet({ budget, targetId, onClose, onSaved, ownerName, onOpenSettings }: {
   budget: BudgetHook; targetId: string | null; onClose: () => void; onSaved: (msg: string) => void; ownerName: (o: Owner) => string
+  onOpenSettings?: () => void
 }) {
   const { data, user, savePolicy } = budget
   const { apiKey, hasKey, loading: keyLoading } = useApiKey(user)
@@ -533,8 +588,8 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName }: {
     if (!list) return
     const ok = Array.from(list).filter(f => /^(application\/pdf|image\/(jpeg|png|webp|gif))$/.test(f.type))
     const rejected = Array.from(list).length - ok.length
-    setFiles(fs => [...fs, ...ok].slice(0, 6))
-    if (rejected > 0) setState({ step: 'error', message: 'Only PDFs and JPG or PNG photos can be read. On an iPhone, HEIC photos need saving as JPG first.' })
+    setFiles(fs => [...fs, ...ok.filter(f => !fs.some(x => x.name === f.name && x.size === f.size))].slice(0, 6))
+    if (rejected > 0) setState({ step: 'error', message: 'Only PDFs and JPG or PNG photos can be read. If your camera saves HEIC photos, switch it to JPG or take a screenshot of the page.' })
   }
 
   const run = async () => {
@@ -550,7 +605,7 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName }: {
       })
       const json = await res.json().catch(() => null)
       if (!res.ok || !json?.result) {
-        setState({ step: 'error', message: json?.message ?? (res.status === 413 ? 'These files are too large to send. Try fewer pages or photos.' : 'Something went wrong reading these. Try again.'), costUsd: json?.costUsd })
+        setState({ step: 'error', message: json?.message ?? (res.status === 413 ? 'These files are too large to send. Try fewer pages or photos.' : 'Something went wrong reading these. Try again.'), costUsd: json?.costUsd, settings: json?.error === 'bad_key' || json?.error === 'not_configured' })
         return
       }
       const result: ReadResult = json.result
@@ -600,8 +655,8 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName }: {
       },
     })
     onSaved(existing
-      ? `Policy saved${updateBudget && read.monthly != null && read.monthly !== existing.monthly ? ` · Budget updated to ${fmt(read.monthly)}/mo` : ''}`
-      : `Policy added${read.monthly ? ` · ${fmt(read.monthly)}/mo on Budget` : ''}`)
+      ? `Policy saved${updateBudget && read.monthly != null && read.monthly !== existing.monthly ? ` · Budget updated to ${fmt2(read.monthly)}/mo` : ''}`
+      : `Policy added${read.monthly ? ` · ${fmt2(read.monthly)}/mo on Budget` : ''}`)
     onClose()
   }
 
@@ -614,11 +669,11 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName }: {
           <div className="py-2">
             <p className="text-[15px] text-ink mt-0">Reading documents uses your Anthropic API key. {user ? 'Add one in Settings.' : 'Sign in, then add one in Settings.'}</p>
             <p className="text-label text-muted">You can still add a policy by hand.</p>
+            {onOpenSettings && <button onClick={() => { onClose(); onOpenSettings() }} className="w-full mt-2 bg-ink text-on-ink rounded-xl min-h-[52px] text-[16px] font-semibold cursor-pointer">Open Settings</button>}
           </div>
         ) : (
           <>
-            <h2 className="text-[22px] font-semibold tracking-[-0.01em] mt-1 mb-1">Add from documents</h2>
-            <p className="text-[15px] text-muted mt-0 mb-3">Upload your policy schedule, renewal letter or certificate. Budge reads it and fills in the policy for you to check.</p>
+            <p className="text-[15px] text-muted mt-1 mb-3">Upload your policy schedule, renewal letter or certificate. Budge reads it and fills in the policy for you to check.</p>
             <label className="flex flex-col items-center justify-center gap-2 rounded-[18px] border-2 border-dashed border-line-2 bg-panel min-h-[150px] px-4 py-5 text-center cursor-pointer">
               <FileUp size={28} className="text-ink-2" aria-hidden="true" />
               <span className="text-[16px] font-semibold text-ink">Choose PDFs or photos</span>
@@ -670,7 +725,9 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName }: {
             <p className="text-[15px] text-ink m-0">{state.message}</p>
           </div>
           {state.costUsd != null && state.costUsd > 0 && <p className="text-caption text-muted mt-2">That attempt cost about {Math.max(1, Math.round(state.costUsd * USD_TO_GBP * 100))}p.</p>}
-          <button onClick={() => setState({ step: 'choose' })} className="w-full mt-3 bg-ink text-on-ink rounded-xl min-h-[52px] text-[16px] font-semibold cursor-pointer">Try again</button>
+          {state.settings && onOpenSettings
+            ? <button onClick={() => { onClose(); onOpenSettings() }} className="w-full mt-3 bg-ink text-on-ink rounded-xl min-h-[52px] text-[16px] font-semibold cursor-pointer">Open Settings</button>
+            : <button onClick={() => setState({ step: 'choose' })} className="w-full mt-3 bg-ink text-on-ink rounded-xl min-h-[52px] text-[16px] font-semibold cursor-pointer">Try again</button>}
         </div>
       )}
 
@@ -681,14 +738,14 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName }: {
         const options = sameKind.length ? sameKind : policies
         const edited = readToPolicy({ ...result, fields: result.fields.map(f => ({ ...f, value: values[f.key] ?? f.value })) }, [])
         const newMonthly = edited.monthly
-        const yearly = edited.details.premiumAnnual ?? (newMonthly != null ? newMonthly * 12 : undefined)
+        const yearly = edited.details.paysMonthly && newMonthly != null ? newMonthly * 12 : edited.details.premiumAnnual ?? (newMonthly != null ? newMonthly * 12 : undefined)
         const lastYear = existing?.yearly
         const clearsLapse = existing?.status === 'lapsed' && edited.renewalDate && new Date(edited.renewalDate).getTime() > Date.now()
         const isHome = HOME_KINDS.includes(read.kind)
         const exC = parseFloat(values.excessCompulsory ?? ''), exV = parseFloat(values.excessVoluntary ?? '')
         const missing = (EXPECTED[read.kind] ?? []).filter(k => !result.fields.some(f => f.key === k))
         const tile: TileKind = read.kind === 'car' ? 'car' : isHome ? (props.findIndex(p => p.id === propertyId) > 0 ? 'cottage' : 'home') : PEOPLE_KINDS.includes(read.kind) ? 'people' : 'other'
-        const shown = result.fields.filter(f => f.key !== 'excessCompulsory' && f.key !== 'excessVoluntary' && f.key !== 'postcode' && f.key !== 'address')
+        const shown = result.fields.filter(f => f.key !== 'postcode' && f.key !== 'address')
         return (
           <>
             <p className="text-[15px] text-muted mt-0 mb-3">{result.fields.length} details from {files.length > 1 ? `${files.length} documents` : 'your document'}. Tap any to change it.</p>
@@ -704,10 +761,10 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName }: {
                 </div>
               </div>
               {newMonthly != null && (
-                <div className="flex items-end justify-between gap-3 mt-3">
+                <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2 mt-3">
                   <div>
                     <div className="text-label text-muted">{existing ? 'New price' : 'Price'}</div>
-                    <div className="figure text-[34px] leading-none font-bold tracking-[-0.02em] mt-1 num">
+                    <div className="figure text-[34px] leading-none font-bold tracking-[-0.02em] mt-1 num whitespace-nowrap">
                       <span className="cur">£</span>{newMonthly.toFixed(2)}<span className="text-[15px] font-medium text-muted tracking-normal ml-1.5">a month</span>
                     </div>
                   </div>
@@ -730,7 +787,11 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName }: {
                 <span className="text-caption text-muted uppercase tracking-label">Save as</span>
                 <select value={target} onChange={e => { setTarget(e.target.value); setMatchReason(null) }} aria-label="Save as" className={`${inputClass} w-full`}>
                   <option value="">A new policy</option>
-                  {options.map(p => <option key={p.id} value={p.id}>Update {p.label}{p.provider ? ` (${p.provider})` : ''}</option>)}
+                  {options.map(p => {
+                    const home = props.find(x => x.id === p.propertyId)?.label
+                    const where = home && !p.label.includes(home) ? ` · ${home}` : ''
+                    return <option key={p.id} value={p.id}>Update {p.label}{where}{p.provider ? ` (${p.provider})` : ''}</option>
+                  })}
                 </select>
               </label>
               {isHome && props.length > 0 && (
@@ -754,32 +815,15 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName }: {
               )}
             </div>
 
-            <div className="section-label text-caption mt-2 mb-1 flex justify-between"><span>What we found</span><span className="normal-case tracking-normal">{result.fields.length} found</span></div>
-            {shown.map(f => {
-              const low = f.confidence === 'low'
-              return (
-                <label key={f.key} className="flex items-center gap-3 py-2.5 border-t border-line min-h-[60px]">
-                  {low
-                    ? <AlertTriangle size={18} className="text-warn shrink-0" aria-label="Check this" />
-                    : <CircleCheck size={18} className="text-pos shrink-0" aria-hidden="true" />}
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-caption text-muted">{FIELD_LABELS[f.key] ?? f.key}{low && <span className="text-warn font-semibold"> · Check this</span>}</span>
-                    <input
-                      value={values[f.key] ?? ''} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
-                      aria-label={FIELD_LABELS[f.key] ?? f.key}
-                      className={`w-full bg-transparent border-0 p-0 outline-none text-[16px] font-medium ${low ? 'text-ink underline decoration-dotted decoration-warn underline-offset-4' : 'text-ink'}`}
-                    />
-                    <span className="block text-caption text-faint">{showValue({ ...f, value: values[f.key] ?? f.value })}</span>
-                  </span>
-                  {f.source && <span className="shrink-0 inline-flex items-center gap-1 h-6 px-2 rounded-md border border-line-2 text-caption text-muted"><FileText size={11} aria-hidden="true" />{f.source}</span>}
-                </label>
-              )
-            })}
+            <div className="section-label text-caption mt-2 mb-1">What we found</div>
+            {shown.map(f => (
+              <ReviewField key={f.key} f={f} value={values[f.key] ?? ''} onChange={v => setValues(x => ({ ...x, [f.key]: v }))} />
+            ))}
             {(Number.isFinite(exC) || Number.isFinite(exV)) && (
               <div className="flex items-center gap-3 py-2.5 border-t border-line min-h-[60px]">
-                <CircleCheck size={18} className="text-pos shrink-0" aria-hidden="true" />
+                <span className="w-[18px] shrink-0" aria-hidden="true" />
                 <span className="flex-1 min-w-0">
-                  <span className="block text-caption text-muted">Excess</span>
+                  <span className="block text-caption text-muted">Total excess</span>
                   <span className="block text-[16px] font-medium text-ink num">
                     {Number.isFinite(exC) ? `Compulsory £${exC}` : ''}{Number.isFinite(exC) && Number.isFinite(exV) ? ` + voluntary £${exV} = £${exC + exV}` : Number.isFinite(exV) ? `Voluntary £${exV}` : ''}
                   </span>
@@ -802,7 +846,7 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName }: {
             {newMonthly != null && (
               <SheetRow
                 label={existing ? `Update ${existing.label} on Budget` : 'Add to Budget'}
-                hint={existing ? <span className="num">{fmt(existing.monthly)} → {fmt(newMonthly)}/mo</span> : <span className="num">{fmt(newMonthly)}/mo as a bill</span>}
+                hint={existing ? <span className="num">{fmt2(existing.monthly)} → {fmt2(newMonthly)}/mo</span> : <span className="num">{fmt2(newMonthly)}/mo as a bill</span>}
               >
                 {existing ? <Toggle checked={updateBudget} onChange={setUpdateBudget} label="Update the budget" /> : <span />}
               </SheetRow>
@@ -821,9 +865,9 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName }: {
 
 // ─── the screen ───────────────────────────────────────────────────────────────
 
-export default function InsuranceScreen({ budget, backLabel, onBack, focusPolicyId, onFocusHandled, onToast }: {
+export default function InsuranceScreen({ budget, backLabel, onBack, focusPolicyId, onFocusHandled, onToast, onOpenSettings }: {
   budget: BudgetHook; backLabel: string; onBack: () => void
-  focusPolicyId?: string | null; onFocusHandled?: () => void; onToast?: (msg: string) => void
+  focusPolicyId?: string | null; onFocusHandled?: () => void; onToast?: (msg: string) => void; onOpenSettings?: () => void
 }) {
   const { data } = budget
   const [sheet, setSheet] = useState<SheetMode | null>(null)
@@ -843,7 +887,8 @@ export default function InsuranceScreen({ budget, backLabel, onBack, focusPolicy
   const next = policies.filter(p => p.days != null && p.days >= 0).sort((a, b) => a.days! - b.days!)[0]
   const lapsed = policies.filter(p => p.status === 'lapsed')
   const counts = {
-    covered: policies.filter(p => p.status === 'covered' || p.status === 'undated').length,
+    covered: policies.filter(p => p.status === 'covered').length,
+    undated: policies.filter(p => p.status === 'undated').length,
     soon: policies.filter(p => p.status === 'soon').length,
     lapsed: lapsed.length,
     gap: gaps.filter(g => g.severity === 'gap').length,
@@ -868,12 +913,12 @@ export default function InsuranceScreen({ budget, backLabel, onBack, focusPolicy
   /** What a policy is for, in a couple of words: the home, the car, or its name. */
   const assetName = (p: Policy) => props.find(x => x.id === p.propertyId)?.label ?? p.details.car?.makeModel ?? p.label.replace(/ insurance$/i, '')
   const peopleTitle = (p: Policy) => p.details.life?.livesCovered || (p.owner === 'JOINT' ? `${ownerName('NIAMH')} & ${ownerName('RUPERT')}` : ownerName(p.owner))
-  const segColor: Record<PolicyStatus, string> = { covered: 'var(--pos)', undated: 'var(--pos)', soon: 'var(--warn)', lapsed: 'var(--neg)' }
+  const segColor: Record<PolicyStatus, string> = { covered: 'var(--pos)', undated: 'var(--faint)', soon: 'var(--warn)', lapsed: 'var(--neg)' }
 
   return (
     <div className="h-full overflow-y-auto px-5 pt-1 pb-[calc(32px+env(safe-area-inset-bottom))]">
       {sheet && <PolicySheet key={JSON.stringify(sheet)} mode={sheet} budget={budget} onClose={() => setSheet(null)} onUpload={id => { setSheet(null); setUpload({ targetId: id }) }} ownerName={ownerName} />}
-      {upload && <UploadSheet budget={budget} targetId={upload.targetId} onClose={() => setUpload(null)} onSaved={m => onToast?.(m)} ownerName={ownerName} />}
+      {upload && <UploadSheet budget={budget} targetId={upload.targetId} onClose={() => setUpload(null)} onSaved={m => onToast?.(m)} ownerName={ownerName} onOpenSettings={onOpenSettings} />}
 
       <button onClick={onBack} className="flex items-center gap-1 min-h-[44px] -ml-1.5 text-[15px] text-ink-2 cursor-pointer"><ChevronLeft size={18} aria-hidden="true" /> {backLabel}</button>
       <div className="flex items-center justify-between gap-3">
@@ -907,7 +952,7 @@ export default function InsuranceScreen({ budget, backLabel, onBack, focusPolicy
             <div className="figure mt-2 flex items-baseline gap-2 text-[44px] leading-none font-bold tracking-[-0.02em] text-ink num">
               <span><span className="cur">£</span>{Math.round(yearly).toLocaleString('en-GB')}</span><span className="text-[17px] font-medium tracking-normal text-muted">a year</span>
             </div>
-            <p className="text-label text-muted mt-2 mb-0 num">{fmt(monthly)} a month{next ? ` · next renewal ${assetName(next)}, ${fmtDay(next.renewalDate!)}` : ''}</p>
+            <p className="text-label text-muted mt-2 mb-0 num [text-wrap:pretty]">{fmt(monthly)} a month{next ? ` · next renewal ${assetName(next)}, ${fmtDay(next.renewalDate!)}` : ''}</p>
             {(policies.length > 0 || counts.gap > 0) && (
               <>
                 <div className="flex gap-[3px] mt-4 h-1.5" aria-hidden="true">
@@ -918,6 +963,7 @@ export default function InsuranceScreen({ budget, backLabel, onBack, focusPolicy
                   {counts.covered > 0 && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-pos" />{counts.covered} covered</span>}
                   {counts.soon > 0 && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-warn" />{counts.soon} renews soon</span>}
                   {counts.lapsed > 0 && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-neg" />{counts.lapsed} lapsed</span>}
+                  {counts.undated > 0 && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-faint" />{counts.undated} no date</span>}
                   {counts.gap > 0 && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full border border-line-2" />{counts.gap} not covered</span>}
                 </div>
               </>

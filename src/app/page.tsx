@@ -248,7 +248,7 @@ export default function HomePage() {
           <div key={screen} className="h-full mx-auto w-full max-w-[640px] lg:max-w-[1080px] lg:pt-6 screen-enter">
             {screen === 'budget'   && <BudgetScreen   budget={budget} tab={activeTab} onTabChange={setTab} onNavigateToDebts={() => setScreen('wealth')} onOpenInsurance={id => openInsurance('budget', id)} />}
             {screen === 'charts'   && <ChartsScreen   budget={budget} onOpenProperty={id => { setFocusPropertyId(id); setScreen('wealth') }} onOpenWealth={() => setScreen('wealth')} onOpenBudget={() => setScreen('budget')} onOpenInsurance={() => openInsurance('charts')} />}
-            {screen === 'insurance' && <InsuranceScreen budget={budget} backLabel={NAV.find(n => n.id === insuranceFrom)?.label ?? 'Back'} onBack={() => setScreen(insuranceFrom)} focusPolicyId={focusPolicyId} onFocusHandled={() => setFocusPolicyId(null)} onToast={showToast} />}
+            {screen === 'insurance' && <InsuranceScreen budget={budget} backLabel={NAV.find(n => n.id === insuranceFrom)?.label ?? 'Back'} onBack={() => setScreen(insuranceFrom)} focusPolicyId={focusPolicyId} onFocusHandled={() => setFocusPolicyId(null)} onToast={showToast} onOpenSettings={() => setScreen('settings')} />}
             {screen === 'wealth'   && <WealthScreen   budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={() => setFocusPropertyId(null)} onOpenInsurance={id => openInsurance('wealth', id)} />}
             {screen === 'settings' && <SettingsScreen budget={budget} onToast={showToast} />}
           </div>

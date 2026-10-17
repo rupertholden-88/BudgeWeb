@@ -31,6 +31,11 @@ function mergeBudgets(incoming: BudgetData, current: BudgetData): BudgetData {
   }
 }
 
+/** Drop keys whose value is undefined, so merging never blanks out what's already known. */
+function defined<T extends object>(o: T): Partial<T> {
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>
+}
+
 /** Put a bill into the payer's insurance group, creating one if there isn't one. */
 function addToInsuranceGroup(categories: BudgetData['categories'], owner: Owner, item: LineItem): BudgetData['categories'] {
   const group = categories.find(c => c.owner === owner && c.type === 'EXPENSE' && /insur/i.test(c.label))
@@ -385,6 +390,8 @@ export function useBudget() {
     monthly?: number
     provider?: string; coverAmount?: number; renewalDate?: string; autoRenews?: boolean; propertyId?: string | null
     details?: PolicyDetails
+    /** The policy sheet edits the whole record; a document read only adds what it found. */
+    replaceDetails?: boolean
   }): string => {
     const id = p.itemId ?? uuid()
     mutate(b => {
@@ -414,7 +421,14 @@ export function useBudget() {
         const item = patch({ id, label: p.label.trim() || 'Insurance', amount: 0, priority: 'NECESSITY' })
         categories = addToInsuranceGroup(categories, p.owner, item)
       }
-      const details = p.details ? { ...(b.policyDetails ?? {}), [id]: { ...(b.policyDetails?.[id] ?? {}), ...p.details } } : b.policyDetails
+      const prev = b.policyDetails?.[id] ?? {}
+      const merged: PolicyDetails | undefined = !p.details ? undefined : p.replaceDetails ? p.details : {
+        ...prev, ...defined(p.details),
+        home: p.details.home ? { ...prev.home, ...defined(p.details.home) } : prev.home,
+        car: p.details.car ? { ...prev.car, ...defined(p.details.car) } : prev.car,
+        life: p.details.life ? { ...prev.life, ...defined(p.details.life) } : prev.life,
+      }
+      const details = merged ? { ...(b.policyDetails ?? {}), [id]: merged } : b.policyDetails
       return { ...b, categories, policyDetails: details }
     })
     return id

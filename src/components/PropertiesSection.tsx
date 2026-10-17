@@ -518,7 +518,7 @@ function PropertyCard({ summary, ownerName, budget, focused, onFocusHandled, onO
                     <span className="flex-1 min-w-0">
                       <span className="block text-[15px] font-medium text-ink truncate">{x.label}</span>
                       <span className={`block text-caption ${x.status === 'lapsed' ? 'text-negative font-semibold' : 'text-muted'}`}>
-                        {[x.provider, x.status === 'lapsed' ? 'Lapsed' : x.renewalDate ? `renews ${new Date(x.renewalDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : null].filter(Boolean).join(' · ')}
+                        {[x.provider, x.status === 'lapsed' ? 'Lapsed' : x.renewalDate ? `renews ${new Date(x.renewalDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(new Date(x.renewalDate).getFullYear() !== new Date().getFullYear() && { year: 'numeric' }) })}` : null].filter(Boolean).join(' · ')}
                       </span>
                     </span>
                     <span className="text-[15px] tabular-nums">{fmt(x.monthly)}/mo</span>

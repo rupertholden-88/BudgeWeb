@@ -49,6 +49,8 @@ export interface Policy {
   monthly: number; yearly: number
   renewalDate?: string; days: number | null; autoRenews: boolean
   status: PolicyStatus
+  /** For life cover and the like: the date cover runs to, in place of a renewal. */
+  coverTo?: string
   /** 0–1 through the policy year, when the renewal date is known. */
   yearProgress: number | null
   details: PolicyDetails
@@ -75,13 +77,14 @@ export function insurancePolicies(data: BudgetData): Policy[] {
         const start = details.startDate ? new Date(details.startDate).getTime() : end - 365 * 864e5
         yearProgress = end > start ? Math.min(1, Math.max(0, (Date.now() - start) / (end - start))) : null
       }
+      const kind: InsuranceKind = isKind(details.kind) ? details.kind : insuranceKind(i.label)
+      const coverTo = !i.renewalDate && PEOPLE_KINDS.includes(kind) ? details.life?.termEnd : undefined
       return {
-        id: i.id, catKey: c.key, label: i.label,
-        kind: isKind(details.kind) ? details.kind : insuranceKind(i.label),
+        id: i.id, catKey: c.key, label: i.label, kind, coverTo,
         owner: c.owner, propertyId: i.propertyId, provider: i.insuranceProvider, cover: i.insuranceCoverAmount,
         monthly: i.amount, yearly: details.premiumAnnual && !details.paysMonthly ? details.premiumAnnual : i.amount * 12,
         renewalDate: i.renewalDate, days, autoRenews: !!i.autoRenews,
-        status: statusOf(days), yearProgress, details,
+        status: coverTo && new Date(coverTo).getTime() > Date.now() ? 'covered' as const : statusOf(days), yearProgress, details,
       }
     }))
     .sort((a, b) => (a.days ?? 9999) - (b.days ?? 9999))
