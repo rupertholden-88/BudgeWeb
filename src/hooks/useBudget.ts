@@ -289,13 +289,15 @@ export function useBudget() {
   }
 
   /** Adds a home and returns its id, so a caller can select it straight away. */
-  const addProperty = (label: string, owner: Owner): string | undefined => {
+  const addProperty = (label: string, owner: Owner, main?: boolean): string | undefined => {
     if (!label.trim()) return
     const id = uuid()
     mutate(b => {
       const existing = b.properties ?? []
       // The first home added is almost always the one lived in.
-      return { ...b, properties: [...existing, { id, label: label.trim(), owner, estimatedValue: 0, isMainResidence: existing.length === 0 || undefined }] }
+      const isMain = main || existing.length === 0
+      const others = isMain ? existing.map(p => ({ ...p, isMainResidence: undefined })) : existing
+      return { ...b, properties: [...others, { id, label: label.trim(), owner, estimatedValue: 0, isMainResidence: isMain || undefined }] }
     })
     return id
   }
