@@ -65,25 +65,40 @@ export function statusOf(days: number | null): PolicyStatus {
   return 'covered'
 }
 
+/**
+ * A policy that renews automatically carries on past its renewal date, so a
+ * date in the past moves on a year at a time until it's ahead.
+ */
+export function rollForward(iso?: string): string | undefined {
+  if (!iso) return iso
+  const d = new Date(iso + 'T12:00:00Z')
+  if (isNaN(d.getTime())) return iso
+  const today = new Date().toISOString().slice(0, 10)
+  for (let n = 0; n < 50 && d.toISOString().slice(0, 10) < today; n++) d.setUTCFullYear(d.getUTCFullYear() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
 export function insurancePolicies(data: BudgetData): Policy[] {
   return data.categories
     .filter(c => c.type === 'EXPENSE')
     .flatMap(c => c.items.filter(i => isInsuranceItem(i.label) || data.policyDetails?.[i.id]).map(i => {
       const details = data.policyDetails?.[i.id] ?? {}
-      const days = i.renewalDate ? daysUntil(i.renewalDate) : null
+      const renewalDate = i.autoRenews ? rollForward(i.renewalDate) : i.renewalDate
+      const days = renewalDate ? daysUntil(renewalDate) : null
       let yearProgress: number | null = null
-      if (i.renewalDate) {
-        const end = new Date(i.renewalDate).getTime()
-        const start = details.startDate ? new Date(details.startDate).getTime() : end - 365 * 864e5
+      if (renewalDate) {
+        const end = new Date(renewalDate).getTime()
+        const started = details.startDate ? new Date(details.startDate).getTime() : NaN
+        const start = started < end && end - started < 400 * 864e5 ? started : end - 365 * 864e5
         yearProgress = end > start ? Math.min(1, Math.max(0, (Date.now() - start) / (end - start))) : null
       }
       const kind: InsuranceKind = isKind(details.kind) ? details.kind : insuranceKind(i.label)
-      const coverTo = !i.renewalDate && PEOPLE_KINDS.includes(kind) ? details.life?.termEnd : undefined
+      const coverTo = !renewalDate && PEOPLE_KINDS.includes(kind) ? details.life?.termEnd : undefined
       return {
         id: i.id, catKey: c.key, label: i.label, kind, coverTo,
         owner: c.owner, propertyId: i.propertyId, provider: i.insuranceProvider, cover: i.insuranceCoverAmount,
         monthly: i.amount, yearly: details.premiumAnnual && !details.paysMonthly ? details.premiumAnnual : i.amount * 12,
-        renewalDate: i.renewalDate, days, autoRenews: !!i.autoRenews,
+        renewalDate, days, autoRenews: !!i.autoRenews,
         status: coverTo && new Date(coverTo).getTime() > Date.now() ? 'covered' as const : statusOf(days), yearProgress, details,
       }
     }))

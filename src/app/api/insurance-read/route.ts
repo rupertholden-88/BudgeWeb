@@ -57,7 +57,8 @@ Rules:
 What to report for insurer: the insurer's short everyday name as a person would say it (e.g. "AXA", "Aviva", "Admiral"), not the legal entity, underwriter or broker.
 
 Formats for value:
-- Dates: YYYY-MM-DD. endDate is the last day of cover or the renewal date.
+- Dates: YYYY-MM-DD. startDate and endDate are the start and end of the policy year the documents are about; endDate is the date the policy next renews.
+- A renewal invitation's "renews on" date is when the NEW year starts, not when cover ends: report it as startDate, and endDate as the end of that new year (usually the same date a year later). E.g. "will renew on 21/06/2026" → startDate 2026-06-21, endDate 2027-06-21. If it says the policy renews automatically unless you tell them, autoRenews is "yes".
 - Money: a plain number in pounds, no £ or commas, e.g. 612.40. For a sum insured with no limit, write "unlimited".
 - premiumAnnual is the yearly price. premiumMonthly is the monthly instalment if paying monthly. paymentFrequency is "monthly" or "annual".
 - Yes/no fields (autoRenews, ncdProtected, secondHomeDeclared, inTrust, homeEmergency, legalExpenses, courtesyCar): "yes" or "no".

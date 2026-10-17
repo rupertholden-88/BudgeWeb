@@ -69,6 +69,22 @@ export interface ReadPolicy {
   details: PolicyDetails
 }
 
+const nextYear = (iso: string) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCFullYear(d.getUTCFullYear() + 1); return d.toISOString().slice(0, 10) }
+
+/**
+ * A renewal letter's "renews on" date starts the new year. If it came back as
+ * the end date, cover actually runs a year beyond it.
+ */
+export function fixRenewalDates(r: ReadResult): ReadResult {
+  const get = (k: FieldKey) => r.fields.find(x => x.key === k)
+  const start = get('startDate'), end = get('endDate')
+  if (!end || !date(end.value) || !r.documents?.some(d => d.type === 'renewal')) return r
+  if (start && start.value !== end.value) return r
+  const fields = r.fields.filter(x => x.key !== 'startDate' && x.key !== 'endDate')
+  fields.push({ ...end, key: 'startDate' }, { ...end, value: nextYear(end.value) })
+  return { ...r, fields }
+}
+
 export function readToPolicy(r: ReadResult, docNames: string[]): ReadPolicy {
   const f = (k: FieldKey) => r.fields.find(x => x.key === k)?.value
   const annual = num(f('premiumAnnual'))
