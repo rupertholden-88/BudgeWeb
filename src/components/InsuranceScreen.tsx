@@ -222,6 +222,57 @@ function AssetCard({ tile, title, titleExtra, sub, policies, gaps, onOpen, onAdd
 
 // ─── policy sheet: view, edit, add, mark renewed ──────────────────────────────
 
+/**
+ * A name for a home from its address: a house name if it has one
+ * ("Mulberry Cottage"), otherwise the area after the street ("Bickley").
+ */
+function townFrom(address?: string): string {
+  const parts = (address ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  const street = /\d|\b(road|rd|lane|street|st|avenue|ave|close|drive|way|gardens?|crescent|place|grove|hill|park|terrace|court|mews)\b/i
+  const postcode = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i
+  return parts.find(s => !street.test(s) && !postcode.test(s)) ?? ''
+}
+
+/**
+ * Choose which home a policy is for, or add one on the spot. Homes otherwise
+ * live on Wealth, which is a long way round when a document names a new one.
+ */
+function HomePicker({ value, onChange, budget, suggestion, owner }: {
+  value: string; onChange: (id: string) => void; budget: BudgetHook; suggestion?: string; owner: Owner
+}) {
+  const props = budget.data.properties ?? []
+  const [adding, setAdding] = useState(false)
+  const [name, setName] = useState(suggestion ?? '')
+  const add = () => {
+    const id = budget.addProperty(name, owner)
+    if (id) { onChange(id); setAdding(false) }
+  }
+  if (adding || props.length === 0) return (
+    <div className="flex flex-col gap-2">
+      <input
+        autoFocus={adding} value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') add() }}
+        aria-label="New home's name" placeholder="Name the home, e.g. Bickley" className={`${inputClass} w-full`}
+      />
+      <div className="flex gap-2">
+        <button onClick={add} disabled={!name.trim()} className="flex-1 bg-ink text-on-ink rounded-xl min-h-[44px] text-[15px] font-semibold cursor-pointer disabled:opacity-40">Add home</button>
+        {props.length > 0 && <button onClick={() => setAdding(false)} className="px-4 bg-fill rounded-xl min-h-[44px] text-[15px] cursor-pointer">Cancel</button>}
+      </div>
+      <span className="text-caption text-muted">Add its value and mortgage on Wealth later.</span>
+    </div>
+  )
+  return (
+    <select
+      value={value}
+      onChange={e => { if (e.target.value === '__new') { setName(suggestion ?? ''); setAdding(true) } else onChange(e.target.value) }}
+      aria-label="Home" className={`${inputClass} w-full`}
+    >
+      <option value="">Choose a home</option>
+      {props.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+      <option value="__new">+ Add a home…</option>
+    </select>
+  )
+}
+
 /** A labelled field in the policy sheet's two-column grid. */
 function F({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
   return (
@@ -347,21 +398,17 @@ function PolicySheet({ mode, budget, onClose, onUpload, ownerName }: {
           </select>
         </F>
         <F label="Insurer">{text(provider, setProvider, 'Insurer', 'e.g. Aviva')}</F>
-        {isHome && props.length > 0 && (
+        {isHome && (
           <F label="Home" full>
-            <select
-              value={propertyId}
-              onChange={e => {
-                setPropertyId(e.target.value)
+            <HomePicker
+              value={propertyId} budget={budget} owner={owner}
+              onChange={id => {
+                setPropertyId(id)
                 // Whoever owns the home usually pays for its cover.
-                const home = props.find(p => p.id === e.target.value)
+                const home = (budget.data.properties ?? []).find(p => p.id === id)
                 if (home && !ownerTouched) setOwner(home.owner)
               }}
-              aria-label="Home" className={`${inputClass} w-full`}
-            >
-              <option value="">Choose a home</option>
-              {props.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-            </select>
+            />
           </F>
         )}
         <F label="Policy number">{text(d.policyNumber, v => setD(x => ({ ...x, policyNumber: v || undefined })), 'Policy number')}</F>
@@ -806,14 +853,11 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName, onOpenSett
                   })}
                 </select>
               </label>
-              {isHome && props.length > 0 && (
-                <label className="flex flex-col gap-1">
+              {isHome && (
+                <div className="flex flex-col gap-1">
                   <span className="text-caption text-muted uppercase tracking-label">Home</span>
-                  <select value={propertyId} onChange={e => setPropertyId(e.target.value)} aria-label="Home" className={`${inputClass} w-full`}>
-                    <option value="">Choose a home</option>
-                    {props.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-                  </select>
-                </label>
+                  <HomePicker value={propertyId} onChange={setPropertyId} budget={budget} owner={owner} suggestion={townFrom(values.address ?? read.address)} />
+                </div>
               )}
               {!existing && (
                 <div>
@@ -865,10 +909,10 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName, onOpenSett
             )}
             <p className="text-caption text-muted mt-1 mb-0">Read for about {Math.max(1, Math.round(state.costUsd * USD_TO_GBP * 100))}p. Nothing is saved until you do.</p>
             {problems.length > 0 && <p className="text-label text-neg text-center mt-3 mb-0">Fix {problems.length === 1 ? 'the highlighted detail' : `${problems.length} highlighted details`} to save.</p>}
-            <button onClick={save} disabled={problems.length > 0 || (isHome && !propertyId && props.length > 0)} className="w-full mt-3 bg-ink text-on-ink rounded-xl min-h-[52px] text-[16px] font-semibold cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-default">
+            <button onClick={save} disabled={problems.length > 0 || (isHome && !propertyId)} className="w-full mt-3 bg-ink text-on-ink rounded-xl min-h-[52px] text-[16px] font-semibold cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-default">
               <Check size={18} aria-hidden="true" /> Save policy
             </button>
-            {isHome && !propertyId && props.length > 0 && <p className="text-caption text-muted text-center mt-1.5 mb-0">Choose which home it&apos;s for first.</p>}
+            {isHome && !propertyId && <p className="text-caption text-muted text-center mt-1.5 mb-0">Choose or add the home it&apos;s for first.</p>}
           </>
         )
       })()}

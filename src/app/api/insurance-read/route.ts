@@ -54,6 +54,8 @@ Rules:
 - If the documents cover two policies or years, report the most recent policy period and say so in notes.
 - A policy wording booklet with no personal details isn't enough: set isInsurance false if there's no schedule, certificate, renewal or statement of fact.
 
+What to report for insurer: the insurer's short everyday name as a person would say it (e.g. "AXA", "Aviva", "Admiral"), not the legal entity, underwriter or broker.
+
 Formats for value:
 - Dates: YYYY-MM-DD. endDate is the last day of cover or the renewal date.
 - Money: a plain number in pounds, no £ or commas, e.g. 612.40. For a sum insured with no limit, write "unlimited".
