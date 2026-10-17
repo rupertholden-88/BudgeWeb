@@ -10,7 +10,7 @@ import {
   insurancePolicies, insuranceGaps, assetOf, statusOf, KIND_LABELS, ALL_KINDS, HOME_KINDS, PEOPLE_KINDS,
   type Policy, type PolicyStatus, type InsuranceGap, type InsuranceKind,
 } from '@/lib/insurance'
-import { readToPolicy, matchRead, fieldProblem, type ReadPolicy, type ReadResult, type ReadFile, type ReadField, type FieldKey } from '@/lib/insuranceRead'
+import { readToPolicy, fixRenewalDates, matchRead, fieldProblem, type ReadPolicy, type ReadResult, type ReadFile, type ReadField, type FieldKey } from '@/lib/insuranceRead'
 import { useApiKey } from '@/hooks/useApiKey'
 import { Sheet, SheetRow, Toggle, OwnerDot } from './BudgetScreen'
 import { ConfirmDelete, NumberInput, inputClass } from './ui'
@@ -670,7 +670,7 @@ function UploadSheet({ budget, targetId, onClose, onSaved, ownerName, onOpenSett
         setState({ step: 'error', message: json?.message ?? (res.status === 413 ? 'These files are too large to send. Try fewer pages or photos.' : 'Something went wrong reading these. Try again.'), costUsd: json?.costUsd, settings: json?.error === 'bad_key' || json?.error === 'not_configured' })
         return
       }
-      const result: ReadResult = json.result
+      const result: ReadResult = fixRenewalDates(json.result)
       if (!result.isInsurance) {
         setState({ step: 'error', message: 'This doesn’t look like an insurance schedule. Try the policy schedule or renewal letter, not the policy wording booklet.', costUsd: json.costUsd })
         return
