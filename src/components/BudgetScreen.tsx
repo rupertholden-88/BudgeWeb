@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Category, LineItem, TabFilter, Owner, EntryType, Debt, Property, fmt, daysUntil, isInsuranceItem,
@@ -9,7 +9,7 @@ import {
 } from '@/lib/models'
 import { needsAttention } from '@/lib/attention'
 import { Plus, ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, X, Check } from 'lucide-react'
-import { ConfirmDelete, NumberInput, inputClass } from './ui'
+import { ConfirmDelete, NumberInput, inputClass, useModal } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -181,19 +181,17 @@ function LapsedBanner({ title, meta, onOpen, onRenewed, onUpdateDate }: {
 
 // ─── item sheet ───────────────────────────────────────────────────────────────
 
-function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useModal(ref, onClose)
   // Portalled to <body> so it sits above the tab bar, outside the screen's stacking context.
   return createPortal(
     <div className="fixed inset-0 z-[900] flex items-end sm:items-center justify-center sm:p-6" style={{ background: 'var(--scrim)' }} onClick={onClose}>
       {/* A bottom sheet on phones; a centred dialog on tablets and desktop. */}
       <div
+        ref={ref} tabIndex={-1}
         role="dialog" aria-modal="true" aria-label={title}
-        className="sheet-enter w-full max-w-[480px] sm:max-w-[520px] max-h-[88dvh] sm:max-h-[85dvh] overflow-y-auto bg-bg rounded-t-[22px] sm:rounded-[22px] px-5 sm:px-6 pt-2 sm:pt-3 pb-[calc(24px+env(safe-area-inset-bottom))] sm:pb-6 sm:shadow-[0_24px_60px_-20px_rgba(0,0,0,.45)]"
+        className="sheet-enter outline-none w-full max-w-[480px] sm:max-w-[520px] max-h-[88dvh] sm:max-h-[85dvh] overflow-y-auto bg-bg rounded-t-[22px] sm:rounded-[22px] px-5 sm:px-6 pt-2 sm:pt-3 pb-[calc(24px+env(safe-area-inset-bottom))] sm:pb-6 sm:shadow-[0_24px_60px_-20px_rgba(0,0,0,.45)]"
         onClick={e => e.stopPropagation()}
       >
         <div className="w-10 h-1 rounded-full bg-line-2 mx-auto mb-1 sm:hidden" aria-hidden="true" />
@@ -208,7 +206,7 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
   )
 }
 
-function SheetRow({ label, children, hint }: { label: string; children: React.ReactNode; hint?: React.ReactNode }) {
+export function SheetRow({ label, children, hint }: { label: string; children: React.ReactNode; hint?: React.ReactNode }) {
   return (
     <div className="py-2.5 border-t border-line">
       <div className="flex items-center justify-between gap-3 min-h-[44px]">
@@ -243,15 +241,15 @@ function AutoFocus({ selector }: { selector: string }) {
   return null
 }
 
-function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose }: {
+function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, onOpenInsurance }: {
   cat: Category; item: LineItem; properties: Property[]; budget: BudgetHook
-  ownerName: (o: Owner) => string; focus: 'amount' | 'date'; onClose: () => void
+  ownerName: (o: Owner) => string; focus: 'amount' | 'date'; onClose: () => void; onOpenInsurance?: (itemId: string) => void
 }) {
   const { updateItemAmount, renameItem, removeItem, updateItemRenewal, toggleItemAutoRenew, toggleItemShared, updateItemInsurance, updateItemProperty } = budget
   const [label, setLabel] = useState(item.label)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const isExpense = cat.type === 'EXPENSE'
-  const isInsurance = isExpense && isInsuranceItem(item.label)
+  const isInsurance = isExpense && (isInsuranceItem(item.label) || !!budget.data.policyDetails?.[item.id])
   const canMarkShared = isExpense && cat.owner !== 'JOINT'
   const days = item.renewalDate ? daysUntil(item.renewalDate) : null
 
@@ -324,6 +322,15 @@ function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose }:
         </SheetRow>
       )}
 
+      {isInsurance && onOpenInsurance && (
+        <button onClick={() => { onClose(); onOpenInsurance(item.id) }} className="w-full flex items-center justify-between gap-3 min-h-[52px] py-2.5 border-t border-line text-left cursor-pointer">
+          <span>
+            <span className="block text-[15px] text-ink">{budget.data.policyDetails?.[item.id] ? 'Linked to a policy' : 'Policy details'}</span>
+            <span className="block text-caption text-muted">Cover, excess and documents on Insurance</span>
+          </span>
+          <span className="flex items-center gap-1 text-[15px] font-semibold text-ink">Open <ChevronRight size={16} aria-hidden="true" /></span>
+        </button>
+      )}
       {isInsurance && (
         <SheetRow label="Provider">
           <input value={item.insuranceProvider ?? ''} placeholder="e.g. Aviva" onChange={e => updateItemInsurance(cat.key, item.id, { provider: e.target.value })} className={`${inputClass} w-full`} aria-label="Provider" />
@@ -745,8 +752,8 @@ function OneOffGroup({ now, upcoming, period, ownerName, onOpen, onAdd }: {
 
 const OWNER_ORDER: Owner[] = ['JOINT', 'NIAMH', 'RUPERT']
 
-export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDebts }: {
-  budget: BudgetHook; tab: TabFilter; onTabChange: (t: TabFilter) => void; onNavigateToDebts: () => void
+export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDebts, onOpenInsurance }: {
+  budget: BudgetHook; tab: TabFilter; onTabChange: (t: TabFilter) => void; onNavigateToDebts: () => void; onOpenInsurance?: (itemId: string) => void
 }) {
   const { data, totals, addCategory, savedAt, user, updateItemRenewal } = budget
   const [addingCat, setAddingCat] = useState(false)
@@ -964,7 +971,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
         />
       )}
       {openCat && openItem && sheet && (
-        <ItemSheet cat={openCat} item={openItem} properties={properties} budget={budget} ownerName={ownerName} focus={sheet.focus} onClose={() => setSheet(null)} />
+        <ItemSheet cat={openCat} item={openItem} properties={properties} budget={budget} ownerName={ownerName} focus={sheet.focus} onClose={() => setSheet(null)} onOpenInsurance={onOpenInsurance} />
       )}
 
       {/* Two columns on wide screens: the month's summary stays put on the left while the groups scroll. */}

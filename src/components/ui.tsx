@@ -17,24 +17,71 @@ export function ownerTextClass(owner: Owner) {
   return 'text-joint'
 }
 
+const modalStack: symbol[] = []
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/**
+ * Behaviour every dialog needs for keyboard users: focus moves in when it
+ * opens, Tab stays inside, Esc closes only the topmost one, and focus goes
+ * back to whatever opened it.
+ */
+export function useModal(ref: React.RefObject<HTMLElement>, onClose: () => void) {
+  const close = useRef(onClose)
+  close.current = onClose
+  useEffect(() => {
+    const id = Symbol('modal')
+    modalStack.push(id)
+    const opener = document.activeElement as HTMLElement | null
+    const el = ref.current
+    // Give the content a moment to mount, then focus the dialog itself unless something inside asked for focus.
+    const t = setTimeout(() => { if (el && !el.contains(document.activeElement)) el.focus() }, 30)
+    const onKey = (e: KeyboardEvent) => {
+      if (modalStack[modalStack.length - 1] !== id || !el) return
+      if (e.key === 'Escape') { e.preventDefault(); close.current(); return }
+      if (e.key !== 'Tab') return
+      const items = Array.from(el.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(x => x.offsetParent !== null)
+      if (items.length === 0) { e.preventDefault(); el.focus(); return }
+      const first = items[0], last = items[items.length - 1]
+      if (!el.contains(document.activeElement)) { e.preventDefault(); first.focus() }
+      else if (e.shiftKey && (document.activeElement === first || document.activeElement === el)) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener('keydown', onKey)
+      const i = modalStack.indexOf(id)
+      if (i >= 0) modalStack.splice(i, 1)
+      if (opener && document.contains(opener)) opener.focus()
+    }
+  }, []) // eslint-disable-line
+}
+
 /** Bottom-sheet confirmation, used for every delete in the app. */
-export function ConfirmDelete({ label, detail, onConfirm, onCancel }: {
+export function ConfirmDelete({ label, detail, onConfirm, onCancel, title, confirmLabel }: {
   label: string; detail?: string; onConfirm: () => void; onCancel: () => void
+  /** Overrides "Delete “label”?" and the Delete button, for removals that aren't a plain delete. */
+  title?: string; confirmLabel?: string
 }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useModal(ref, onCancel)
   // Portalled to <body> so it always sits above the tab bar and any open sheet.
   return createPortal(
     <div className="fixed inset-0 z-[1000] bg-black/45 flex items-end sm:items-center justify-center sm:p-6" onClick={onCancel}>
       <div
+        ref={ref}
         role="dialog"
         aria-modal="true"
-        className="bg-card rounded-t-2xl sm:rounded-[22px] px-5 sm:px-6 pt-5 pb-[calc(2rem+env(safe-area-inset-bottom))] sm:pb-6 w-full max-w-[480px] sm:max-w-[420px]"
+        aria-label={title ?? `Delete ${label}?`}
+        tabIndex={-1}
+        className="outline-none bg-card rounded-t-2xl sm:rounded-[22px] px-5 sm:px-6 pt-5 pb-[calc(2rem+env(safe-area-inset-bottom))] sm:pb-6 w-full max-w-[480px] sm:max-w-[420px]"
         onClick={e => e.stopPropagation()}
       >
-        <div className="text-lead font-semibold mb-1 break-words">Delete &ldquo;{label}&rdquo;?</div>
+        <div className="text-lead font-semibold mb-1 break-words">{title ?? <>Delete &ldquo;{label}&rdquo;?</>}</div>
         <div className="text-body text-muted mb-5">{detail ?? "This can't be undone."}</div>
         <div className="flex flex-col gap-2">
           <button onClick={onConfirm} className="bg-ink text-on-ink border-0 rounded-xl p-3.5 cursor-pointer text-lead font-semibold min-h-[48px]">
-            Delete
+            {confirmLabel ?? 'Delete'}
           </button>
           <button onClick={onCancel} className="bg-fill text-ink border-0 rounded-xl p-3.5 cursor-pointer text-lead min-h-[48px]">
             Cancel

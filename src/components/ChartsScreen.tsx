@@ -5,7 +5,8 @@ import { fmt, Owner, Debt, upcomingRenewals, householdCostSplit, monthlyInterest
 import { buildFinancialSummary, hashSummary } from '@/lib/financialSummary'
 import { useApiKey } from '@/hooks/useApiKey'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown, CalendarClock, Sparkles, KeyRound, Zap } from 'lucide-react'
+import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown, CalendarClock, Sparkles, KeyRound, Zap, Shield, ChevronRight } from 'lucide-react'
+import { insurancePolicies, insuranceGaps } from '@/lib/insurance'
 import { StatCard } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
@@ -368,7 +369,52 @@ function FinancialHealthCard({ data, totals, user, recordFinancialHealthRun }: {
   )
 }
 
-export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth }: { budget: BudgetHook; onOpenProperty?: (propertyId: string) => void; onOpenWealth?: () => void }) {
+/** A summary of the household's insurance, with what needs a look; the detail lives on Insurance. */
+function InsuranceCard({ data, onOpen }: { data: BudgetHook['data']; onOpen?: () => void }) {
+  const policies = insurancePolicies(data)
+  const gaps = insuranceGaps(data, policies)
+  if (policies.length === 0 && gaps.length === 0) return null
+  const yearly = policies.reduce((a, p) => a + p.yearly, 0)
+  const lapsed = policies.filter(p => p.status === 'lapsed')
+  const soon = policies.filter(p => p.status === 'soon')
+  const next = policies.filter(p => p.days != null && p.days >= 0)[0]
+  const top = gaps.filter(g => g.severity === 'gap').concat(gaps.filter(g => g.severity === 'check')).slice(0, 3)
+  return (
+    <SectionCard
+      title="Insurance"
+      sub={policies.length > 0 ? `${policies.length} ${policies.length === 1 ? 'policy' : 'policies'} · ${fmt(yearly)} a year` : 'No policies recorded yet'}
+      icon={<Shield size={14} />}
+    >
+      {(lapsed.length > 0 || soon.length > 0 || next) && (
+        <p className="text-[15px] m-0 mb-2">
+          {lapsed.length > 0
+            ? <span className="text-negative font-semibold">{lapsed.map(p => p.label).join(', ')} {lapsed.length === 1 ? 'has' : 'have'} lapsed.</span>
+            : soon.length > 0
+              ? <>{soon[0].label} renews in {soon[0].days} {soon[0].days === 1 ? 'day' : 'days'}{soon[0].autoRenews ? '' : ' and won’t auto-renew'}.</>
+              : <span className="text-muted">Next renewal: {next!.label}, {new Date(next!.renewalDate!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.</span>}
+        </p>
+      )}
+      {top.length > 0 && (
+        <div className="space-y-2">
+          {top.map(g => (
+            <div key={g.id} className="flex items-start gap-2.5">
+              <AlertTriangle size={15} className={`mt-0.5 shrink-0 ${g.severity === 'gap' ? 'text-negative' : 'text-muted'}`} aria-hidden="true" />
+              <div className="text-[15px] text-ink leading-snug min-w-0 flex-1">{g.title}</div>
+              <span className={`pill shrink-0 ${g.severity === 'gap' ? 'pill-bad' : ''}`}>{g.severity === 'gap' ? 'Missing' : 'Worth a look'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {onOpen && (
+        <button onClick={onOpen} className="mt-3 w-full flex items-center justify-center gap-1.5 min-h-[48px] rounded-xl bg-fill text-[15px] font-semibold text-ink cursor-pointer">
+          Open insurance <ChevronRight size={16} aria-hidden="true" />
+        </button>
+      )}
+    </SectionCard>
+  )
+}
+
+export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth, onOpenBudget, onOpenInsurance }: { budget: BudgetHook; onOpenProperty?: (propertyId: string) => void; onOpenWealth?: () => void; onOpenBudget?: () => void; onOpenInsurance?: () => void }) {
   // Judge a typical month; the trend line shows this month as it actually is, one-offs included.
   const { data, regularTotals: totals, totals: monthTotals, user, recordFinancialHealthRun } = budget
   const today = new Date().toISOString().slice(0, 7)
@@ -666,6 +712,8 @@ export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth }: {
           </p>
         </SectionCard>
       )}
+
+      <InsuranceCard data={data} onOpen={onOpenInsurance} />
 
       {/* Fair share */}
       {fairShare && (

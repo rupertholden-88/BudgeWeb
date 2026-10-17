@@ -12,8 +12,9 @@ import { needsAttention } from '@/lib/attention'
 import { Wallet, BarChart3, Landmark, Settings2, User, CheckCircle } from 'lucide-react'
 
 const ChartsScreen = dynamic(() => import('@/components/ChartsScreen'))
+const InsuranceScreen = dynamic(() => import('@/components/InsuranceScreen'))
 
-type Screen = 'budget' | 'charts' | 'wealth' | 'settings'
+type Screen = 'budget' | 'charts' | 'wealth' | 'settings' | 'insurance'
 
 const NAV = [
   { id: 'budget'   as Screen, label: 'Budget',   Icon: Wallet },
@@ -102,6 +103,11 @@ export default function HomePage() {
   const [screen, setScreen] = useState<Screen>('budget')
   const [tab, setTab] = useState<TabFilter>('ALL')
   const [focusPropertyId, setFocusPropertyId] = useState<string | null>(null)
+  // Insurance isn't a tab: it opens from Analysis, Wealth or Budget and goes back there.
+  const [insuranceFrom, setInsuranceFrom] = useState<Screen>('charts')
+  const [focusPolicyId, setFocusPolicyId] = useState<string | null>(null)
+  const openInsurance = (from: Screen, policyId?: string) => { setInsuranceFrom(from); setFocusPolicyId(policyId ?? null); setScreen('insurance') }
+  const navScreen: Screen = screen === 'insurance' ? insuranceFrom : screen
   const [setupDone, setSetupDone] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const swipeRef = useRef<{ x: number; y: number; t: number } | null>(null)
@@ -130,6 +136,7 @@ export default function HomePage() {
     const dt = Date.now() - swipeRef.current.t
     swipeRef.current = null
     if (dt > 500 || Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.75) return
+    if (screen === 'insurance') return
     const idx = SCREEN_ORDER.indexOf(screen)
     if (dx < 0 && idx < SCREEN_ORDER.length - 1) setScreen(SCREEN_ORDER[idx + 1])
     if (dx > 0 && idx > 0) setScreen(SCREEN_ORDER[idx - 1])
@@ -172,7 +179,7 @@ export default function HomePage() {
   ) : (
     <button onClick={signIn} className="flex items-center gap-1.5 min-h-[44px] text-label text-muted cursor-pointer text-left">
       <User size={14} aria-hidden="true" className="shrink-0" />
-      <span>On this phone only · <span className="font-semibold text-ink underline underline-offset-2">Back up</span></span>
+      <span>On this device only · <span className="font-semibold text-ink underline underline-offset-2">Back up</span></span>
     </button>
   )
 
@@ -201,10 +208,10 @@ export default function HomePage() {
             <button
               key={id}
               onClick={() => setScreen(id)}
-              aria-current={screen === id ? 'page' : undefined}
-              className={`flex items-center gap-3 px-3 min-h-[44px] rounded-xl cursor-pointer text-[15px] text-left ${screen === id ? 'bg-fill text-ink font-semibold' : 'text-muted font-medium hover:bg-fill'}`}
+              aria-current={navScreen === id ? 'page' : undefined}
+              className={`flex items-center gap-3 px-3 min-h-[44px] rounded-xl cursor-pointer text-[15px] text-left ${navScreen === id ? 'bg-fill text-ink font-semibold' : 'text-muted font-medium hover:bg-fill'}`}
             >
-              <Icon size={20} strokeWidth={screen === id ? 2.1 : 1.75} aria-hidden="true" />
+              <Icon size={20} strokeWidth={navScreen === id ? 2.1 : 1.75} aria-hidden="true" />
               <span className="flex-1">{label}</span>
               {id === 'charts' && attentionCount > 0 && (
                 <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-neg text-on-ink text-caption leading-[22px] font-bold text-center">
@@ -239,9 +246,10 @@ export default function HomePage() {
         >
           {/* A comfortable column on tablets; wider, two-column screens on desktop. */}
           <div key={screen} className="h-full mx-auto w-full max-w-[640px] lg:max-w-[1080px] lg:pt-6 screen-enter">
-            {screen === 'budget'   && <BudgetScreen   budget={budget} tab={activeTab} onTabChange={setTab} onNavigateToDebts={() => setScreen('wealth')} />}
-            {screen === 'charts'   && <ChartsScreen   budget={budget} onOpenProperty={id => { setFocusPropertyId(id); setScreen('wealth') }} onOpenWealth={() => setScreen('wealth')} />}
-            {screen === 'wealth'   && <WealthScreen   budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={() => setFocusPropertyId(null)} />}
+            {screen === 'budget'   && <BudgetScreen   budget={budget} tab={activeTab} onTabChange={setTab} onNavigateToDebts={() => setScreen('wealth')} onOpenInsurance={id => openInsurance('budget', id)} />}
+            {screen === 'charts'   && <ChartsScreen   budget={budget} onOpenProperty={id => { setFocusPropertyId(id); setScreen('wealth') }} onOpenWealth={() => setScreen('wealth')} onOpenBudget={() => setScreen('budget')} onOpenInsurance={() => openInsurance('charts')} />}
+            {screen === 'insurance' && <InsuranceScreen budget={budget} backLabel={NAV.find(n => n.id === insuranceFrom)?.label ?? 'Back'} onBack={() => setScreen(insuranceFrom)} focusPolicyId={focusPolicyId} onFocusHandled={() => setFocusPolicyId(null)} onToast={showToast} onOpenSettings={() => setScreen('settings')} />}
+            {screen === 'wealth'   && <WealthScreen   budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={() => setFocusPropertyId(null)} onOpenInsurance={id => openInsurance('wealth', id)} />}
             {screen === 'settings' && <SettingsScreen budget={budget} onToast={showToast} />}
           </div>
         </main>
@@ -252,11 +260,11 @@ export default function HomePage() {
               <button
                 key={id}
                 onClick={() => setScreen(id)}
-                aria-current={screen === id ? 'page' : undefined}
-                className={`flex-1 flex flex-col items-center justify-center gap-1 pt-2 pb-1.5 min-h-[56px] cursor-pointer text-caption ${screen === id ? 'text-ink font-semibold' : 'text-muted font-medium'}`}
+                aria-current={navScreen === id ? 'page' : undefined}
+                className={`flex-1 flex flex-col items-center justify-center gap-1 pt-2 pb-1.5 min-h-[56px] cursor-pointer text-caption ${navScreen === id ? 'text-ink font-semibold' : 'text-muted font-medium'}`}
               >
                 <span className="relative flex">
-                  <Icon size={22} strokeWidth={screen === id ? 2.1 : 1.75} aria-hidden="true" />
+                  <Icon size={22} strokeWidth={navScreen === id ? 2.1 : 1.75} aria-hidden="true" />
                   {badge(id)}
                 </span>
                 {label}
