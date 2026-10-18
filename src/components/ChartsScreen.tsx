@@ -8,6 +8,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown, CalendarClock, Sparkles, KeyRound, Zap, Shield, ChevronRight } from 'lucide-react'
 import { insurancePolicies, insuranceGaps } from '@/lib/insurance'
 import { StatCard } from './ui'
+import CombineCards from './CombineCards'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -913,6 +914,8 @@ export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth, onO
           )}
         </SectionCard>
       )}
+
+      <CombineCards debts={data.debts} />
 
       {/* Trend */}
       {hasHistory && (
