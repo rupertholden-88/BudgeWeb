@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Owner, DebtType, Debt, Property, fmt, debtPayoff, paymentToClear, daysUntil } from '@/lib/models'
-import { Plus, Home } from 'lucide-react'
+import { Plus, Home, Merge } from 'lucide-react'
 import { ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, NumberInput, inputClass, useLongPress, ownerBorderClass, MonthInput } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
@@ -63,10 +63,87 @@ function ClearBy({ debt, onUse }: { debt: Debt; onUse: (payment: number) => void
   )
 }
 
-function DebtCard({ debt, ownerName, properties, onUpdate, onDelete }: {
+/**
+ * Merge debts that are really one: two purchases recorded separately that sit
+ * on the same card. Balances and payments add up; the balance can be set to
+ * the latest statement, which may include other spending and interest.
+ */
+function CombineWith({ debt, others, onCombine }: { debt: Debt; others: Debt[]; onCombine: (removeIds: string[], fields: Partial<Debt>) => void }) {
+  const [open, setOpen] = useState(false)
+  const [picked, setPicked] = useState<Set<string>>(new Set(others.filter(o => o.type === debt.type).map(o => o.id)))
+  const chosen = others.filter(o => picked.has(o.id))
+  const sum = (k: 'currentBalance' | 'monthlyPayment') => [debt, ...chosen].reduce((a, d) => a + (d[k] || 0), 0)
+  const [name, setName] = useState(debt.institution || '')
+  const [balance, setBalance] = useState<number | undefined>(undefined)
+  const [rate, setRate] = useState<number | undefined>(undefined)
+  const rates = [debt, ...chosen].map(d => Number(d.interestRate) || 0)
+  const autoRate = Math.max(...rates)
+  if (!open) return (
+    <button onClick={() => setOpen(true)} className="flex items-center gap-2 min-h-[44px] text-[15px] font-semibold text-ink cursor-pointer">
+      <Merge size={16} aria-hidden="true" /> Combine with another debt
+    </button>
+  )
+  const all = [debt, ...chosen]
+  const owners = new Set(all.map(d => d.owner))
+  const allZero = all.every(d => d.isZeroPercent)
+  const combine = () => {
+    onCombine(chosen.map(c => c.id), {
+      label: name.trim() || debt.label,
+      institution: name.trim() || debt.institution,
+      currentBalance: balance ?? sum('currentBalance'),
+      monthlyPayment: sum('monthlyPayment'),
+      interestRate: rate ?? autoRate,
+      owner: owners.size > 1 ? 'JOINT' : debt.owner,
+      isZeroPercent: allZero,
+      zeroPercentExpiryDate: allZero ? all.map(d => d.zeroPercentExpiryDate).filter(Boolean).sort()[0] : undefined,
+    })
+    setOpen(false)
+  }
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <div className="text-caption text-muted mb-1.5">Combine {debt.label} with</div>
+        <div className="flex flex-col">
+          {others.map(o => (
+            <label key={o.id} className="flex items-center gap-3 min-h-[44px] cursor-pointer text-[15px]">
+              <input type="checkbox" className="w-5 h-5 shrink-0" checked={picked.has(o.id)} onChange={e => { const n = new Set(picked); if (e.target.checked) n.add(o.id); else n.delete(o.id); setPicked(n) }} />
+              <span className="flex-1 min-w-0 truncate">{o.label}</span>
+              <span className="tabular-nums text-muted shrink-0">{fmt(o.currentBalance)}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+      <Field label="Card name">
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Lloyds" aria-label="Card name" className={`${inputClass} w-full`} />
+      </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Balance now £">
+          <NumberInput value={balance ?? sum('currentBalance')} onChange={setBalance} ariaLabel="Combined balance" className={`${inputClass} w-full min-w-0`} />
+        </Field>
+        <Field label="Rate %">
+          <NumberInput value={rate ?? autoRate} onChange={setRate} ariaLabel="Combined rate" className={`${inputClass} w-full min-w-0`} />
+        </Field>
+      </div>
+      <p className="text-caption text-muted m-0 [text-wrap:pretty]">
+        Payments add up to {fmt(sum('monthlyPayment'))} a month. Set the balance from your latest statement, as it may include other spending and interest.
+      </p>
+      <div className="flex gap-2">
+        <button onClick={combine} disabled={chosen.length === 0} className="flex-1 bg-ink text-on-ink rounded-xl min-h-[44px] text-[15px] font-semibold cursor-pointer disabled:opacity-40">
+          Combine {chosen.length + 1} into one
+        </button>
+        <button onClick={() => setOpen(false)} className="px-4 bg-fill rounded-xl min-h-[44px] text-[15px] cursor-pointer">Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+function DebtCard({ debt, ownerName, properties, onUpdate, onDelete, others, onCombine }: {
   debt: Debt; ownerName: string; properties: Property[]
   onUpdate: (id: string, fields: Partial<Debt>) => void
   onDelete: (id: string) => void
+  /** Other debts it could be combined with. */
+  others: Debt[]
+  onCombine: (removeIds: string[], fields: Partial<Debt>) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [editingLabel, setEditingLabel] = useState(false)
@@ -178,6 +255,12 @@ function DebtCard({ debt, ownerName, properties, onUpdate, onDelete }: {
               </PanelSection>
             )}
 
+            {debt.type !== 'MORTGAGE' && others.length > 0 && (
+              <PanelSection title="Combine">
+                <CombineWith debt={debt} others={others} onCombine={onCombine} />
+              </PanelSection>
+            )}
+
             {securable && properties.length > 0 && (
               <PanelSection title="Secured on">
                 <select
@@ -220,7 +303,7 @@ function DebtCard({ debt, ownerName, properties, onUpdate, onDelete }: {
 }
 
 export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
-  const { data, addDebt, updateDebt, deleteDebt, totals } = budget
+  const { data, addDebt, updateDebt, deleteDebt, combineDebts, totals } = budget
   const [adding, setAdding] = useState(false)
   const [newLabel, setNewLabel] = useState('')
   const [newOwner, setNewOwner] = useState<Owner>('JOINT')
@@ -255,7 +338,11 @@ export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
 
       <div className="lg:columns-2 lg:gap-5 [&>*]:break-inside-avoid">
         {data.debts.map(d => (
-          <DebtCard key={d.id} debt={d} ownerName={ownerName(d.owner)} properties={properties} onUpdate={updateDebt} onDelete={deleteDebt} />
+          <DebtCard
+            key={d.id} debt={d} ownerName={ownerName(d.owner)} properties={properties} onUpdate={updateDebt} onDelete={deleteDebt}
+            others={data.debts.filter(o => o.id !== d.id && o.type !== 'MORTGAGE')}
+            onCombine={(ids, fields) => combineDebts(d.id, ids, fields)}
+          />
         ))}
       </div>
 

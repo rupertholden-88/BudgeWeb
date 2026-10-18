@@ -549,6 +549,14 @@ export function useBudget() {
     mutate(b => ({ ...b, debts: b.debts.map(d => d.id === id ? { ...d, ...fields } : d) }))
   }
 
+  /** Merges several debts into one, e.g. purchases recorded separately that sit on the same card. */
+  const combineDebts = (keepId: string, removeIds: string[], fields: Partial<Debt>) => {
+    mutate(b => ({
+      ...b,
+      debts: b.debts.filter(d => !removeIds.includes(d.id)).map(d => d.id === keepId ? { ...d, ...fields } : d),
+    }))
+  }
+
   const deleteDebt = (id: string) => {
     mutate(b => ({ ...b, debts: b.debts.filter(d => d.id !== id) }))
   }
@@ -612,7 +620,7 @@ export function useBudget() {
     updateGrossIncome, updatePayday, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,
     addOneOff, updateOneOff, deleteOneOff, setOneOffDone, savePolicy, removePolicy,
     addAsset, updateAsset, updateAssetFields, deleteAsset,
-    addDebt, updateDebt, deleteDebt,
+    addDebt, updateDebt, deleteDebt, combineDebts,
     getJsonString, importFromJson,
   }
 }
