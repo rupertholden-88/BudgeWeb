@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Owner, DebtType, Debt, Property, fmt, debtPayoff } from '@/lib/models'
+import { Owner, DebtType, Debt, Property, fmt, debtPayoff, paymentToClear, daysUntil } from '@/lib/models'
 import { Plus, Home } from 'lucide-react'
 import { ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, NumberInput, inputClass, useLongPress, ownerBorderClass, MonthInput } from './ui'
 
@@ -8,6 +8,59 @@ type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 const DEBT_LABELS: Record<DebtType, string> = {
   CREDIT_CARD: 'Credit Card', PERSONAL_LOAN: 'Personal Loan', CAR_FINANCE: 'Car Finance',
   MORTGAGE: 'Mortgage', STUDENT_LOAN: 'Student Loan', OTHER: 'Other'
+}
+
+const monthLabel = (months: number) => {
+  const d = new Date(); d.setMonth(d.getMonth() + months)
+  return d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+}
+
+/** Whole months until a 0% deal ends, if it's still running. */
+function zeroMonthsLeft(d: Debt): number | null {
+  if (!d.isZeroPercent || !d.zeroPercentExpiryDate) return null
+  const days = daysUntil(d.zeroPercentExpiryDate.length === 7 ? `${d.zeroPercentExpiryDate}-01` : d.zeroPercentExpiryDate)
+  const m = Math.floor(days / 30.44)
+  return m >= 1 ? m : null
+}
+
+/** What to pay each month to clear a debt by a chosen time. */
+function ClearBy({ debt, onUse }: { debt: Debt; onUse: (payment: number) => void }) {
+  const zero = zeroMonthsLeft(debt)
+  const options = [...(zero ? [zero] : []), 6, 12, 18, 24, 36].filter((m, i, a) => a.indexOf(m) === i)
+  const [months, setMonths] = useState(zero ?? 12)
+  const plan = paymentToClear(debt, months)
+  const noRate = !debt.isZeroPercent && !(Number(debt.interestRate) > 0)
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Clear it by">
+        {options.map(m => (
+          <button
+            key={m} onClick={() => setMonths(m)} aria-pressed={months === m}
+            className={`min-h-[40px] px-3 rounded-full text-[14px] cursor-pointer border ${months === m ? 'bg-ink text-on-ink border-ink' : 'bg-panel text-ink-2 border-line-2'}`}
+          >{m === zero ? 'Before 0% ends' : `${m} months`}</button>
+        ))}
+      </div>
+      {plan && (
+        <div className="mt-3 flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="text-[17px] font-semibold text-ink tabular-nums">Pay {fmt(plan.payment)} a month</div>
+            <div className="text-label text-muted">
+              Clear by {monthLabel(months)}{plan.interest >= 1 ? ` · ${fmt(plan.interest)} interest` : ' · no interest'}
+            </div>
+          </div>
+          {plan.payment !== Math.round(debt.monthlyPayment) && (
+            <button onClick={() => onUse(plan.payment)} className="shrink-0 px-3.5 min-h-[44px] rounded-xl bg-fill text-[15px] font-semibold cursor-pointer">
+              Use this
+            </button>
+          )}
+        </div>
+      )}
+      {debt.monthlyPayment > 0 && plan && plan.payment === Math.round(debt.monthlyPayment) && (
+        <p className="text-caption text-muted mt-1 mb-0">That&apos;s what you pay now.</p>
+      )}
+      {noRate && <p className="text-caption text-warn mt-2 mb-0">Add the interest rate above, or tick 0% deal, for an accurate figure.</p>}
+    </div>
+  )
 }
 
 function DebtCard({ debt, ownerName, properties, onUpdate, onDelete }: {
@@ -118,6 +171,12 @@ function DebtCard({ debt, ownerName, properties, onUpdate, onDelete }: {
                 className={`${inputClass} mt-2 w-full`}
               />
             </PanelSection>
+
+            {debt.type !== 'MORTGAGE' && debt.currentBalance > 0 && (
+              <PanelSection title="Pay it off">
+                <ClearBy debt={debt} onUse={p => onUpdate(debt.id, { monthlyPayment: p })} />
+              </PanelSection>
+            )}
 
             {securable && properties.length > 0 && (
               <PanelSection title="Secured on">
