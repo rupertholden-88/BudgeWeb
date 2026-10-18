@@ -673,3 +673,17 @@ export function nextPayday(payday: number | undefined, now = new Date()): { date
 export function isFirstRun(data: BudgetData): boolean {
   return !data.nameNiamh && !data.nameRupert
 }
+
+/**
+ * The monthly payment that clears a debt in `months`, allowing for interest
+ * and any 0% period ending on the way. Rounded up to the pound.
+ */
+export function paymentToClear(d: Debt, months: number): { payment: number; interest: number } | null {
+  if (d.currentBalance <= 0 || months < 1) return null
+  const clears = (p: number) => { const r = debtPayoff({ ...d, monthlyPayment: p }); return r.months != null && r.months <= months }
+  let lo = 0, hi = d.currentBalance * 2 + 1
+  if (!clears(hi)) return null
+  for (let i = 0; i < 50; i++) { const mid = (lo + hi) / 2; if (clears(mid)) hi = mid; else lo = mid }
+  const payment = Math.ceil(hi)
+  return { payment, interest: debtPayoff({ ...d, monthlyPayment: payment }).interest }
+}
