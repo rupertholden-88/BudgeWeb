@@ -243,28 +243,37 @@ function AutoFocus({ selector }: { selector: string }) {
   return null
 }
 
-type MoveTo = { key: string } | { newGroup: string; owner: Owner }
+export type MoveTo = { key: string } | { newGroup: string; owner: Owner }
 
 /**
  * Pick a group to move a bill to, listed under whoever pays each group.
  * A group's owner pays its bills, so a move that changes the payer says so
  * before it happens.
  */
-function MoveSheet({ cat, item, budget, ownerName, onMove, onClose }: {
-  cat: Category; item: LineItem; budget: BudgetHook; ownerName: (o: Owner) => string
+export function MoveSheet({ type, title, current, budget, ownerName, onMove, onClose }: {
+  type: EntryType; title: string
+  /** Where each bill being moved sits now. */
+  current: { catKey: string; owner: Owner }[]
+  budget: BudgetHook; ownerName: (o: Owner) => string
   onMove: (to: MoveTo, owner: Owner) => void; onClose: () => void
 }) {
-  const groups = budget.data.categories.filter(c => c.type === cat.type)
+  const groups = budget.data.categories.filter(c => c.type === type)
+  // A group every bill is already in can't be chosen.
+  const allIn = (key: string) => current.every(c => c.catKey === key)
   const [pick, setPick] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [owner, setOwner] = useState<Owner | null>(null)
   const target = pick === '__new' ? owner : groups.find(g => g.key === pick)?.owner ?? null
-  const ready = pick === '__new' ? !!name.trim() && !!owner : !!pick && pick !== cat.key
-  const payerChange = target && target !== cat.owner
-    ? `${target === 'JOINT' ? 'The joint account' : ownerName(target)} will pay this instead of ${cat.owner === 'JOINT' ? 'the joint account' : ownerName(cat.owner)}.` : null
+  const ready = pick === '__new' ? !!name.trim() && !!owner : !!pick && !allIn(pick)
+  const who = (o: Owner, start = false) => o === 'JOINT' ? `${start ? 'The' : 'the'} joint account` : ownerName(o)
+  const changing = target ? current.filter(c => c.owner !== target) : []
+  const owners = Array.from(new Set(changing.map(c => c.owner)))
+  const payerChange = !target || changing.length === 0 ? null
+    : current.length === 1 ? `${who(target, true)} will pay this instead of ${who(current[0].owner)}.`
+    : `${who(target, true)} will pay ${changing.length === current.length ? `all ${current.length}` : `${changing.length} of these`}${owners.length === 1 ? `, instead of ${who(owners[0])}` : ''}.`
   const row = (on: boolean) => `w-full flex items-center gap-3 text-left px-3 min-h-[52px] rounded-xl cursor-pointer ${on ? 'bg-fill' : ''}`
   return (
-    <Sheet title={`Move ${item.label}`} onClose={onClose}>
+    <Sheet title={title} onClose={onClose}>
       {(['JOINT', 'NIAMH', 'RUPERT'] as Owner[]).map(o => {
         const mine = groups.filter(g => g.owner === o)
         if (mine.length === 0) return null
@@ -274,12 +283,12 @@ function MoveSheet({ cat, item, budget, ownerName, onMove, onClose }: {
               <OwnerDot owner={o} label={ownerName(o)} /> {o === 'JOINT' ? `${ownerName(o)} · paid from the joint account` : `${ownerName(o)} pays`}
             </div>
             {mine.map(g => (
-              <button key={g.key} onClick={() => setPick(g.key)} disabled={g.key === cat.key} aria-pressed={pick === g.key} className={`${row(pick === g.key)} disabled:cursor-default`}>
+              <button key={g.key} onClick={() => setPick(g.key)} disabled={allIn(g.key)} aria-pressed={pick === g.key} className={`${row(pick === g.key)} disabled:cursor-default`}>
                 <span className="flex-1 min-w-0">
                   <span className="block text-[16px] text-ink truncate">{g.label}</span>
                   <span className="block text-label text-muted">{g.items.length} {g.items.length === 1 ? 'item' : 'items'}</span>
                 </span>
-                {g.key === cat.key ? <span className="pill shrink-0">Now</span> : pick === g.key ? <Check size={18} className="shrink-0" aria-hidden="true" /> : null}
+                {allIn(g.key) ? <span className="pill shrink-0">Now</span> : pick === g.key ? <Check size={18} className="shrink-0" aria-hidden="true" /> : null}
               </button>
             ))}
           </div>
@@ -382,7 +391,7 @@ function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, o
       </label>
       {focus === 'amount' && <AutoFocus selector='input[aria-label^="Amount per month"]' />}
 
-      {moving && <MoveSheet cat={cat} item={item} budget={budget} ownerName={ownerName} onMove={move} onClose={() => setMoving(false)} />}
+      {moving && <MoveSheet type={cat.type} title={`Move ${item.label}`} current={[{ catKey: cat.key, owner: cat.owner }]} budget={budget} ownerName={ownerName} onMove={move} onClose={() => setMoving(false)} />}
 
       <div className="py-2.5 border-t border-line">
         <div className="flex items-center justify-between gap-3 min-h-[44px]">
