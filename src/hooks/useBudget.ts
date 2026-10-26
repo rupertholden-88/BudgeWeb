@@ -265,6 +265,10 @@ export function useBudget() {
     }) }) }))
   }
 
+  const updateItemRecurring = (catKey: string, itemId: string, recurring: 'subscription' | 'contract' | 'none' | undefined) => {
+    mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.map(i => i.id === itemId ? { ...i, recurring } : i) }) }))
+  }
+
   const updateItemProperty = (catKey: string, itemId: string, propertyId: string) => {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.map(i => i.id === itemId ? { ...i, propertyId: propertyId || undefined } : i) }) }))
   }
@@ -620,7 +624,7 @@ export function useBudget() {
     updateGrossIncome, updatePayday, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,
     addOneOff, updateOneOff, deleteOneOff, setOneOffDone, savePolicy, removePolicy,
     addAsset, updateAsset, updateAssetFields, deleteAsset,
-    addDebt, updateDebt, deleteDebt, combineDebts,
+    addDebt, updateDebt, deleteDebt, combineDebts, updateItemRecurring,
     getJsonString, importFromJson,
   }
 }

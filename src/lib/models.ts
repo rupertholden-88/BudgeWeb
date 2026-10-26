@@ -11,7 +11,9 @@ export type DebtType = 'CREDIT_CARD' | 'PERSONAL_LOAN' | 'CAR_FINANCE' | 'MORTGA
  * makes the cost visible to the fairness comparison, which would otherwise
  * treat it as personal spending and understate that person's contribution.
  */
-export interface LineItem { id: string; label: string; amount: number; priority: SpendingPriority; renewalDate?: string; autoRenews?: boolean; sharedContribution?: boolean; insuranceProvider?: string; insuranceCoverAmount?: number; propertyId?: string }
+export interface LineItem { id: string; label: string; amount: number; priority: SpendingPriority; renewalDate?: string; autoRenews?: boolean; sharedContribution?: boolean; insuranceProvider?: string; insuranceCoverAmount?: number; propertyId?: string
+  /** Overrides Budge's guess of whether this is a subscription or contract (shown on Renewals). */
+  recurring?: 'subscription' | 'contract' | 'none' }
 /** Detects an insurance line by its label — no separate flag to set, so the
  * extra fields just appear on anything already named as insurance. */
 /** Insurance by name: anything called insurance, plus cover that rarely is ("Life cover"). */

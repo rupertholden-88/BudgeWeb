@@ -5,11 +5,11 @@ import { createPortal } from 'react-dom'
 import {
   Category, LineItem, TabFilter, Owner, EntryType, Debt, Property, fmt, daysUntil, isInsuranceItem,
   debtPayoff, isMortgage, propertySummaries, nextPayday, energySwitchReminders, householdCostSplit,
-  OneOff, monthKey, PayPeriod, BudgetData, paydayFor, periodFor,
+  OneOff, monthKey, PayPeriod, BudgetData, paydayFor, periodFor, upcomingRenewals,
 } from '@/lib/models'
 import { needsAttention } from '@/lib/attention'
-import { Plus, ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, X, Check } from 'lucide-react'
-import { ConfirmDelete, NumberInput, inputClass, useModal } from './ui'
+import { Plus, ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, X, Check, CalendarClock } from 'lucide-react'
+import { ConfirmDelete, NumberInput, inputClass, useModal, RenewalBar } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -752,8 +752,9 @@ function OneOffGroup({ now, upcoming, period, ownerName, onOpen, onAdd }: {
 
 const OWNER_ORDER: Owner[] = ['JOINT', 'NIAMH', 'RUPERT']
 
-export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDebts, onOpenInsurance }: {
+export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDebts, onOpenInsurance, onOpenRenewals }: {
   budget: BudgetHook; tab: TabFilter; onTabChange: (t: TabFilter) => void; onNavigateToDebts: () => void; onOpenInsurance?: (itemId: string) => void
+  onOpenRenewals?: () => void
 }) {
   const { data, totals, addCategory, savedAt, user, updateItemRenewal } = budget
   const [addingCat, setAddingCat] = useState(false)
@@ -800,6 +801,9 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
   // Two paydays already fill the line, so the save time is left off then.
   const twoPaydays = !ownerTab && !!pdN && !!pdR && pdN !== pdR
   const asOf = savedAt && !twoPaydays ? ` · as of ${new Date(savedAt).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' })}` : ''
+
+  // Renewals due within 60 days, shown as one line that opens the Renewals tab.
+  const comingUp = useMemo(() => upcomingRenewals(data).filter(r => r.days >= 0 && r.days <= 60), [data])
 
   // Lapsed renewals pinned above everything.
   const lapsed = useMemo(() => needsAttention(data).filter(a => a.action.type === 'renewal' && a.severity === 'bad'), [data])
@@ -1029,6 +1033,18 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
           />
         )
       })}
+
+      {!propertyId && comingUp.length > 0 && onOpenRenewals && (
+        <button onClick={onOpenRenewals} className="panel w-full mt-4 px-4 py-3 flex items-center gap-3 text-left cursor-pointer">
+          <span className="w-10 h-10 rounded-xl grid place-items-center shrink-0 bg-warn-tint text-warn"><CalendarClock size={19} aria-hidden="true" /></span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-[15px] font-semibold text-ink">{comingUp.length} renewing in the next 60 days</span>
+            <span className="block text-label text-muted truncate">{comingUp.slice(0, 2).map(r => `${r.label} · ${r.days === 0 ? 'today' : `${r.days} ${r.days === 1 ? 'day' : 'days'}`}`).join(', ')}</span>
+            <RenewalBar days={comingUp[0].days} />
+          </span>
+          <ChevronRight size={18} className="text-faint shrink-0" aria-hidden="true" />
+        </button>
+      )}
 
       {isEmpty && !propertyId ? (
         <section className="panel p-5 mt-4">
