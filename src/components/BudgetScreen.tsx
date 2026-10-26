@@ -241,9 +241,55 @@ function AutoFocus({ selector }: { selector: string }) {
   return null
 }
 
-function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, onOpenInsurance }: {
+/** Which group a bill sits in: any group of the same kind, or a new one. */
+function GroupPicker({ cat, item, budget, ownerName, onMoved }: {
+  cat: Category; item: LineItem; budget: BudgetHook; ownerName: (o: Owner) => string; onMoved: (catKey: string) => void
+}) {
+  const groups = budget.data.categories.filter(c => c.type === cat.type)
+  const [adding, setAdding] = useState(false)
+  const [name, setName] = useState('')
+  const [owner, setOwner] = useState<Owner>(cat.owner)
+  const move = (to: Parameters<BudgetHook['moveItem']>[2]) => { const key = budget.moveItem(cat.key, item.id, to); if (key) onMoved(key) }
+  const label = (c: Category) => `${c.label} · ${ownerName(c.owner)}`
+  return (
+    <div className="py-2.5 border-t border-line">
+      <div className="flex items-center justify-between gap-3 min-h-[44px]">
+        <span className="text-[15px] text-ink">Group</span>
+        <div className="w-[200px] shrink-0">
+          <select
+            value={adding ? '__new' : cat.key}
+            onChange={e => { if (e.target.value === '__new') setAdding(true); else { setAdding(false); move({ key: e.target.value }) } }}
+            className={`${inputClass} w-full`} aria-label="Group"
+          >
+            {groups.map(c => <option key={c.key} value={c.key}>{label(c)}</option>)}
+            <option value="__new">+ New group…</option>
+          </select>
+        </div>
+      </div>
+      {adding && (
+        <div className="flex flex-col gap-2 mt-2">
+          <input autoFocus value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && name.trim()) move({ newGroup: name, owner }) }}
+            placeholder="e.g. Subscriptions" aria-label="New group's name" className={`${inputClass} w-full`} />
+          <div className="seg" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }} role="group" aria-label="Whose group">
+            {(['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(o => (
+              <button key={o} aria-pressed={owner === o} onClick={() => setOwner(o)}><OwnerDot owner={o} label={ownerName(o)} /><span className="lbl">{ownerName(o)}</span></button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => move({ newGroup: name, owner })} disabled={!name.trim()} className="flex-1 bg-ink text-on-ink rounded-xl min-h-[44px] text-[15px] font-semibold cursor-pointer disabled:opacity-40">Move to new group</button>
+            <button onClick={() => setAdding(false)} className="px-4 bg-fill rounded-xl min-h-[44px] text-[15px] cursor-pointer">Cancel</button>
+          </div>
+        </div>
+      )}
+      <p className="text-caption text-muted mt-1 mb-0">Moving it to someone else’s group changes who pays it.</p>
+    </div>
+  )
+}
+
+function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, onOpenInsurance, onMoved }: {
   cat: Category; item: LineItem; properties: Property[]; budget: BudgetHook
   ownerName: (o: Owner) => string; focus: 'amount' | 'date'; onClose: () => void; onOpenInsurance?: (itemId: string) => void
+  onMoved: (catKey: string) => void
 }) {
   const { updateItemAmount, renameItem, removeItem, updateItemRenewal, toggleItemAutoRenew, toggleItemShared, updateItemInsurance, updateItemProperty } = budget
   const [label, setLabel] = useState(item.label)
@@ -281,6 +327,8 @@ function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, o
         <span className="suffix">a month</span>
       </label>
       {focus === 'amount' && <AutoFocus selector='input[aria-label^="Amount per month"]' />}
+
+      <GroupPicker key={cat.key} cat={cat} item={item} budget={budget} ownerName={ownerName} onMoved={onMoved} />
 
       {canMarkShared && (
         <SheetRow label="For the household" hint="Counts towards your share of household costs — e.g. a mortgage only you pay.">
@@ -975,7 +1023,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
         />
       )}
       {openCat && openItem && sheet && (
-        <ItemSheet cat={openCat} item={openItem} properties={properties} budget={budget} ownerName={ownerName} focus={sheet.focus} onClose={() => setSheet(null)} onOpenInsurance={onOpenInsurance} />
+        <ItemSheet cat={openCat} item={openItem} properties={properties} budget={budget} ownerName={ownerName} focus={sheet.focus} onClose={() => setSheet(null)} onOpenInsurance={onOpenInsurance} onMoved={catKey => setSheet(s => s && { ...s, catKey })} />
       )}
 
       {/* Two columns on wide screens: the month's summary stays put on the left while the groups scroll. */}
