@@ -10,6 +10,8 @@ import {
 import { needsAttention } from '@/lib/attention'
 import { Plus, ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, X, Check, CalendarClock } from 'lucide-react'
 import { ConfirmDelete, NumberInput, inputClass, useModal, RenewalBar } from './ui'
+import { subscriptionKind } from '@/lib/subscriptions'
+import { ItemIcon, IconPicker } from '@/lib/itemIcons'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -241,59 +243,111 @@ function AutoFocus({ selector }: { selector: string }) {
   return null
 }
 
-/** Which group a bill sits in: any group of the same kind, or a new one. */
-function GroupPicker({ cat, item, budget, ownerName, onMoved }: {
-  cat: Category; item: LineItem; budget: BudgetHook; ownerName: (o: Owner) => string; onMoved: (catKey: string) => void
+type MoveTo = { key: string } | { newGroup: string; owner: Owner }
+
+/**
+ * Pick a group to move a bill to, listed under whoever pays each group.
+ * A group's owner pays its bills, so a move that changes the payer says so
+ * before it happens.
+ */
+function MoveSheet({ cat, item, budget, ownerName, onMove, onClose }: {
+  cat: Category; item: LineItem; budget: BudgetHook; ownerName: (o: Owner) => string
+  onMove: (to: MoveTo, owner: Owner) => void; onClose: () => void
 }) {
   const groups = budget.data.categories.filter(c => c.type === cat.type)
-  const [adding, setAdding] = useState(false)
+  const [pick, setPick] = useState<string | null>(null)
   const [name, setName] = useState('')
-  const [owner, setOwner] = useState<Owner>(cat.owner)
-  const move = (to: Parameters<BudgetHook['moveItem']>[2]) => { const key = budget.moveItem(cat.key, item.id, to); if (key) onMoved(key) }
-  const label = (c: Category) => `${c.label} · ${ownerName(c.owner)}`
+  const [owner, setOwner] = useState<Owner | null>(null)
+  const target = pick === '__new' ? owner : groups.find(g => g.key === pick)?.owner ?? null
+  const ready = pick === '__new' ? !!name.trim() && !!owner : !!pick && pick !== cat.key
+  const payerChange = target && target !== cat.owner
+    ? `${target === 'JOINT' ? 'The joint account' : ownerName(target)} will pay this instead of ${cat.owner === 'JOINT' ? 'the joint account' : ownerName(cat.owner)}.` : null
+  const row = (on: boolean) => `w-full flex items-center gap-3 text-left px-3 min-h-[52px] rounded-xl cursor-pointer ${on ? 'bg-fill' : ''}`
   return (
-    <div className="py-2.5 border-t border-line">
-      <div className="flex items-center justify-between gap-3 min-h-[44px]">
-        <span className="text-[15px] text-ink">Group</span>
-        <div className="w-[200px] shrink-0">
-          <select
-            value={adding ? '__new' : cat.key}
-            onChange={e => { if (e.target.value === '__new') setAdding(true); else { setAdding(false); move({ key: e.target.value }) } }}
-            className={`${inputClass} w-full`} aria-label="Group"
-          >
-            {groups.map(c => <option key={c.key} value={c.key}>{label(c)}</option>)}
-            <option value="__new">+ New group…</option>
-          </select>
-        </div>
-      </div>
-      {adding && (
-        <div className="flex flex-col gap-2 mt-2">
-          <input autoFocus value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && name.trim()) move({ newGroup: name, owner }) }}
-            placeholder="e.g. Subscriptions" aria-label="New group's name" className={`${inputClass} w-full`} />
-          <div className="seg" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }} role="group" aria-label="Whose group">
+    <Sheet title={`Move ${item.label}`} onClose={onClose}>
+      {(['JOINT', 'NIAMH', 'RUPERT'] as Owner[]).map(o => {
+        const mine = groups.filter(g => g.owner === o)
+        if (mine.length === 0) return null
+        return (
+          <div key={o} className="mb-2">
+            <div className="flex items-center gap-2 text-caption text-muted uppercase tracking-label px-3 pt-2 pb-1">
+              <OwnerDot owner={o} label={ownerName(o)} /> {o === 'JOINT' ? `${ownerName(o)} · paid from the joint account` : `${ownerName(o)} pays`}
+            </div>
+            {mine.map(g => (
+              <button key={g.key} onClick={() => setPick(g.key)} disabled={g.key === cat.key} aria-pressed={pick === g.key} className={`${row(pick === g.key)} disabled:cursor-default`}>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[16px] text-ink truncate">{g.label}</span>
+                  <span className="block text-label text-muted">{g.items.length} {g.items.length === 1 ? 'item' : 'items'}</span>
+                </span>
+                {g.key === cat.key ? <span className="pill shrink-0">Now</span> : pick === g.key ? <Check size={18} className="shrink-0" aria-hidden="true" /> : null}
+              </button>
+            ))}
+          </div>
+        )
+      })}
+      <button onClick={() => setPick('__new')} aria-pressed={pick === '__new'} className={row(pick === '__new')}>
+        <Plus size={18} aria-hidden="true" /><span className="text-[16px] font-medium text-ink">New group…</span>
+      </button>
+      {pick === '__new' && (
+        <div className="flex flex-col gap-2 px-3 mt-2">
+          <input autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Subscriptions" aria-label="New group's name" className={`${inputClass} w-full`} />
+          <span className="text-label text-ink-2 mt-1">Who pays it?</span>
+          <div className="seg" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }} role="group" aria-label="Who pays the new group">
             {(['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(o => (
               <button key={o} aria-pressed={owner === o} onClick={() => setOwner(o)}><OwnerDot owner={o} label={ownerName(o)} /><span className="lbl">{ownerName(o)}</span></button>
             ))}
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => move({ newGroup: name, owner })} disabled={!name.trim()} className="flex-1 bg-ink text-on-ink rounded-xl min-h-[44px] text-[15px] font-semibold cursor-pointer disabled:opacity-40">Move to new group</button>
-            <button onClick={() => setAdding(false)} className="px-4 bg-fill rounded-xl min-h-[44px] text-[15px] cursor-pointer">Cancel</button>
-          </div>
         </div>
       )}
-      <p className="text-caption text-muted mt-1 mb-0">Moving it to someone else’s group changes who pays it.</p>
-    </div>
+      <div className="sticky bottom-0 bg-bg pt-3 mt-3 border-t border-line">
+        {payerChange && (
+          <p role="status" className="flex items-start gap-2 text-[15px] text-warn bg-warn-tint rounded-xl px-3 py-2.5 mt-0 mb-2.5">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" /> {payerChange}
+          </p>
+        )}
+        <button
+          disabled={!ready}
+          onClick={() => onMove(pick === '__new' ? { newGroup: name, owner: owner! } : { key: pick! }, target!)}
+          className="w-full bg-ink text-on-ink rounded-xl min-h-[52px] text-[16px] font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-default"
+        >Move here</button>
+      </div>
+    </Sheet>
   )
 }
 
-function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, onOpenInsurance, onMoved }: {
+function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, onOpenInsurance, onMoved, onToast }: {
   cat: Category; item: LineItem; properties: Property[]; budget: BudgetHook
   ownerName: (o: Owner) => string; focus: 'amount' | 'date'; onClose: () => void; onOpenInsurance?: (itemId: string) => void
-  onMoved: (catKey: string) => void
+  onMoved: (catKey: string) => void; onToast?: (msg: string, action?: { label: string; run: () => void }) => void
 }) {
-  const { updateItemAmount, renameItem, removeItem, updateItemRenewal, toggleItemAutoRenew, toggleItemShared, updateItemInsurance, updateItemProperty } = budget
+  const { updateItemAmount, renameItem, removeItem, updateItemRenewal, toggleItemAutoRenew, toggleItemShared, updateItemInsurance, updateItemProperty, updateItemRecurring, updateItemIcon } = budget
   const [label, setLabel] = useState(item.label)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [moving, setMoving] = useState(false)
+  const [pickingIcon, setPickingIcon] = useState(false)
+  // A group the last move left empty, offered for deletion.
+  const [emptied, setEmptied] = useState<Category | null>(null)
+  const kind = subscriptionKind(item.label, cat.label, item.recurring)
+
+  const move = (to: MoveTo, toOwner: Owner) => {
+    const from = cat
+    const key = budget.moveItem(from.key, item.id, to)
+    if (!key) return
+    setMoving(false)
+    onMoved(key)
+    const toLabel = 'key' in to ? budget.data.categories.find(c => c.key === to.key)?.label : to.newGroup.trim()
+    setEmptied(from.items.length === 1 ? from : null)
+    const shared = item.sharedContribution
+    onToast?.(
+      `Moved to ${toLabel} · ${ownerName(toOwner)}${toOwner !== from.owner ? ` — ${toOwner === 'JOINT' ? 'the joint account pays' : `${ownerName(toOwner)} pays`} this now` : ''}`,
+      { label: 'Undo', run: () => {
+        // The old group may have been deleted since: it's recreated if so.
+        const k = budget.moveItem(key, item.id, { key: from.key, recreate: { label: from.label, owner: from.owner } }, { sharedContribution: shared })
+        if (k) onMoved(k)
+        setEmptied(null)
+      } },
+    )
+  }
   const isExpense = cat.type === 'EXPENSE'
   const isInsurance = isExpense && (isInsuranceItem(item.label) || !!budget.data.policyDetails?.[item.id])
   const canMarkShared = isExpense && cat.owner !== 'JOINT'
@@ -328,7 +382,48 @@ function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, o
       </label>
       {focus === 'amount' && <AutoFocus selector='input[aria-label^="Amount per month"]' />}
 
-      <GroupPicker key={cat.key} cat={cat} item={item} budget={budget} ownerName={ownerName} onMoved={onMoved} />
+      {moving && <MoveSheet cat={cat} item={item} budget={budget} ownerName={ownerName} onMove={move} onClose={() => setMoving(false)} />}
+
+      <div className="py-2.5 border-t border-line">
+        <div className="flex items-center justify-between gap-3 min-h-[44px]">
+          <span className="min-w-0">
+            <span className="block text-[15px] text-ink">Group <span className="text-muted">(who pays)</span></span>
+            <span className="flex items-center gap-1.5 text-label text-muted mt-0.5"><OwnerDot owner={cat.owner} label={ownerName(cat.owner)} /><span className="truncate">{cat.label} · {ownerName(cat.owner)}</span></span>
+          </span>
+          <button onClick={() => setMoving(true)} className="shrink-0 px-4 min-h-[44px] rounded-xl bg-fill text-[15px] font-semibold text-ink cursor-pointer">Move to…</button>
+        </div>
+        {emptied && budget.data.categories.some(c => c.key === emptied.key && c.items.length === 0) && (
+          <div className="flex items-center gap-3 mt-2 px-3 py-2 rounded-xl bg-fill">
+            <span className="flex-1 min-w-0 text-label text-ink-2">{emptied.label} · {ownerName(emptied.owner)} is now empty.</span>
+            <button onClick={() => { budget.deleteCategory(emptied.key); setEmptied(null) }} className="shrink-0 min-h-[40px] text-[14px] font-semibold text-ink underline underline-offset-2 cursor-pointer">Delete group</button>
+          </div>
+        )}
+      </div>
+
+      {isExpense && !isInsurance && (
+        <div className="py-2.5 border-t border-line">
+          <div className="text-[15px] text-ink mb-2">Type</div>
+          <div className="seg" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }} role="group" aria-label="Type">
+            {([['bill', 'Bill'], ['subscription', 'Subscription'], ['contract', 'Contract']] as const).map(([v, l]) => (
+              <button key={v} aria-pressed={(kind ?? 'bill') === v} onClick={() => updateItemRecurring(cat.key, item.id, v === 'bill' ? 'none' : v)}><span className="lbl">{l}</span></button>
+            ))}
+          </div>
+          <p className="text-caption text-muted mt-1.5 mb-0">
+            {!item.recurring && kind ? 'Budge guessed this from the name. ' : ''}Subscriptions and contracts are listed on Renewals.
+          </p>
+        </div>
+      )}
+
+      <div className="py-2.5 border-t border-line">
+        <div className="flex items-center justify-between gap-3 min-h-[44px]">
+          <span className="flex items-center gap-3">
+            <span className="w-10 h-10 rounded-xl grid place-items-center bg-fill text-ink-2"><ItemIcon label={item.label} chosen={item.icon} /></span>
+            <span className="text-[15px] text-ink">Icon <span className="text-muted">{item.icon ? '' : '(automatic)'}</span></span>
+          </span>
+          <button onClick={() => setPickingIcon(v => !v)} aria-expanded={pickingIcon} className="shrink-0 px-4 min-h-[44px] rounded-xl bg-fill text-[15px] font-semibold text-ink cursor-pointer">{pickingIcon ? 'Done' : 'Change'}</button>
+        </div>
+        {pickingIcon && <div className="mt-2"><IconPicker label={item.label} value={item.icon} onChange={k => updateItemIcon(cat.key, item.id, k)} /></div>}
+      </div>
 
       {canMarkShared && (
         <SheetRow label="For the household" hint="Counts towards your share of household costs — e.g. a mortgage only you pay.">
@@ -800,9 +895,9 @@ function OneOffGroup({ now, upcoming, period, ownerName, onOpen, onAdd }: {
 
 const OWNER_ORDER: Owner[] = ['JOINT', 'NIAMH', 'RUPERT']
 
-export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDebts, onOpenInsurance, onOpenRenewals }: {
+export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDebts, onOpenInsurance, onOpenRenewals, onToast }: {
   budget: BudgetHook; tab: TabFilter; onTabChange: (t: TabFilter) => void; onNavigateToDebts: () => void; onOpenInsurance?: (itemId: string) => void
-  onOpenRenewals?: () => void
+  onOpenRenewals?: () => void; onToast?: (msg: string, action?: { label: string; run: () => void }) => void
 }) {
   const { data, totals, addCategory, savedAt, user, updateItemRenewal } = budget
   const [addingCat, setAddingCat] = useState(false)
@@ -1023,7 +1118,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
         />
       )}
       {openCat && openItem && sheet && (
-        <ItemSheet cat={openCat} item={openItem} properties={properties} budget={budget} ownerName={ownerName} focus={sheet.focus} onClose={() => setSheet(null)} onOpenInsurance={onOpenInsurance} onMoved={catKey => setSheet(s => s && { ...s, catKey })} />
+        <ItemSheet cat={openCat} item={openItem} properties={properties} budget={budget} ownerName={ownerName} focus={sheet.focus} onClose={() => setSheet(null)} onOpenInsurance={onOpenInsurance} onMoved={catKey => setSheet(s => s && { ...s, catKey })} onToast={onToast} />
       )}
 
       {/* Two columns on wide screens: the month's summary stays put on the left while the groups scroll. */}

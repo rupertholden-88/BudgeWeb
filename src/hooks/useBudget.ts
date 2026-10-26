@@ -200,7 +200,7 @@ export function useBudget() {
    * Moves a bill to another group, or to a new one named `newGroup`. Keeps its
    * id, so policy details and reminders follow it. Returns the group's key.
    */
-  const moveItem = (fromKey: string, itemId: string, to: { key: string } | { newGroup: string; owner: Owner }): string | undefined => {
+  const moveItem = (fromKey: string, itemId: string, to: { key: string; recreate?: { label: string; owner: Owner } } | { newGroup: string; owner: Owner }, patch?: Partial<LineItem>): string | undefined => {
     const key = 'key' in to ? to.key : `custom_${uuid()}`
     if ('newGroup' in to && !to.newGroup.trim()) return
     if (key === fromKey) return key
@@ -209,8 +209,16 @@ export function useBudget() {
       const item = from?.items.find(i => i.id === itemId)
       if (!from || !item) return b
       let categories = b.categories.map(c => c.key === fromKey ? { ...c, items: c.items.filter(i => i.id !== itemId) } : c)
+      if ('key' in to && !categories.some(c => c.key === key)) {
+        // A group deleted since (say, before an undo): bring it back, or leave the bill where it is.
+        if (!to.recreate) return b
+        categories = [...categories, { key, owner: to.recreate.owner, type: from.type, label: to.recreate.label, items: [] }]
+      }
       if ('newGroup' in to) categories = [...categories, { key, owner: to.owner, type: from.type, label: to.newGroup.trim(), items: [] }]
-      categories = categories.map(c => c.key === key ? { ...c, items: [...c.items, item] } : c)
+      const owner = categories.find(c => c.key === key)?.owner
+      // "For the household" only means something on a bill one person pays.
+      const moved: LineItem = { ...item, ...patch, ...(owner === 'JOINT' && { sharedContribution: undefined }) }
+      categories = categories.map(c => c.key === key ? { ...c, items: [...c.items, moved] } : c)
       return { ...b, categories }
     })
     return key
@@ -283,6 +291,10 @@ export function useBudget() {
       ...('provider' in fields && { insuranceProvider: fields.provider || undefined }),
       ...('coverAmount' in fields && { insuranceCoverAmount: fields.coverAmount || undefined }),
     }) }) }))
+  }
+
+  const updateItemIcon = (catKey: string, itemId: string, icon: string | undefined) => {
+    mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.map(i => i.id === itemId ? { ...i, icon } : i) }) }))
   }
 
   const updateItemRecurring = (catKey: string, itemId: string, recurring: 'subscription' | 'contract' | 'none' | undefined) => {
@@ -644,7 +656,7 @@ export function useBudget() {
     updateGrossIncome, updatePayday, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,
     addOneOff, updateOneOff, deleteOneOff, setOneOffDone, savePolicy, removePolicy,
     addAsset, updateAsset, updateAssetFields, deleteAsset,
-    addDebt, updateDebt, deleteDebt, combineDebts, updateItemRecurring, moveItem,
+    addDebt, updateDebt, deleteDebt, combineDebts, updateItemRecurring, updateItemIcon, moveItem,
     getJsonString, importFromJson,
   }
 }

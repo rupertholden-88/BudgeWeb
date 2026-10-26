@@ -1,7 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Shield, ShieldAlert, Zap, Repeat, TrendingUp, Upload, ChevronRight, Plus, Tv, Smartphone, CalendarClock, Check } from 'lucide-react'
+import { Shield, ShieldAlert, Zap, Repeat, TrendingUp, Upload, ChevronRight, Plus, Check } from 'lucide-react'
+import { ItemIcon, IconPicker } from '@/lib/itemIcons'
 import { Owner, fmt, upcomingRenewals, isInsuranceItem } from '@/lib/models'
 import { insurancePolicies, insuranceGaps } from '@/lib/insurance'
 import { subscriptions, subscriptionKind, type Subscription } from '@/lib/subscriptions'
@@ -25,15 +26,18 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
   onOpenProperty: (propertyId: string) => void
   onUploadInsurance: () => void
 }) {
-  const { data, updateItemRecurring } = budget
+  const { data, updateItemRecurring, updateItemIcon } = budget
   const [filter, setFilter] = useState<Filter>('all')
   const [person, setPerson] = useState<Owner | null>(null)
-  const [editing, setEditing] = useState<Subscription | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [marking, setMarking] = useState(false)
   const ownerName = (o: Owner) => o === 'NIAMH' ? data.nameNiamh || 'Person 1' : o === 'RUPERT' ? data.nameRupert || 'Person 2' : data.nameJoint || 'Joint'
 
   const renewals = useMemo(() => upcomingRenewals(data), [data])
   const subs = useMemo(() => subscriptions(data), [data])
+  const editing = subs.find(x => x.id === editingId) ?? null
+  const setEditing = (x: Subscription | null) => setEditingId(x?.id ?? null)
+  const iconOf = (id: string) => data.categories.flatMap(c => c.items).find(i => i.id === id)?.icon
   const policies = useMemo(() => insurancePolicies(data), [data])
   const gaps = useMemo(() => insuranceGaps(data, policies), [data, policies])
   const subIds = new Set(subs.map(s => s.id))
@@ -100,7 +104,7 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
                       <>
                         <div className="flex items-start gap-3">
                           <span className={`w-10 h-10 rounded-xl grid place-items-center shrink-0 ${r.isEnergy ? 'bg-warn-tint text-warn' : r.isInsurance ? 'bg-rupert-light text-rupert-text' : 'bg-fill text-ink-2'}`}>
-                            {r.isEnergy ? <Zap size={19} aria-hidden="true" /> : r.isInsurance ? <Shield size={19} aria-hidden="true" /> : subIds.has(r.id) ? <Smartphone size={19} aria-hidden="true" /> : <CalendarClock size={19} aria-hidden="true" />}
+                            {r.isEnergy ? <Zap size={19} aria-hidden="true" /> : r.isInsurance ? <Shield size={19} aria-hidden="true" /> : <ItemIcon label={r.label} chosen={iconOf(r.id)} fallback={subIds.has(r.id) ? 'repeat' : 'bill'} />}
                           </span>
                           <div className="flex-1 min-w-0">
                             <div className="text-[16px] font-semibold text-ink leading-tight">{r.label}</div>
@@ -192,7 +196,7 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
                     <button key={s.id} onClick={() => setEditing(s)} className="block w-full text-left px-4 py-3.5 border-t border-line first:border-t-0 cursor-pointer">
                       <div className="flex items-start gap-3">
                         <span className={`w-10 h-10 rounded-xl grid place-items-center shrink-0 ${s.kind === 'contract' ? 'bg-pos-tint text-pos' : 'bg-fill text-ink-2'}`}>
-                          {s.kind === 'contract' ? <Smartphone size={19} aria-hidden="true" /> : <Tv size={19} aria-hidden="true" />}
+                          <ItemIcon label={s.label} chosen={s.icon} fallback={s.kind === 'contract' ? 'contract' : 'repeat'} />
                         </span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 text-[16px] font-semibold text-ink leading-tight"><span className="truncate">{s.label}</span> <OwnerDot owner={s.owner} label={ownerName(s.owner)} /></div>
@@ -223,6 +227,9 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
       {editing && (
         <Sheet title={editing.label} onClose={() => setEditing(null)}>
           <p className="text-[15px] text-ink-2 mt-0 mb-3">{ownerName(editing.owner)} · {fmt(editing.amount)} a month. Change the price or renewal date on Budget.</p>
+          <div className="text-caption text-muted uppercase tracking-label mb-2">Icon</div>
+          <div className="mb-4"><IconPicker label={editing.label} value={editing.icon} onChange={k => updateItemIcon(editing.catKey, editing.id, k)} /></div>
+          <div className="text-caption text-muted uppercase tracking-label mb-1">What it is</div>
           {([
             ['subscription', 'Subscription', 'Rolls on monthly or yearly, cancel any time'],
             ['contract', 'Contract', 'Runs for a fixed term, e.g. a phone or broadband deal'],

@@ -13,7 +13,9 @@ export type DebtType = 'CREDIT_CARD' | 'PERSONAL_LOAN' | 'CAR_FINANCE' | 'MORTGA
  */
 export interface LineItem { id: string; label: string; amount: number; priority: SpendingPriority; renewalDate?: string; autoRenews?: boolean; sharedContribution?: boolean; insuranceProvider?: string; insuranceCoverAmount?: number; propertyId?: string
   /** Overrides Budge's guess of whether this is a subscription or contract (shown on Renewals). */
-  recurring?: 'subscription' | 'contract' | 'none' }
+  recurring?: 'subscription' | 'contract' | 'none'
+  /** Chosen icon (a key of ITEM_ICONS); otherwise guessed from the name. */
+  icon?: string }
 /** Detects an insurance line by its label — no separate flag to set, so the
  * extra fields just appear on anything already named as insurance. */
 /** Insurance by name: anything called insurance, plus cover that rarely is ("Life cover"). */

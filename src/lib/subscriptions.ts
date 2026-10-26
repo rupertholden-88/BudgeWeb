@@ -15,7 +15,7 @@ export type SubKind = 'subscription' | 'contract'
 
 export interface Subscription {
   id: string; catKey: string; label: string; owner: Owner; amount: number
-  kind: SubKind; renewalDate?: string; autoRenews?: boolean
+  kind: SubKind; renewalDate?: string; autoRenews?: boolean; icon?: string
 }
 
 /** Which kind of recurring thing a bill is, if any. A "Subscriptions" category counts everything in it. */
@@ -33,7 +33,7 @@ export function subscriptions(data: BudgetData): Subscription[] {
     .filter(c => c.type === 'EXPENSE')
     .flatMap(c => c.items.flatMap(i => {
       const kind = subscriptionKind(i.label, c.label, i.recurring)
-      return kind ? [{ id: i.id, catKey: c.key, label: i.label, owner: c.owner, amount: i.amount, kind, renewalDate: i.renewalDate, autoRenews: i.autoRenews }] : []
+      return kind ? [{ id: i.id, catKey: c.key, label: i.label, owner: c.owner, amount: i.amount, kind, renewalDate: i.renewalDate, autoRenews: i.autoRenews, icon: i.icon }] : []
     }))
     .sort((a, b) => b.amount - a.amount)
 }
