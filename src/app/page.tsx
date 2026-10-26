@@ -110,7 +110,8 @@ export default function HomePage() {
   const openInsurance = (from: Screen, policyId?: string) => { setInsuranceFrom(from); setFocusPolicyId(policyId ?? null); setScreen('insurance') }
   const navScreen: Screen = screen === 'insurance' ? insuranceFrom : screen
   const [setupDone, setSetupDone] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ msg: string; action?: { label: string; run: () => void } } | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>()
   const swipeRef = useRef<{ x: number; y: number; t: number } | null>(null)
   const { data, user, authLoading, cloudLoading, localLoading, signIn, signOutUser, updateOwnerName } = budget
   // Renewals that need acting on badge the Renewals tab; everything else badges Analysis.
@@ -120,9 +121,11 @@ export default function HomePage() {
   // A property filter outlives its property if that property is deleted.
   const activeTab: TabFilter = tab.startsWith('property:') && !(data.properties ?? []).some(p => `property:${p.id}` === tab) ? 'ALL' : tab
 
-  const showToast = (msg: string) => {
-    setToast(msg)
-    setTimeout(() => setToast(null), 2500)
+  // With an action (Undo), it stays long enough to reach for it.
+  const showToast = (msg: string, action?: { label: string; run: () => void }) => {
+    clearTimeout(toastTimer.current)
+    setToast({ msg, action })
+    toastTimer.current = setTimeout(() => setToast(null), action ? 6000 : 2500)
   }
 
   const confirmSignOut = () => {
@@ -206,9 +209,15 @@ export default function HomePage() {
     <div className="flex h-[100dvh] bg-bg">
 
       {toast && (
-        <div role="status" aria-live="polite" className="fixed bottom-24 lg:bottom-8 inset-x-0 lg:left-[220px] z-[100] flex justify-center pointer-events-none px-4">
-          <div className="bg-ink text-on-ink px-5 py-2.5 rounded-full text-label font-medium flex items-center gap-1.5 shadow-[0_4px_12px_rgba(0,0,0,0.2)] fade-up">
-            <CheckCircle size={14} /> {toast}
+        <div role="status" aria-live="polite" className="fixed bottom-24 lg:bottom-8 inset-x-0 lg:left-[220px] z-[1000] flex justify-center pointer-events-none px-4">
+          <div className={`bg-ink text-on-ink pl-5 ${toast.action ? 'pr-2 pointer-events-auto' : 'pr-5'} py-2 rounded-full text-label font-medium flex items-center gap-1.5 shadow-[0_4px_12px_rgba(0,0,0,0.2)] fade-up max-w-[560px]`}>
+            <CheckCircle size={14} className="shrink-0" /> <span className="min-w-0">{toast.msg}</span>
+            {toast.action && (
+              <button
+                onClick={() => { toast.action!.run(); setToast(null) }}
+                className="ml-2 px-3 min-h-[36px] rounded-full text-[14px] font-semibold underline underline-offset-2 cursor-pointer shrink-0"
+              >{toast.action.label}</button>
+            )}
           </div>
         </div>
       )}
@@ -267,7 +276,7 @@ export default function HomePage() {
         >
           {/* A comfortable column on tablets; wider, two-column screens on desktop. */}
           <div key={screen} className="h-full mx-auto w-full max-w-[640px] lg:max-w-[1080px] lg:pt-6 screen-enter">
-            {screen === 'budget'   && <BudgetScreen   budget={budget} tab={activeTab} onTabChange={setTab} onNavigateToDebts={() => setScreen('wealth')} onOpenInsurance={id => openInsurance('budget', id)} onOpenRenewals={() => setScreen('renewals')} />}
+            {screen === 'budget'   && <BudgetScreen   budget={budget} tab={activeTab} onTabChange={setTab} onNavigateToDebts={() => setScreen('wealth')} onOpenInsurance={id => openInsurance('budget', id)} onOpenRenewals={() => setScreen('renewals')} onToast={showToast} />}
             {screen === 'charts'   && <ChartsScreen   budget={budget} onOpenProperty={id => { setFocusPropertyId(id); setScreen('wealth') }} onOpenWealth={() => setScreen('wealth')} onOpenBudget={() => setScreen('budget')} onOpenRenewals={() => setScreen('renewals')} />}
             {screen === 'renewals' && <RenewalsScreen budget={budget} onOpenInsurance={id => openInsurance('renewals', id)} onUploadInsurance={() => openInsurance('renewals', '__upload')} onOpenProperty={id => { setFocusPropertyId(id); setScreen('wealth') }} />}
             {screen === 'insurance' && <InsuranceScreen budget={budget} backLabel={NAV.find(n => n.id === insuranceFrom)?.label ?? 'Back'} onBack={() => setScreen(insuranceFrom)} focusPolicyId={focusPolicyId} onFocusHandled={() => setFocusPolicyId(null)} onToast={showToast} onOpenSettings={() => setScreen('settings')} />}
