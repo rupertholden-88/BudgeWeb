@@ -10,6 +10,7 @@
 :root {
   /* Lightness for traffic-light bars (green → red by hue). */
   --bar-l: 44%;
+  --bar-l-orange: 52%;
   --bg: #F8F5F0;
   --panel: #FFFFFF;
   --fill: #EFEAE2;
@@ -85,6 +86,7 @@
 
 [data-theme="dark"] {
   --bar-l: 62%;
+  --bar-l-orange: 60%;
   --bg: #171311;
   --panel: #2A2320;
   --fill: #2A2320;
