@@ -1,9 +1,12 @@
+'use client'
+
 import {
   Tv, Music, Headphones, Smartphone, Wifi, Dumbbell, Trees, Castle, Newspaper, Gamepad2, Cloud, Sparkles,
   Utensils, TrainFront, Car, House, Zap, Shield, Heart, Baby, GraduationCap, ShoppingCart, Coffee, Plane,
   PawPrint, Gift, Scissors, Shirt, Package, PiggyBank, CreditCard, ReceiptPoundSterling as Receipt, Repeat, FileText, Film, BookOpen,
   Bike, Fuel, Droplets, Stethoscope, Laptop, Ticket, Palette, Bus, type LucideIcon,
 } from 'lucide-react'
+import { useState } from 'react'
 
 /** Icons a bill can wear, in the order the picker shows them. */
 export const ITEM_ICONS: Record<string, { Icon: LucideIcon; label: string }> = {
@@ -91,6 +94,32 @@ export function IconPicker({ label, value, onChange }: { label: string; value?: 
           <Icon size={20} aria-hidden="true" />
         </button>
       ))}
+    </div>
+  )
+}
+
+/**
+ * The bill's icon with a "Change icon" button. Tapping either opens the
+ * grid; choosing one closes it again.
+ */
+export function IconChooser({ label, value, onChange }: { label: string; value?: string; onChange: (key: string | undefined) => void }) {
+  const [open, setOpen] = useState(false)
+  const name = ITEM_ICONS[iconKey(label, value)].label
+  return (
+    <div>
+      <div className="flex items-center gap-3 min-h-[44px]">
+        <button
+          onClick={() => setOpen(o => !o)} aria-expanded={open} aria-label={`Icon: ${name}. Change icon`}
+          className="w-11 h-11 rounded-xl grid place-items-center bg-fill text-ink-2 cursor-pointer shrink-0"
+        >
+          <ItemIcon label={label} chosen={value} size={20} />
+        </button>
+        <span className="flex-1 min-w-0 text-[15px] text-ink">{name} <span className="text-muted">{value ? '' : '(automatic)'}</span></span>
+        <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="shrink-0 px-4 min-h-[44px] rounded-xl bg-fill text-[15px] font-semibold text-ink cursor-pointer">
+          {open ? 'Cancel' : 'Change icon'}
+        </button>
+      </div>
+      {open && <div className="mt-2"><IconPicker label={label} value={value} onChange={k => { onChange(k); setOpen(false) }} /></div>}
     </div>
   )
 }

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { Shield, ShieldAlert, Zap, Repeat, TrendingUp, Upload, ChevronRight, Plus, Check, Circle, CheckCircle2 } from 'lucide-react'
-import { ItemIcon, IconPicker } from '@/lib/itemIcons'
+import { ItemIcon, IconChooser } from '@/lib/itemIcons'
 import { Owner, fmt, upcomingRenewals, isInsuranceItem } from '@/lib/models'
 import { insurancePolicies, insuranceGaps } from '@/lib/insurance'
 import { subscriptions, subscriptionKind, type Subscription } from '@/lib/subscriptions'
@@ -299,8 +299,8 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
       {editing && (
         <Sheet title={editing.label} onClose={() => setEditing(null)}>
           <p className="text-[15px] text-ink-2 mt-0 mb-3">{ownerName(editing.owner)} · {fmt(editing.amount)} a month. Change the price or renewal date on Budget.</p>
-          <div className="text-caption text-muted uppercase tracking-label mb-2">Icon</div>
-          <div className="mb-4"><IconPicker label={editing.label} value={editing.icon} onChange={k => updateItemIcon(editing.catKey, editing.id, k)} /></div>
+          <div className="text-caption text-muted uppercase tracking-label mb-1">Icon</div>
+          <div className="mb-4"><IconChooser key={editing.id} label={editing.label} value={editing.icon} onChange={k => updateItemIcon(editing.catKey, editing.id, k)} /></div>
           <div className="text-caption text-muted uppercase tracking-label mb-1">What it is</div>
           {([
             ['subscription', 'Subscription', 'Rolls on monthly or yearly, cancel any time'],
