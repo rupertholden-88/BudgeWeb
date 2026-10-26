@@ -196,6 +196,26 @@ export function useBudget() {
     mutate(b => ({ ...b, categories: [...b.categories, { key: `custom_${uuid()}`, owner, type, label: label.trim(), items: [] }] }))
   }
 
+  /**
+   * Moves a bill to another group, or to a new one named `newGroup`. Keeps its
+   * id, so policy details and reminders follow it. Returns the group's key.
+   */
+  const moveItem = (fromKey: string, itemId: string, to: { key: string } | { newGroup: string; owner: Owner }): string | undefined => {
+    const key = 'key' in to ? to.key : `custom_${uuid()}`
+    if ('newGroup' in to && !to.newGroup.trim()) return
+    if (key === fromKey) return key
+    mutate(b => {
+      const from = b.categories.find(c => c.key === fromKey)
+      const item = from?.items.find(i => i.id === itemId)
+      if (!from || !item) return b
+      let categories = b.categories.map(c => c.key === fromKey ? { ...c, items: c.items.filter(i => i.id !== itemId) } : c)
+      if ('newGroup' in to) categories = [...categories, { key, owner: to.owner, type: from.type, label: to.newGroup.trim(), items: [] }]
+      categories = categories.map(c => c.key === key ? { ...c, items: [...c.items, item] } : c)
+      return { ...b, categories }
+    })
+    return key
+  }
+
   const renameCategory = (catKey: string, newLabel: string) => {
     if (!newLabel.trim()) return
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key === catKey ? { ...c, label: newLabel.trim() } : c) }))
@@ -624,7 +644,7 @@ export function useBudget() {
     updateGrossIncome, updatePayday, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,
     addOneOff, updateOneOff, deleteOneOff, setOneOffDone, savePolicy, removePolicy,
     addAsset, updateAsset, updateAssetFields, deleteAsset,
-    addDebt, updateDebt, deleteDebt, combineDebts, updateItemRecurring,
+    addDebt, updateDebt, deleteDebt, combineDebts, updateItemRecurring, moveItem,
     getJsonString, importFromJson,
   }
 }
