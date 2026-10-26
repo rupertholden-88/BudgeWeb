@@ -1,12 +1,12 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Shield, ShieldAlert, Zap, Repeat, TrendingUp, Upload, ChevronRight, Plus, Check } from 'lucide-react'
+import { Shield, ShieldAlert, Zap, Repeat, TrendingUp, Upload, ChevronRight, Plus, Check, Circle, CheckCircle2 } from 'lucide-react'
 import { ItemIcon, IconPicker } from '@/lib/itemIcons'
 import { Owner, fmt, upcomingRenewals, isInsuranceItem } from '@/lib/models'
 import { insurancePolicies, insuranceGaps } from '@/lib/insurance'
 import { subscriptions, subscriptionKind, type Subscription } from '@/lib/subscriptions'
-import { OwnerDot, Sheet } from './BudgetScreen'
+import { OwnerDot, Sheet, MoveSheet, type MoveTo } from './BudgetScreen'
 import { RenewalBar } from './ui'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
@@ -20,17 +20,23 @@ const daysText = (days: number) => days < 0 ? 'Date passed' : days === 0 ? 'Toda
  * contracts and subscriptions. All of them renew, and all are worth a check
  * before they do.
  */
-export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty, onUploadInsurance }: {
+export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty, onUploadInsurance, onToast }: {
   budget: BudgetHook
   onOpenInsurance: (policyId?: string) => void
   onOpenProperty: (propertyId: string) => void
   onUploadInsurance: () => void
+  onToast?: (msg: string, action?: { label: string; run: () => void }) => void
 }) {
   const { data, updateItemRecurring, updateItemIcon } = budget
   const [filter, setFilter] = useState<Filter>('all')
   const [person, setPerson] = useState<Owner | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [marking, setMarking] = useState(false)
+  // Select mode: tick several subscriptions and move them to one group.
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [movingSel, setMovingSel] = useState(false)
+  const [emptied, setEmptied] = useState<{ key: string; label: string; owner: Owner }[]>([])
   const ownerName = (o: Owner) => o === 'NIAMH' ? data.nameNiamh || 'Person 1' : o === 'RUPERT' ? data.nameRupert || 'Person 2' : data.nameJoint || 'Joint'
 
   const renewals = useMemo(() => upcomingRenewals(data), [data])
@@ -52,6 +58,30 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
 
   const perPerson = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(o => ({ owner: o, total: subs.filter(s => s.owner === o).reduce((a, s) => a + s.amount, 0) })).filter(p => p.total > 0)
   const subsShown = subs.filter(s => !person || s.owner === person)
+  const picked = subs.filter(x => selected.has(x.id))
+  const toggle = (id: string) => setSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const stopSelecting = () => { setSelecting(false); setSelected(new Set()); setMovingSel(false) }
+
+  const moveSelected = (to: MoveTo, owner: Owner) => {
+    const items = data.categories.flatMap(c => c.items.filter(i => selected.has(i.id)).map(i => ({ cat: c, item: i })))
+    const key = budget.moveItems(items.map(x => ({ fromKey: x.cat.key, itemId: x.item.id })), to)
+    if (!key) return
+    const toLabel = 'key' in to ? data.categories.find(c => c.key === to.key)?.label : to.newGroup.trim()
+    // Groups that had nothing else in them are offered for deletion.
+    const left = Array.from(new Map(items.map(x => [x.cat.key, x.cat])).values())
+      .filter(c => c.key !== key && c.items.every(i => selected.has(i.id)))
+      .map(c => ({ key: c.key, label: c.label, owner: c.owner }))
+    setEmptied(left)
+    stopSelecting()
+    onToast?.(`Moved ${items.length} to ${toLabel} · ${ownerName(owner)}`, { label: 'Undo', run: () => {
+      budget.applyMoves(items.map(x => ({
+        fromKey: key, itemId: x.item.id,
+        to: { key: x.cat.key, recreate: { label: x.cat.label, owner: x.cat.owner } },
+        patch: { sharedContribution: x.item.sharedContribution },
+      })))
+      setEmptied([])
+    } })
+  }
 
   const openRenewal = (r: typeof renewals[number]) => {
     if (r.isEnergy) onOpenProperty(r.id.split(':')[0])
@@ -169,7 +199,20 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
         <div className="min-w-0">
           {(filter === 'all' || filter === 'subs') && (
             <>
-              <h2 className="text-[20px] font-semibold tracking-[-0.01em] mt-7 mb-2.5">Subscriptions & contracts</h2>
+              <h2 className="flex items-baseline justify-between text-[20px] font-semibold tracking-[-0.01em] mt-7 mb-2.5">
+                Subscriptions & contracts
+                {subs.length > 1 && (
+                  <button onClick={() => selecting ? stopSelecting() : setSelecting(true)} className="text-[15px] font-semibold text-ink-2 underline underline-offset-[3px] min-h-[44px] -my-3 cursor-pointer">
+                    {selecting ? 'Cancel' : 'Select'}
+                  </button>
+                )}
+              </h2>
+              {emptied.filter(e => data.categories.some(c => c.key === e.key && c.items.length === 0)).map(e => (
+                <div key={e.key} className="flex items-center gap-3 mb-2 px-3 py-2 rounded-xl bg-fill">
+                  <span className="flex-1 min-w-0 text-label text-ink-2">{e.label} · {ownerName(e.owner)} is now empty.</span>
+                  <button onClick={() => { budget.deleteCategory(e.key); setEmptied(x => x.filter(y => y.key !== e.key)) }} className="shrink-0 min-h-[40px] text-[14px] font-semibold text-ink underline underline-offset-2 cursor-pointer">Delete group</button>
+                </div>
+              ))}
               {perPerson.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3" role="group" aria-label="Show subscriptions for">
                   <button onClick={() => setPerson(null)} aria-pressed={!person}
@@ -193,8 +236,15 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
                 {subsShown.map(s => {
                   const days = s.renewalDate ? renewals.find(r => r.id === s.id)?.days ?? null : null
                   return (
-                    <button key={s.id} onClick={() => setEditing(s)} className="block w-full text-left px-4 py-3.5 border-t border-line first:border-t-0 cursor-pointer">
+                    <button
+                      key={s.id} onClick={() => selecting ? toggle(s.id) : setEditing(s)}
+                      aria-pressed={selecting ? selected.has(s.id) : undefined}
+                      className={`block w-full text-left px-4 py-3.5 border-t border-line first:border-t-0 cursor-pointer ${selecting && selected.has(s.id) ? 'bg-fill' : ''}`}
+                    >
                       <div className="flex items-start gap-3">
+                        {selecting && (selected.has(s.id)
+                          ? <CheckCircle2 size={22} className="text-ink shrink-0 mt-2" aria-hidden="true" />
+                          : <Circle size={22} className="text-faint shrink-0 mt-2" aria-hidden="true" />)}
                         <span className={`w-10 h-10 rounded-xl grid place-items-center shrink-0 ${s.kind === 'contract' ? 'bg-pos-tint text-pos' : 'bg-fill text-ink-2'}`}>
                           <ItemIcon label={s.label} chosen={s.icon} fallback={s.kind === 'contract' ? 'contract' : 'repeat'} />
                         </span>
@@ -213,16 +263,38 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
                     </button>
                   )
                 })}
-                <button onClick={() => setMarking(true)} className="w-full flex items-center gap-2.5 px-4 min-h-[52px] border-t border-line text-[15px] font-semibold text-ink cursor-pointer">
-                  <Plus size={18} aria-hidden="true" /> Mark a bill as a subscription
-                  <ChevronRight size={18} className="text-faint ml-auto" aria-hidden="true" />
-                </button>
+                {!selecting && (
+                  <button onClick={() => setMarking(true)} className="w-full flex items-center gap-2.5 px-4 min-h-[52px] border-t border-line text-[15px] font-semibold text-ink cursor-pointer">
+                    <Plus size={18} aria-hidden="true" /> Mark a bill as a subscription
+                    <ChevronRight size={18} className="text-faint ml-auto" aria-hidden="true" />
+                  </button>
+                )}
               </div>
-              <p className="text-caption text-muted mt-2 mb-0">Found by name in your bills on Budget. Tap one to change what it is.</p>
+              <p className="text-caption text-muted mt-2 mb-0">{selecting ? 'Tap the ones to move together, then Move to…' : 'Found by name in your bills on Budget. Tap one to change what it is, or Select to move several into one group.'}</p>
             </>
           )}
         </div>
       </div>
+
+      {selecting && (
+        <div className="sticky bottom-0 -mx-5 mt-4 px-5 pt-3 pb-3 bg-bg border-t border-line flex items-center gap-3" role="region" aria-label="Selection">
+          <span className="flex-1 min-w-0 text-[15px] text-ink" aria-live="polite">
+            {picked.length === 0 ? 'Select subscriptions' : `${picked.length} selected · ${fmt(picked.reduce((a, x) => a + x.amount, 0))} a month`}
+          </span>
+          <button onClick={() => setSelected(new Set(picked.length === subsShown.length ? [] : subsShown.map(x => x.id)))} className="shrink-0 min-h-[44px] px-2 text-[15px] font-semibold text-ink-2 underline underline-offset-2 cursor-pointer">
+            {picked.length === subsShown.length ? 'None' : 'All'}
+          </button>
+          <button onClick={() => setMovingSel(true)} disabled={picked.length === 0} className="shrink-0 min-h-[44px] px-4 rounded-xl bg-ink text-on-ink text-[15px] font-semibold cursor-pointer disabled:opacity-40">Move to…</button>
+        </div>
+      )}
+
+      {movingSel && picked.length > 0 && (
+        <MoveSheet
+          type="EXPENSE" title={`Move ${picked.length} ${picked.length === 1 ? 'subscription' : 'subscriptions'}`}
+          current={picked.map(x => ({ catKey: x.catKey, owner: x.owner }))}
+          budget={budget} ownerName={ownerName} onMove={moveSelected} onClose={() => setMovingSel(false)}
+        />
+      )}
 
       {editing && (
         <Sheet title={editing.label} onClose={() => setEditing(null)}>

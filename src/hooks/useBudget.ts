@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore'
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth'
 import { db, auth, provider } from '@/lib/firebase'
-import { BudgetData, OneOff, PolicyDetails, LineItem, Debt, Owner, EntryType, AssetType, Asset, DebtType, Property, Fuel, EnergyTariff, defaultBudgetData, calcTotals, monthlyInterest, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
+import { BudgetData, Category, OneOff, PolicyDetails, LineItem, Debt, Owner, EntryType, AssetType, Asset, DebtType, Property, Fuel, EnergyTariff, defaultBudgetData, calcTotals, monthlyInterest, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
 
 function uuid() { return crypto.randomUUID() }
 
@@ -200,28 +200,53 @@ export function useBudget() {
    * Moves a bill to another group, or to a new one named `newGroup`. Keeps its
    * id, so policy details and reminders follow it. Returns the group's key.
    */
-  const moveItem = (fromKey: string, itemId: string, to: { key: string; recreate?: { label: string; owner: Owner } } | { newGroup: string; owner: Owner }, patch?: Partial<LineItem>): string | undefined => {
-    const key = 'key' in to ? to.key : `custom_${uuid()}`
-    if ('newGroup' in to && !to.newGroup.trim()) return
-    if (key === fromKey) return key
-    mutate(b => {
-      const from = b.categories.find(c => c.key === fromKey)
-      const item = from?.items.find(i => i.id === itemId)
-      if (!from || !item) return b
-      let categories = b.categories.map(c => c.key === fromKey ? { ...c, items: c.items.filter(i => i.id !== itemId) } : c)
-      if ('key' in to && !categories.some(c => c.key === key)) {
-        // A group deleted since (say, before an undo): bring it back, or leave the bill where it is.
-        if (!to.recreate) return b
-        categories = [...categories, { key, owner: to.recreate.owner, type: from.type, label: to.recreate.label, items: [] }]
-      }
-      if ('newGroup' in to) categories = [...categories, { key, owner: to.owner, type: from.type, label: to.newGroup.trim(), items: [] }]
-      const owner = categories.find(c => c.key === key)?.owner
-      // "For the household" only means something on a bill one person pays.
-      const moved: LineItem = { ...item, ...patch, ...(owner === 'JOINT' && { sharedContribution: undefined }) }
-      categories = categories.map(c => c.key === key ? { ...c, items: [...c.items, moved] } : c)
-      return { ...b, categories }
-    })
-    return key
+  type MoveTarget = { key: string; recreate?: { label: string; owner: Owner } } | { newGroup: string; owner: Owner }
+  type MoveOp = { fromKey: string; itemId: string; to: { key: string; recreate?: { label: string; owner: Owner } }; patch?: Partial<LineItem> }
+
+  /** One bill out of its group and into another, creating the target if it's missing and `recreate` says how. */
+  const applyMove = (categories: Category[], op: MoveOp): Category[] => {
+    const { fromKey, itemId, to, patch } = op
+    if (to.key === fromKey) return categories
+    const from = categories.find(c => c.key === fromKey)
+    const item = from?.items.find(i => i.id === itemId)
+    if (!from || !item) return categories
+    let next = categories.map(c => c.key === fromKey ? { ...c, items: c.items.filter(i => i.id !== itemId) } : c)
+    if (!next.some(c => c.key === to.key)) {
+      // A new group, or one deleted since (say, before an undo). Without a recipe, leave the bill where it is.
+      if (!to.recreate) return categories
+      next = [...next, { key: to.key, owner: to.recreate.owner, type: from.type, label: to.recreate.label, items: [] }]
+    }
+    const owner = next.find(c => c.key === to.key)?.owner
+    // "For the household" only means something on a bill one person pays.
+    const moved: LineItem = { ...item, ...patch, ...(owner === 'JOINT' && { sharedContribution: undefined }) }
+    return next.map(c => c.key === to.key ? { ...c, items: [...c.items, moved] } : c)
+  }
+
+  const target = (to: MoveTarget): { key: string; recreate?: { label: string; owner: Owner } } | undefined => {
+    if ('key' in to) return to
+    if (!to.newGroup.trim()) return
+    return { key: `custom_${uuid()}`, recreate: { label: to.newGroup.trim(), owner: to.owner } }
+  }
+
+  /** Moves a bill to another group (or a new one). Returns the group's key. */
+  const moveItem = (fromKey: string, itemId: string, to: MoveTarget, patch?: Partial<LineItem>): string | undefined => {
+    const t = target(to)
+    if (!t) return
+    mutate(b => ({ ...b, categories: applyMove(b.categories, { fromKey, itemId, to: t, patch }) }))
+    return t.key
+  }
+
+  /** Moves several bills to one group at once. */
+  const moveItems = (items: { fromKey: string; itemId: string }[], to: MoveTarget): string | undefined => {
+    const t = target(to)
+    if (!t) return
+    mutate(b => ({ ...b, categories: items.reduce((cats, i) => applyMove(cats, { ...i, to: t }), b.categories) }))
+    return t.key
+  }
+
+  /** Applies several moves together, e.g. to undo a group move. */
+  const applyMoves = (ops: MoveOp[]) => {
+    mutate(b => ({ ...b, categories: ops.reduce(applyMove, b.categories) }))
   }
 
   const renameCategory = (catKey: string, newLabel: string) => {
@@ -656,7 +681,7 @@ export function useBudget() {
     updateGrossIncome, updatePayday, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,
     addOneOff, updateOneOff, deleteOneOff, setOneOffDone, savePolicy, removePolicy,
     addAsset, updateAsset, updateAssetFields, deleteAsset,
-    addDebt, updateDebt, deleteDebt, combineDebts, updateItemRecurring, updateItemIcon, moveItem,
+    addDebt, updateDebt, deleteDebt, combineDebts, updateItemRecurring, updateItemIcon, moveItem, moveItems, applyMoves,
     getJsonString, importFromJson,
   }
 }
