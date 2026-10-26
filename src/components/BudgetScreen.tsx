@@ -11,7 +11,7 @@ import { needsAttention } from '@/lib/attention'
 import { Plus, ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, X, Check, CalendarClock } from 'lucide-react'
 import { ConfirmDelete, NumberInput, inputClass, useModal, RenewalBar } from './ui'
 import { subscriptionKind } from '@/lib/subscriptions'
-import { ItemIcon, IconPicker } from '@/lib/itemIcons'
+import { IconChooser } from '@/lib/itemIcons'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -333,7 +333,6 @@ function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, o
   const [label, setLabel] = useState(item.label)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [moving, setMoving] = useState(false)
-  const [pickingIcon, setPickingIcon] = useState(false)
   // A group the last move left empty, offered for deletion.
   const [emptied, setEmptied] = useState<Category | null>(null)
   const kind = subscriptionKind(item.label, cat.label, item.recurring)
@@ -424,14 +423,7 @@ function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, o
       )}
 
       <div className="py-2.5 border-t border-line">
-        <div className="flex items-center justify-between gap-3 min-h-[44px]">
-          <span className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl grid place-items-center bg-fill text-ink-2"><ItemIcon label={item.label} chosen={item.icon} /></span>
-            <span className="text-[15px] text-ink">Icon <span className="text-muted">{item.icon ? '' : '(automatic)'}</span></span>
-          </span>
-          <button onClick={() => setPickingIcon(v => !v)} aria-expanded={pickingIcon} className="shrink-0 px-4 min-h-[44px] rounded-xl bg-fill text-[15px] font-semibold text-ink cursor-pointer">{pickingIcon ? 'Done' : 'Change'}</button>
-        </div>
-        {pickingIcon && <div className="mt-2"><IconPicker label={item.label} value={item.icon} onChange={k => updateItemIcon(cat.key, item.id, k)} /></div>}
+        <IconChooser label={item.label} value={item.icon} onChange={k => updateItemIcon(cat.key, item.id, k)} />
       </div>
 
       {canMarkShared && (
