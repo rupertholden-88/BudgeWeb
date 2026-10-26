@@ -47,13 +47,13 @@ function SectionCard({ title, sub, icon, children }: {
 }
 
 /**
- * Time left until a renewal: full and green a year out, shrinking and
- * turning amber then red as the date gets close.
+ * Time left until a renewal: full and green a year out, shrinking as the
+ * date gets close and turning orange, then red.
  */
 function RenewalBar({ days }: { days: number }) {
   const left = Math.max(0, Math.min(1, days / 365))
-  // Hue runs red (0) through amber to green (135); lightness follows the theme.
-  const colour = `hsl(${Math.round(left * 135)} 68% var(--bar-l))`
+  // Three clear steps, a third of the year each: red, then orange, then green.
+  const colour = left > 2 / 3 ? 'hsl(140 60% var(--bar-l))' : left > 1 / 3 ? 'hsl(28 90% var(--bar-l-orange))' : 'hsl(4 72% var(--bar-l))'
   return (
     <div className="mt-2 h-[6px] rounded-full bg-surface overflow-hidden" role="img" aria-label={days < 0 ? 'Renewal date passed' : `${days} days until renewal`}>
       <div className="h-full rounded-full" style={{ width: `${Math.max(days < 0 ? 100 : 3, left * 100)}%`, background: days < 0 ? 'var(--neg)' : colour }} />
