@@ -947,7 +947,9 @@ export default function InsuranceScreen({ budget, backLabel, onBack, focusPolicy
   const ownerName = (o: Owner) => o === 'NIAMH' ? data.nameNiamh || 'Person 1' : o === 'RUPERT' ? data.nameRupert || 'Person 2' : data.nameJoint || 'Joint'
 
   useEffect(() => {
-    if (focusPolicyId && policies.some(p => p.id === focusPolicyId)) setSheet({ type: 'edit', id: focusPolicyId })
+    // "__upload" opens the document upload straight away.
+    if (focusPolicyId === '__upload') setUpload({ targetId: null })
+    else if (focusPolicyId && policies.some(p => p.id === focusPolicyId)) setSheet({ type: 'edit', id: focusPolicyId })
     if (focusPolicyId) onFocusHandled?.()
   }, [focusPolicyId]) // eslint-disable-line
 

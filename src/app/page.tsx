@@ -9,21 +9,22 @@ import Brand from '@/components/Brand'
 import SettingsScreen from '@/components/SettingsScreen'
 import { TabFilter } from '@/lib/models'
 import { needsAttention } from '@/lib/attention'
-import { Wallet, BarChart3, Landmark, Settings2, User, CheckCircle } from 'lucide-react'
+import { Wallet, BarChart3, Landmark, Settings as Cog, User, CheckCircle, CalendarClock } from 'lucide-react'
 
 const ChartsScreen = dynamic(() => import('@/components/ChartsScreen'))
 const InsuranceScreen = dynamic(() => import('@/components/InsuranceScreen'))
+const RenewalsScreen = dynamic(() => import('@/components/RenewalsScreen'))
 
-type Screen = 'budget' | 'charts' | 'wealth' | 'settings' | 'insurance'
+type Screen = 'budget' | 'charts' | 'wealth' | 'renewals' | 'settings' | 'insurance'
 
 const NAV = [
   { id: 'budget'   as Screen, label: 'Budget',   Icon: Wallet },
   { id: 'charts'   as Screen, label: 'Analysis', Icon: BarChart3 },
   { id: 'wealth'   as Screen, label: 'Wealth',   Icon: Landmark },
-  { id: 'settings' as Screen, label: 'Settings', Icon: Settings2 },
+  { id: 'renewals' as Screen, label: 'Renewals', Icon: CalendarClock },
 ]
 
-const SCREEN_ORDER: Screen[] = ['budget', 'charts', 'wealth', 'settings']
+const SCREEN_ORDER: Screen[] = ['budget', 'charts', 'wealth', 'renewals']
 
 
 function SetupScreen({ onDone, updateOwnerName, signIn, isSignedIn }: {
@@ -103,8 +104,8 @@ export default function HomePage() {
   const [screen, setScreen] = useState<Screen>('budget')
   const [tab, setTab] = useState<TabFilter>('ALL')
   const [focusPropertyId, setFocusPropertyId] = useState<string | null>(null)
-  // Insurance isn't a tab: it opens from Analysis, Wealth or Budget and goes back there.
-  const [insuranceFrom, setInsuranceFrom] = useState<Screen>('charts')
+  // Insurance isn't a tab: it opens from Renewals, Wealth or Budget and goes back there.
+  const [insuranceFrom, setInsuranceFrom] = useState<Screen>('renewals')
   const [focusPolicyId, setFocusPolicyId] = useState<string | null>(null)
   const openInsurance = (from: Screen, policyId?: string) => { setInsuranceFrom(from); setFocusPolicyId(policyId ?? null); setScreen('insurance') }
   const navScreen: Screen = screen === 'insurance' ? insuranceFrom : screen
@@ -112,7 +113,10 @@ export default function HomePage() {
   const [toast, setToast] = useState<string | null>(null)
   const swipeRef = useRef<{ x: number; y: number; t: number } | null>(null)
   const { data, user, authLoading, cloudLoading, localLoading, signIn, signOutUser, updateOwnerName } = budget
-  const attentionCount = needsAttention(data).length
+  // Renewals that need acting on badge the Renewals tab; everything else badges Analysis.
+  const attention = needsAttention(data)
+  const renewalCount = attention.filter(a => a.action.type === 'renewal').length
+  const attentionCount = attention.length - renewalCount
   // A property filter outlives its property if that property is deleted.
   const activeTab: TabFilter = tab.startsWith('property:') && !(data.properties ?? []).some(p => `property:${p.id}` === tab) ? 'ALL' : tab
 
@@ -183,10 +187,19 @@ export default function HomePage() {
     </button>
   )
 
-  const badge = (id: Screen) => id === 'charts' && attentionCount > 0 && (
+  const countFor = (id: Screen) => id === 'charts' ? attentionCount : id === 'renewals' ? renewalCount : 0
+  const badge = (id: Screen) => countFor(id) > 0 && (
     <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 rounded-full bg-neg text-on-ink text-caption leading-[18px] font-bold text-center ring-2 ring-bg">
-      {attentionCount}<span className="sr-only"> things need attention</span>
+      {countFor(id)}<span className="sr-only"> things need attention</span>
     </span>
+  )
+  const settingsButton = (
+    <button
+      onClick={() => setScreen('settings')} aria-label="Settings" aria-current={screen === 'settings' ? 'page' : undefined}
+      className={`w-[44px] h-[44px] grid place-items-center rounded-full cursor-pointer ${screen === 'settings' ? 'text-ink bg-fill' : 'text-ink-2'}`}
+    >
+      <Cog size={21} strokeWidth={1.9} aria-hidden="true" />
+    </button>
   )
 
   return (
@@ -213,13 +226,21 @@ export default function HomePage() {
             >
               <Icon size={20} strokeWidth={navScreen === id ? 2.1 : 1.75} aria-hidden="true" />
               <span className="flex-1">{label}</span>
-              {id === 'charts' && attentionCount > 0 && (
+              {countFor(id) > 0 && (
                 <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-neg text-on-ink text-caption leading-[22px] font-bold text-center">
-                  {attentionCount}<span className="sr-only"> things need attention</span>
+                  {countFor(id)}<span className="sr-only"> things need attention</span>
                 </span>
               )}
             </button>
           ))}
+          <button
+            onClick={() => setScreen('settings')}
+            aria-current={screen === 'settings' ? 'page' : undefined}
+            className={`mt-3 flex items-center gap-3 px-3 min-h-[44px] rounded-xl cursor-pointer text-[15px] text-left ${screen === 'settings' ? 'bg-fill text-ink font-semibold' : 'text-muted font-medium hover:bg-fill'}`}
+          >
+            <Cog size={20} strokeWidth={screen === 'settings' ? 2.1 : 1.75} aria-hidden="true" />
+            <span className="flex-1">Settings</span>
+          </button>
         </nav>
         <div className="mt-auto px-2">
           {user ? account : (
@@ -235,7 +256,7 @@ export default function HomePage() {
         <header className="lg:hidden shrink-0 px-5 pt-[max(12px,env(safe-area-inset-top))] pb-1">
           <div className="mx-auto w-full max-w-[600px] flex items-center justify-between min-h-[56px]">
             <Brand />
-            {account}
+            <div className="flex items-center gap-1">{account}{settingsButton}</div>
           </div>
         </header>
 
@@ -246,8 +267,9 @@ export default function HomePage() {
         >
           {/* A comfortable column on tablets; wider, two-column screens on desktop. */}
           <div key={screen} className="h-full mx-auto w-full max-w-[640px] lg:max-w-[1080px] lg:pt-6 screen-enter">
-            {screen === 'budget'   && <BudgetScreen   budget={budget} tab={activeTab} onTabChange={setTab} onNavigateToDebts={() => setScreen('wealth')} onOpenInsurance={id => openInsurance('budget', id)} />}
-            {screen === 'charts'   && <ChartsScreen   budget={budget} onOpenProperty={id => { setFocusPropertyId(id); setScreen('wealth') }} onOpenWealth={() => setScreen('wealth')} onOpenBudget={() => setScreen('budget')} onOpenInsurance={() => openInsurance('charts')} />}
+            {screen === 'budget'   && <BudgetScreen   budget={budget} tab={activeTab} onTabChange={setTab} onNavigateToDebts={() => setScreen('wealth')} onOpenInsurance={id => openInsurance('budget', id)} onOpenRenewals={() => setScreen('renewals')} />}
+            {screen === 'charts'   && <ChartsScreen   budget={budget} onOpenProperty={id => { setFocusPropertyId(id); setScreen('wealth') }} onOpenWealth={() => setScreen('wealth')} onOpenBudget={() => setScreen('budget')} onOpenRenewals={() => setScreen('renewals')} />}
+            {screen === 'renewals' && <RenewalsScreen budget={budget} onOpenInsurance={id => openInsurance('renewals', id)} onUploadInsurance={() => openInsurance('renewals', '__upload')} onOpenProperty={id => { setFocusPropertyId(id); setScreen('wealth') }} />}
             {screen === 'insurance' && <InsuranceScreen budget={budget} backLabel={NAV.find(n => n.id === insuranceFrom)?.label ?? 'Back'} onBack={() => setScreen(insuranceFrom)} focusPolicyId={focusPolicyId} onFocusHandled={() => setFocusPolicyId(null)} onToast={showToast} onOpenSettings={() => setScreen('settings')} />}
             {screen === 'wealth'   && <WealthScreen   budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={() => setFocusPropertyId(null)} onOpenInsurance={id => openInsurance('wealth', id)} />}
             {screen === 'settings' && <SettingsScreen budget={budget} onToast={showToast} />}
