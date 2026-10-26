@@ -46,6 +46,21 @@ function SectionCard({ title, sub, icon, children }: {
   )
 }
 
+/**
+ * Time left until a renewal: full and green a year out, shrinking and
+ * turning amber then red as the date gets close.
+ */
+function RenewalBar({ days }: { days: number }) {
+  const left = Math.max(0, Math.min(1, days / 365))
+  // Hue runs red (0) through amber to green (135); lightness follows the theme.
+  const colour = `hsl(${Math.round(left * 135)} 68% var(--bar-l))`
+  return (
+    <div className="mt-2 h-[6px] rounded-full bg-surface overflow-hidden" role="img" aria-label={days < 0 ? 'Renewal date passed' : `${days} days until renewal`}>
+      <div className="h-full rounded-full" style={{ width: `${Math.max(days < 0 ? 100 : 3, left * 100)}%`, background: days < 0 ? 'var(--neg)' : colour }} />
+    </div>
+  )
+}
+
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
@@ -673,8 +688,8 @@ export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth, onO
               const urgent = r.days >= 0 && r.days <= 30
               const soon = r.days > 30 && r.days <= 60
               return (
-                <div key={r.id} className="flex items-center gap-3">
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${passed || urgent ? 'bg-negative' : soon ? 'bg-expense-text' : 'bg-border'}`} />
+                <div key={r.id} className="pb-2.5 border-b border-border last:border-b-0 last:pb-0">
+                <div className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="text-body font-medium text-ink truncate">{r.label}</div>
                     <div className="text-caption text-muted">
@@ -702,6 +717,8 @@ export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth, onO
                       <div className="text-caption text-muted tabular-nums">{fmt(r.amount)}/mo</div>
                     )}
                   </div>
+                </div>
+                <RenewalBar days={r.days} />
                 </div>
               )
             })}
