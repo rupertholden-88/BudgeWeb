@@ -6,7 +6,7 @@ import { fmt, Owner } from '@/lib/models'
 import { Point, Trend } from './PortfolioCarousel'
 import { Sheet } from './BudgetScreen'
 
-type PensionPot = { key: string; label: string; owner: Owner; ownerLabel: string; color: string }
+type PensionPot = { assetId: string; historyNames: string[]; earlierNames: string[]; key: string; label: string; owner: Owner; ownerLabel: string; color: string }
 
 function BalanceChange({ value }: { value: number | null }) {
   return <span className={`block text-caption mt-1 mb-0 num ${value == null || value === 0 ? 'text-muted' : value > 0 ? 'text-positive' : 'text-negative'}`}>
@@ -14,7 +14,7 @@ function BalanceChange({ value }: { value: number | null }) {
   </span>
 }
 
-export default function PensionOverview({ points, pots, total, change }: { points: Point[]; pots: PensionPot[]; total: number; change: number | null }) {
+export default function PensionOverview({ points, pots, total, change, onHistoryNames }: { points: Point[]; pots: PensionPot[]; total: number; change: number | null; onHistoryNames: (pot: PensionPot, names: string[]) => void }) {
   const [selected, setSelected] = useState<string | null>(null)
   const latest = points[points.length - 1]
   const previous = points[points.length - 2]
@@ -59,6 +59,13 @@ export default function PensionOverview({ points, pots, total, change }: { point
       <p className="text-label text-muted mt-1 mb-4">{opened.ownerLabel}</p>
       <div className="text-[30px] font-semibold num">{typeof latest?.[opened.key] === 'number' ? fmt(latest[opened.key] as number) : 'No current balance recorded'}</div>
       <BalanceChange value={difference(opened)} />
+      {opened.earlierNames.length > 0 && <div className="my-4 border border-line rounded-xl p-3">
+        <h3 className="text-label font-semibold mt-0 mb-1">Earlier names for this pension</h3>
+        <p className="text-caption text-muted mt-0 mb-2">Link a previous name to join its history. Select only names for this same pot.</p>
+        {opened.earlierNames.map(name => <label key={name} className="flex items-center gap-3 min-h-[44px] text-label cursor-pointer">
+          <input type="checkbox" checked={opened.historyNames.includes(name)} onChange={e => onHistoryNames(opened, e.target.checked ? [...opened.historyNames, name] : opened.historyNames.filter(n => n !== name))} />{name}
+        </label>)}
+      </div>}
       <Trend points={points} seriesKey={opened.key} label={opened.label} color={opened.color} />
       <p className="text-caption text-muted mt-2 mb-4">Focused £ scale. Gaps mean no recorded balance.</p>
       <table className="w-full text-label num"><caption className="text-left font-semibold pb-2">Recorded balances</caption><thead><tr className="text-muted text-left"><th className="font-medium py-2">Month</th><th className="font-medium py-2 text-right">Balance</th></tr></thead><tbody>{[...points].reverse().map(point => <tr key={point.month} className="border-t border-line"><th className="text-left py-2 font-normal">{point.month}</th><td className="text-right py-2">{typeof point[opened.key] === 'number' ? fmt(point[opened.key] as number) : 'Not recorded'}</td></tr>)}</tbody></table>

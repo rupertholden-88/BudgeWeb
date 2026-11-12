@@ -47,6 +47,8 @@ export interface Category { key: string; owner: Owner; type: EntryType; label: s
  */
 export interface Asset {
   id: string; type: AssetType; label: string; amount: number; interestRate?: number; institution?: string; monthlyContribution?: number; employerContribution?: number
+  /** Earlier names of this pension, used to join its monthly history after renaming. */
+  pensionHistoryNames?: string[]
   /** Capped-rate accounts (regular savers etc.): interestRate applies up to rateCap, rateAboveCap beyond it. */
   rateCap?: number; rateAboveCap?: number
 }
