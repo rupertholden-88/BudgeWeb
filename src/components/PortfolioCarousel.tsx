@@ -5,7 +5,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { fmt } from '@/lib/models'
 
-type Point = { month: string; total: number | null; [key: string]: string | number | null }
+export type Point = { month: string; total: number | null; [key: string]: string | number | null }
 type Series = { key: string; color: string }
 
 function axisMoney(value: number) {
@@ -25,7 +25,7 @@ function ValueTooltip({ active, payload, label }: any) {
   </div>
 }
 
-function Trend({ points, seriesKey, color, compact = false }: { points: Point[]; seriesKey: string; color: string; compact?: boolean }) {
+export function Trend({ points, seriesKey, color, compact = false, label }: { points: Point[]; seriesKey: string; color: string; compact?: boolean; label?: string }) {
   const gradient = useId().replace(/:/g, '')
   const values = points.filter(p => typeof p[seriesKey] === 'number')
   if (!values.length) return <p className="text-label text-muted py-6">No balances recorded yet.</p>
@@ -42,7 +42,7 @@ function Trend({ points, seriesKey, color, compact = false }: { points: Point[];
         </AreaChart>
       </ResponsiveContainer>
     </div>
-    <table className="sr-only"><caption>{seriesKey === 'total' ? 'Total portfolio value' : seriesKey} by month</caption><tbody>{points.map(p => <tr key={p.month}><th>{p.month}</th><td>{typeof p[seriesKey] === 'number' ? fmt(p[seriesKey] as number) : 'Not recorded'}</td></tr>)}</tbody></table>
+    <table className="sr-only"><caption>{label ?? (seriesKey === 'total' ? 'Total portfolio value' : seriesKey)} by month</caption><tbody>{points.map(p => <tr key={p.month}><th>{p.month}</th><td>{typeof p[seriesKey] === 'number' ? fmt(p[seriesKey] as number) : 'Not recorded'}</td></tr>)}</tbody></table>
     {values.length === 1 && <p className="text-caption text-muted mt-1">One month recorded. Your trend will build as you save more balances.</p>}
   </>
 }
