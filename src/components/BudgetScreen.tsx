@@ -410,7 +410,6 @@ function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, o
             </div>
             <p className="text-caption text-muted mt-2 mb-0">Enter the full amount of each bill. It counts only in the selected calendar months, not spread across the year. This month: {fmt(itemAmountForMonth(item))}.</p>
           </>}
-          {/water/i.test(item.label) && <button className="min-h-[44px] text-label underline text-ink cursor-pointer" onClick={() => budget.updateItemPaymentSchedule(cat.key, item.id, { paymentMonths: [5, 11], paymentDay: 13 })}>Use Thames Water dates: 13 May & 13 November</button>}
           <SheetRow label="Payment day (optional)">
             <select aria-label="Payment day" value={item.paymentDay ?? ''} className={`${inputClass} w-full`}
               onChange={e => budget.updateItemPaymentSchedule(cat.key, item.id, { paymentDay: e.target.value ? Number(e.target.value) : undefined })}>
