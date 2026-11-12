@@ -6,6 +6,7 @@ import { Plus } from 'lucide-react'
 import { StatCard, ConfirmDelete, AmountCell, TapToEdit, ExpandButton, DeleteAction, Field, NumberInput, inputClass, useLongPress, ownerBorderClass } from './ui'
 import PropertiesSection from './PropertiesSection'
 import PortfolioCarousel from './PortfolioCarousel'
+import PensionOverview from './PensionOverview'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -346,8 +347,8 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
   const pensionPotKey = (owner: Owner, label: string) => `pot:${owner}:${label.trim().toLowerCase()}`
   const pensionPots = Array.from(new Map(data.savingsHistory
     .filter(s => chartMonths.includes(s.date.slice(0, 7)))
-    .flatMap(s => s.assets.filter(a => a.type === 'PENSION').map(a => [pensionPotKey(s.owner, a.label), {
-      key: pensionPotKey(s.owner, a.label), label: `${a.label} · ${s.owner === 'NIAMH' ? n1 : s.owner === 'RUPERT' ? n2 : n3}`,
+    .flatMap(s => (Array.isArray(s.assets) ? s.assets : []).filter(a => a.type === 'PENSION').map(a => [pensionPotKey(s.owner, a.label), {
+      key: pensionPotKey(s.owner, a.label), label: a.label, owner: s.owner, ownerLabel: s.owner === 'NIAMH' ? n1 : s.owner === 'RUPERT' ? n2 : n3,
       color: s.owner === 'NIAMH' ? 'var(--niamh)' : s.owner === 'RUPERT' ? 'var(--rupert)' : 'var(--joint)',
     }] as const))).values())
   const pensionChartData = chartMonths.map(month => {
@@ -359,7 +360,7 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
     })
     pensionPots.forEach(pot => {
       const entries = data.savingsHistory.filter(s => s.date.slice(0, 7) === month)
-        .flatMap(s => s.assets.filter(a => a.type === 'PENSION' && pensionPotKey(s.owner, a.label) === pot.key))
+        .flatMap(s => (Array.isArray(s.assets) ? s.assets : []).filter(a => a.type === 'PENSION' && pensionPotKey(s.owner, a.label) === pot.key))
       row[pot.key] = entries.length ? entries.reduce((sum, a) => sum + a.amount, 0) : null
     })
     const recorded = pensionOwners.map(o => row[o.key]).filter((v): v is number => typeof v === 'number')
@@ -470,7 +471,7 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
         {pensionContributions.total === 0 && <div className="mb-4" />}
 
         {activePensionOwners.length > 0 && (
-          <PortfolioCarousel pension pensionSeries={pensionPots} points={pensionChartData} series={activePensionOwners} total={totalPensions} change={pensionChange} />
+          <PensionOverview points={pensionChartData} pots={pensionPots} total={totalPensions} change={pensionChange} />
         )}
 
         <PensionOwnerPanel owner="NIAMH"  name={n1} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
