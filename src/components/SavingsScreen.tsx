@@ -6,7 +6,6 @@ import { Plus } from 'lucide-react'
 import { StatCard, ConfirmDelete, AmountCell, TapToEdit, ExpandButton, DeleteAction, Field, NumberInput, inputClass, useLongPress, ownerBorderClass } from './ui'
 import PropertiesSection from './PropertiesSection'
 import PortfolioCarousel from './PortfolioCarousel'
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -36,33 +35,6 @@ function formatMonth(dateStr: string) {
 function fmtK(n: number) {
   if (Math.abs(n) >= 1000) return `£${(n / 1000).toFixed(1)}k`
   return fmt(n)
-}
-
-function ChartTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null
-  const filtered = payload.filter((p: any) => (p.value ?? 0) > 0)
-  if (!filtered.length) return null
-  return (
-    <div className="bg-card border border-border rounded-xl px-3 py-2.5 text-xs shadow-[0_4px_20px_rgba(0,0,0,0.12)]">
-      <div className="font-semibold text-ink mb-1.5">{label}</div>
-      {filtered.map((p: any) => (
-        <div key={p.name} className="flex justify-between gap-4 mb-0.5">
-          <span className="text-muted">{p.name}</span>
-          <span className="font-semibold tabular-nums" style={{ color: p.color }}>{fmt(p.value)}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function AllocationBar({ segments }: { segments: { color: string; pct: number }[] }) {
-  return (
-    <div className="flex h-2 rounded-full overflow-hidden gap-[2px] mb-3">
-      {segments.filter(s => s.pct > 0.5).map((s, i) => (
-        <div key={i} className="h-full" style={{ width: `${s.pct}%`, background: s.color, minWidth: 4 }} />
-      ))}
-    </div>
-  )
 }
 
 function AssetRow({ asset, owner, today, updateAsset, updateAssetFields, deleteAsset, lockType }: {
@@ -346,7 +318,6 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
 
   const months = Array.from(new Set(data.savingsHistory.map(s => s.date.slice(0, 7)))).sort()
   if (!months.includes(today)) months.push(today)
-  const hasHistory = months.length > 1
 
   // Calendar months retain gaps instead of inventing zero balances between records.
   const chartMonths = Array.from({ length: 12 }, (_, i) => {
@@ -366,27 +337,26 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
   })
   const activeTypes = REGULAR_ASSET_TYPES.filter(type => chartData.some(row => Number(row[ASSET_LABELS[type]]) > 0))
 
-  // Pension chart data (stacked by owner)
-  const pensionChartData = months.map(month => {
-    const row: any = { month: formatMonth(month) }
-    ;(['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).forEach(owner => {
-      const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === month)
-      const pension = (Array.isArray(snap?.assets) ? snap!.assets : [])
-        .filter((a: any) => a.type === 'PENSION')
-        .reduce((sum: number, a: any) => sum + (a.amount || 0), 0)
-      const ownerName = owner === 'NIAMH' ? n1 : owner === 'RUPERT' ? n2 : n3
-      row[ownerName] = pension
+  // A missing pension entry is unknown, not a zero balance before it was added.
+  const pensionOwners = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(owner => ({
+    key: owner, label: owner === 'NIAMH' ? n1 : owner === 'RUPERT' ? n2 : n3,
+    color: owner === 'NIAMH' ? 'var(--niamh)' : owner === 'RUPERT' ? 'var(--rupert)' : 'var(--joint)',
+  }))
+  const pensionChartData = chartMonths.map(month => {
+    const row: { month: string; total: number | null; [key: string]: string | number | null } = { month: formatMonth(month), total: null }
+    pensionOwners.forEach(({ key }) => {
+      const pensions = data.savingsHistory.filter(s => s.owner === key && s.date.slice(0, 7) === month)
+        .flatMap(s => Array.isArray(s.assets) ? s.assets : []).filter(a => a.type === 'PENSION')
+      row[key] = pensions.length ? pensions.reduce((sum, a) => sum + (a.amount || 0), 0) : null
     })
+    const recorded = pensionOwners.map(o => row[o.key]).filter((v): v is number => typeof v === 'number')
+    row.total = recorded.length ? recorded.reduce((sum, v) => sum + v, 0) : null
     return row
   })
-  const pensionOwnerKeys = [n1, n2, n3].filter(name => pensionChartData.some(r => (r[name] || 0) > 0))
-
-  // Current pension allocation
-  const currentPensionRow = pensionChartData[pensionChartData.length - 1] ?? {}
-  const pensionAllocationSegments = pensionOwnerKeys.map(key => ({
-    color: key === n1 ? 'var(--niamh)' : key === n2 ? 'var(--rupert)' : 'var(--joint)',
-    pct: totalPensions > 0 ? ((currentPensionRow[key] || 0) / totalPensions) * 100 : 0,
-  }))
+  const activePensionOwners = pensionOwners.filter(o => pensionChartData.some(row => typeof row[o.key] === 'number'))
+  const previousPensions = data.savingsHistory.filter(s => s.date.slice(0, 7) === lastMonth)
+    .flatMap(s => Array.isArray(s.assets) ? s.assets : []).filter(a => a.type === 'PENSION')
+  const pensionChange = previousPensions.length ? totalPensions - previousPensions.reduce((sum, a) => sum + (a.amount || 0), 0) : null
 
   // Interest income
   const byOwner = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(owner => {
@@ -486,65 +456,8 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
         )}
         {pensionContributions.total === 0 && <div className="mb-4" />}
 
-        {pensionOwnerKeys.length > 0 && (
-          <div className="card p-4 mb-4 border-l-[3px] border-l-pension">
-            <div className="text-xs font-semibold text-muted uppercase tracking-label mb-3">Pension Growth Over Time</div>
-
-            <AllocationBar segments={pensionAllocationSegments} />
-
-            {hasHistory && (
-              <ResponsiveContainer width="100%" height={160}>
-                <AreaChart data={pensionChartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis hide />
-                  <Tooltip content={<ChartTooltip />} />
-                  {pensionOwnerKeys.map(key => (
-                    <Area
-                      key={key}
-                      type="monotone"
-                      dataKey={key}
-                      name={key}
-                      stackId="p"
-                      stroke={key === n1 ? 'var(--niamh)' : key === n2 ? 'var(--rupert)' : 'var(--joint)'}
-                      fill={key === n1 ? 'var(--niamh)' : key === n2 ? 'var(--rupert)' : 'var(--joint)'}
-                      fillOpacity={0.8}
-                      strokeWidth={0}
-                    />
-                  ))}
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-
-            {/* Per-owner breakdown */}
-            <div className="mt-3 space-y-2">
-              {pensionOwnerKeys.map(key => {
-                const value = currentPensionRow[key] || 0
-                const pct = totalPensions > 0 ? (value / totalPensions) * 100 : 0
-                const color = key === n1 ? 'var(--niamh)' : key === n2 ? 'var(--rupert)' : 'var(--joint)'
-                if (value === 0) return null
-                return (
-                  <div key={key}>
-                    <div className="flex justify-between items-baseline mb-1">
-                      <span className="text-xs font-medium text-ink flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full shrink-0 inline-block" style={{ background: color }} />
-                        {key}
-                      </span>
-                      <span className="text-xs tabular-nums text-muted">
-                        {fmt(value)} <span className="text-caption">{pct.toFixed(0)}%</span>
-                      </span>
-                    </div>
-                    <div className="h-[6px] bg-surface rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.max(pct, 0.5)}%`, background: color }} />
-                    </div>
-                  </div>
-                )
-              })}
-              <div className="flex justify-between text-xs pt-2 mt-1 border-t border-border">
-                <span className="text-muted font-medium">Total pensions</span>
-                <span className="tabular-nums font-bold text-pension">{fmt(totalPensions)}</span>
-              </div>
-            </div>
-          </div>
+        {activePensionOwners.length > 0 && (
+          <PortfolioCarousel pension points={pensionChartData} series={activePensionOwners} total={totalPensions} change={pensionChange} />
         )}
 
         <PensionOwnerPanel owner="NIAMH"  name={n1} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />

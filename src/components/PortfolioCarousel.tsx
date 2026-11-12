@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { fmt } from '@/lib/models'
 
 type Point = { month: string; total: number | null; [key: string]: string | number | null }
-type Series = { key: string; color: string }
+type Series = { key: string; color: string; label?: string }
 
 function axisMoney(value: number) {
   return Math.abs(value) >= 1000 ? `£${Number((value / 1000).toFixed(1))}k` : `£${Math.round(value)}`
@@ -25,7 +25,7 @@ function ValueTooltip({ active, payload, label }: any) {
   </div>
 }
 
-function Trend({ points, seriesKey, color, compact = false }: { points: Point[]; seriesKey: string; color: string; compact?: boolean }) {
+function Trend({ points, seriesKey, color, compact = false, label }: { points: Point[]; seriesKey: string; color: string; compact?: boolean; label?: string }) {
   const gradient = useId().replace(/:/g, '')
   const values = points.filter(p => typeof p[seriesKey] === 'number')
   if (!values.length) return <p className="text-label text-muted py-6">No balances recorded yet.</p>
@@ -42,12 +42,14 @@ function Trend({ points, seriesKey, color, compact = false }: { points: Point[];
         </AreaChart>
       </ResponsiveContainer>
     </div>
-    <table className="sr-only"><caption>{seriesKey === 'total' ? 'Total portfolio value' : seriesKey} by month</caption><tbody>{points.map(p => <tr key={p.month}><th>{p.month}</th><td>{typeof p[seriesKey] === 'number' ? fmt(p[seriesKey] as number) : 'Not recorded'}</td></tr>)}</tbody></table>
+    <table className="sr-only"><caption>{label ?? (seriesKey === 'total' ? 'Total portfolio value' : seriesKey)} by month</caption><tbody>{points.map(p => <tr key={p.month}><th>{p.month}</th><td>{typeof p[seriesKey] === 'number' ? fmt(p[seriesKey] as number) : 'Not recorded'}</td></tr>)}</tbody></table>
     {values.length === 1 && <p className="text-caption text-muted mt-1">One month recorded. Your trend will build as you save more balances.</p>}
   </>
 }
 
-export default function PortfolioCarousel({ points, series, total, change }: { points: Point[]; series: Series[]; total: number; change: number | null }) {
+export default function PortfolioCarousel({ points, series, total, change, pension = false }: { points: Point[]; series: Series[]; total: number; change: number | null; pension?: boolean }) {
+  const title = pension ? 'Pensions' : 'Portfolio'
+  const breakdown = pension ? 'By person' : 'By asset'
   const [slide, setSlide] = useState(0)
   const [height, setHeight] = useState<number>()
   const first = useRef<HTMLDivElement>(null)
@@ -63,18 +65,18 @@ export default function PortfolioCarousel({ points, series, total, change }: { p
     return () => observer.disconnect()
   }, [slide])
   const latest = points[points.length - 1]
-  return <section className="card p-4 sm:p-5 mb-4 portfolio-carousel" aria-label="Portfolio charts" aria-roledescription="carousel"
+  return <section className="card p-4 sm:p-5 mb-4 portfolio-carousel" aria-label={`${title} charts`} aria-roledescription="carousel"
     onKeyDown={e => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); setSlide(e.key === 'ArrowRight' ? 1 : 0) } }}
     onTouchStart={e => { e.stopPropagation(); touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY } }}
     onTouchMove={e => e.stopPropagation()}
     onTouchCancel={e => { e.stopPropagation(); touch.current = null }}
     onTouchEnd={e => { e.stopPropagation(); const start = touch.current; touch.current = null; if (!start) return; const dx = e.changedTouches[0].clientX - start.x; const dy = e.changedTouches[0].clientY - start.y; if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.5) setSlide(dx < 0 ? 1 : 0) }}>
     <div className="flex items-center justify-between gap-3 mb-4">
-      <span className="text-caption font-semibold uppercase tracking-label text-muted">Portfolio</span>
-      <span className="text-caption text-muted num" aria-live="polite">{slide + 1} / 2 · {slide === 0 ? 'Total value' : 'By asset'}</span>
+      <span className="text-caption font-semibold uppercase tracking-label text-muted">{title}</span>
+      <span className="text-caption text-muted num" aria-live="polite">{slide + 1} / 2 · {slide === 0 ? 'Total value' : breakdown}</span>
     </div>
-    <div className="seg grid-cols-2 mb-4" role="group" aria-label="Portfolio view">
-      {['Total value', 'By asset'].map((label, i) => <button key={label} aria-pressed={slide === i} aria-controls={`${id}-${i}`} onClick={() => setSlide(i)}><span className="lbl">{label}</span></button>)}
+    <div className="seg grid-cols-2 mb-4" role="group" aria-label={`${title} view`}>
+      {['Total value', breakdown].map((label, i) => <button key={label} aria-pressed={slide === i} aria-controls={`${id}-${i}`} onClick={() => setSlide(i)}><span className="lbl">{label}</span></button>)}
     </div>
     <div className="portfolio-viewport" style={{ height }}>
       <div className="portfolio-track" style={{ transform: `translateX(-${slide * 100}%)` }}>
@@ -83,27 +85,27 @@ export default function PortfolioCarousel({ points, series, total, change }: { p
           <p className={`text-label mt-1 mb-3 ${change == null || change === 0 ? 'text-muted' : change > 0 ? 'text-positive' : 'text-negative'}`}>
             {change == null ? 'No previous-month balance to compare' : `${change > 0 ? '+' : change < 0 ? '−' : ''}${fmt(Math.abs(change))} vs last month`}
           </p>
-          <Trend points={points} seriesKey="total" color="var(--positive)" />
+          <Trend points={points} seriesKey="total" label={`Total ${title.toLowerCase()} value`} color="var(--positive)" />
           <p className="text-caption text-muted mt-2 mb-4">Focused £ scale to show smaller changes. Gaps mean no recorded balance.</p>
           <div className="border-t border-line pt-3 space-y-2">
-            {series.filter(s => typeof latest?.[s.key] === 'number' && Number(latest[s.key]) > 0).map(s => <div key={s.key} className="flex items-center justify-between gap-2 text-label"><span className="flex items-center gap-2 text-muted"><span className="w-2 h-2 rounded-full" style={{ background: s.color }} />{s.key}</span><span className="num font-medium">{fmt(latest[s.key] as number)}</span></div>)}
+            {series.filter(s => typeof latest?.[s.key] === 'number' && Number(latest[s.key]) > 0).map(s => <div key={s.key} className="flex items-center justify-between gap-2 text-label"><span className="flex items-center gap-2 text-muted"><span className="w-2 h-2 rounded-full" style={{ background: s.color }} />{s.label ?? s.key}</span><span className="num font-medium">{fmt(latest[s.key] as number)}</span></div>)}
           </div>
         </div>
-        <div ref={second} id={`${id}-1`} role="group" aria-roledescription="slide" aria-label="2 of 2: By asset" aria-hidden={slide !== 1} className={`portfolio-slide ${slide === 1 ? 'is-active' : ''}`}>
+        <div ref={second} id={`${id}-1`} role="group" aria-roledescription="slide" aria-label={`2 of 2: ${breakdown}`} aria-hidden={slide !== 1} className={`portfolio-slide ${slide === 1 ? 'is-active' : ''}`}>
           <h3 className="text-[22px] font-semibold mt-0 mb-1">A closer look</h3>
-          <p className="text-caption text-muted mt-0 mb-4">Each asset type has its own £ scale.</p>
+          <p className="text-caption text-muted mt-0 mb-4">{pension ? 'Each person has their own £ scale.' : 'Each asset type has its own £ scale.'}</p>
           <div className="space-y-3">{series.map(s => <div key={s.key} className="rounded-2xl border border-line px-2 pt-3 pb-1">
-            <div className="flex justify-between gap-2 items-center px-2 mb-1 text-label"><span className="flex gap-2 items-center font-medium"><span className="w-2 h-2 rounded-full" style={{ background: s.color }} />{s.key}</span><span className="font-semibold num">{typeof latest?.[s.key] === 'number' ? fmt(latest[s.key] as number) : '—'}</span></div>
-            <Trend points={points} seriesKey={s.key} color={s.color} compact />
+            <div className="flex justify-between gap-2 items-center px-2 mb-1 text-label"><span className="flex gap-2 items-center font-medium"><span className="w-2 h-2 rounded-full" style={{ background: s.color }} />{s.label ?? s.key}</span><span className="font-semibold num">{typeof latest?.[s.key] === 'number' ? fmt(latest[s.key] as number) : '—'}</span></div>
+            <Trend points={points} seriesKey={s.key} label={s.label} color={s.color} compact />
           </div>)}</div>
         </div>
       </div>
     </div>
     <div className="flex justify-between items-center mt-3 border-t border-line pt-2">
-      <button aria-label="Previous portfolio slide" disabled={slide === 0} onClick={() => setSlide(0)} className="min-h-[44px] min-w-[44px] grid place-items-center rounded-full disabled:opacity-25 text-muted"><ChevronLeft size={18} /></button>
-      <span className="text-caption text-muted">{slide === 0 ? 'Swipe for asset trends' : 'Swipe for total value'}</span>
-      <button aria-label="Next portfolio slide" disabled={slide === 1} onClick={() => setSlide(1)} className="min-h-[44px] min-w-[44px] grid place-items-center rounded-full disabled:opacity-25 text-muted"><ChevronRight size={18} /></button>
+      <button aria-label={`Previous ${title.toLowerCase()} slide`} disabled={slide === 0} onClick={() => setSlide(0)} className="min-h-[44px] min-w-[44px] grid place-items-center rounded-full disabled:opacity-25 text-muted"><ChevronLeft size={18} /></button>
+      <span className="text-caption text-muted">{slide === 0 ? `Swipe for ${pension ? 'individual' : 'asset'} trends` : 'Swipe for total value'}</span>
+      <button aria-label={`Next ${title.toLowerCase()} slide`} disabled={slide === 1} onClick={() => setSlide(1)} className="min-h-[44px] min-w-[44px] grid place-items-center rounded-full disabled:opacity-25 text-muted"><ChevronRight size={18} /></button>
     </div>
-    <p className="text-caption text-muted mb-0 mt-1">Balance changes include deposits and withdrawals. Pensions shown separately below.</p>
+    <p className="text-caption text-muted mb-0 mt-1">{pension ? 'Balance changes include your contributions, employer payments and investment movements.' : 'Balance changes include deposits and withdrawals. Pensions shown separately below.'}</p>
   </section>
 }
