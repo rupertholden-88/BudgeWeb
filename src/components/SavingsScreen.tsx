@@ -342,12 +342,25 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
     key: owner, label: owner === 'NIAMH' ? n1 : owner === 'RUPERT' ? n2 : n3,
     color: owner === 'NIAMH' ? 'var(--niamh)' : owner === 'RUPERT' ? 'var(--rupert)' : 'var(--joint)',
   }))
+  // Asset ids change between monthly snapshots; match pots by owner and name.
+  const pensionPotKey = (owner: Owner, label: string) => `pot:${owner}:${label.trim().toLowerCase()}`
+  const pensionPots = Array.from(new Map(data.savingsHistory
+    .filter(s => chartMonths.includes(s.date.slice(0, 7)))
+    .flatMap(s => s.assets.filter(a => a.type === 'PENSION').map(a => [pensionPotKey(s.owner, a.label), {
+      key: pensionPotKey(s.owner, a.label), label: `${a.label} · ${s.owner === 'NIAMH' ? n1 : s.owner === 'RUPERT' ? n2 : n3}`,
+      color: s.owner === 'NIAMH' ? 'var(--niamh)' : s.owner === 'RUPERT' ? 'var(--rupert)' : 'var(--joint)',
+    }] as const))).values())
   const pensionChartData = chartMonths.map(month => {
     const row: { month: string; total: number | null; [key: string]: string | number | null } = { month: formatMonth(month), total: null }
     pensionOwners.forEach(({ key }) => {
       const pensions = data.savingsHistory.filter(s => s.owner === key && s.date.slice(0, 7) === month)
         .flatMap(s => Array.isArray(s.assets) ? s.assets : []).filter(a => a.type === 'PENSION')
       row[key] = pensions.length ? pensions.reduce((sum, a) => sum + (a.amount || 0), 0) : null
+    })
+    pensionPots.forEach(pot => {
+      const entries = data.savingsHistory.filter(s => s.date.slice(0, 7) === month)
+        .flatMap(s => s.assets.filter(a => a.type === 'PENSION' && pensionPotKey(s.owner, a.label) === pot.key))
+      row[pot.key] = entries.length ? entries.reduce((sum, a) => sum + a.amount, 0) : null
     })
     const recorded = pensionOwners.map(o => row[o.key]).filter((v): v is number => typeof v === 'number')
     row.total = recorded.length ? recorded.reduce((sum, v) => sum + v, 0) : null
@@ -457,7 +470,7 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
         {pensionContributions.total === 0 && <div className="mb-4" />}
 
         {activePensionOwners.length > 0 && (
-          <PortfolioCarousel pension points={pensionChartData} series={activePensionOwners} total={totalPensions} change={pensionChange} />
+          <PortfolioCarousel pension pensionSeries={pensionPots} points={pensionChartData} series={activePensionOwners} total={totalPensions} change={pensionChange} />
         )}
 
         <PensionOwnerPanel owner="NIAMH"  name={n1} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
