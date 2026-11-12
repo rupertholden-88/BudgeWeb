@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { Owner, Asset, AssetType, fmt, netWorth, monthlyInterest, annualInterest, blendedAer, isCapped } from '@/lib/models'
-import { Plus, TrendingUp, TrendingDown } from 'lucide-react'
+import { Owner, Asset, AssetType, fmt, netWorth, monthlyInterest, annualInterest, blendedAer, isCapped, monthKey } from '@/lib/models'
+import { Plus } from 'lucide-react'
 import { StatCard, ConfirmDelete, AmountCell, TapToEdit, ExpandButton, DeleteAction, Field, NumberInput, inputClass, useLongPress, ownerBorderClass } from './ui'
 import PropertiesSection from './PropertiesSection'
+import PortfolioCarousel from './PortfolioCarousel'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
@@ -308,7 +309,7 @@ function PensionOwnerPanel({ owner, name, budget, addAsset, updateAsset, updateA
 
 export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled, onOpenInsurance }: { budget: BudgetHook; focusPropertyId?: string | null; onFocusHandled?: () => void; onOpenInsurance?: (policyId?: string) => void }) {
   const { data, addAsset, updateAsset, updateAssetFields, deleteAsset, resyncInterest } = budget
-  const today = new Date().toISOString().slice(0, 7)
+  const today = monthKey()
 
   const n1 = data.nameNiamh || 'Person 1'
   const n2 = data.nameRupert || 'Person 2'
@@ -332,7 +333,7 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
     return { own: acc.own + own, employer: acc.employer + employer, total: acc.total + own + employer }
   }, { own: 0, employer: 0, total: 0 })
 
-  const lastMonth = (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7) })()
+  const lastMonth = (() => { const d = new Date(); return monthKey(new Date(d.getFullYear(), d.getMonth() - 1, 1)) })()
   const totalLastMonth = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).reduce((acc, owner) => {
     const snap = data.savingsHistory.find(s => s.owner === owner && s.date.slice(0, 7) === lastMonth)
     return acc + (Array.isArray(snap?.assets) ? snap!.assets : []).filter((a: any) => a.type !== 'PENSION').reduce((a, i) => a + (i.amount || 0), 0)
@@ -340,26 +341,30 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
 
   // Everything owned minus everything owed — property values in, all debt out.
   const worth = netWorth(data, today)
-  const monthDiff = totalLastMonth > 0 ? totalAll - totalLastMonth : null
+  const monthDiff = data.savingsHistory.some(s => s.date.slice(0, 7) === lastMonth) ? totalAll - totalLastMonth : null
 
 
   const months = Array.from(new Set(data.savingsHistory.map(s => s.date.slice(0, 7)))).sort()
   if (!months.includes(today)) months.push(today)
   const hasHistory = months.length > 1
 
-  // Asset chart data (stacked by type)
-  const chartData = months.map(month => {
-    const allAssets = data.savingsHistory
-      .filter(s => s.date.slice(0, 7) === month)
-      .flatMap(s => Array.isArray(s.assets) ? s.assets : [])
-      .filter((a: any) => a.type !== 'PENSION')
-    const row: any = { month: formatMonth(month) }
+  // Calendar months retain gaps instead of inventing zero balances between records.
+  const chartMonths = Array.from({ length: 12 }, (_, i) => {
+    const now = new Date()
+    return monthKey(new Date(now.getFullYear(), now.getMonth() - 11 + i, 1))
+  }).filter(month => month >= (months[0] ?? today))
+  const chartData = chartMonths.map(month => {
+    const snapshots = data.savingsHistory.filter(s => s.date.slice(0, 7) === month)
+    const allAssets = snapshots.flatMap(s => Array.isArray(s.assets) ? s.assets : []).filter(a => a.type !== 'PENSION')
+    const row: { month: string; total: number | null; [key: string]: string | number | null } = {
+      month: formatMonth(month), total: snapshots.length ? allAssets.reduce((sum, a) => sum + (a.amount || 0), 0) : null,
+    }
     REGULAR_ASSET_TYPES.forEach(type => {
-      row[ASSET_LABELS[type]] = allAssets.filter((a: any) => a.type === type).reduce((sum: number, a: any) => sum + (a.amount || 0), 0)
+      row[ASSET_LABELS[type]] = snapshots.length ? allAssets.filter(a => a.type === type).reduce((sum, a) => sum + (a.amount || 0), 0) : null
     })
     return row
   })
-  const activeTypes = REGULAR_ASSET_TYPES.filter(type => chartData.some(row => (row[ASSET_LABELS[type]] || 0) > 0))
+  const activeTypes = REGULAR_ASSET_TYPES.filter(type => chartData.some(row => Number(row[ASSET_LABELS[type]]) > 0))
 
   // Pension chart data (stacked by owner)
   const pensionChartData = months.map(month => {
@@ -375,13 +380,6 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
     return row
   })
   const pensionOwnerKeys = [n1, n2, n3].filter(name => pensionChartData.some(r => (r[name] || 0) > 0))
-
-  // Current allocation
-  const currentRow = chartData[chartData.length - 1] ?? {}
-  const allocationSegments = activeTypes.map(type => ({
-    color: ASSET_COLORS[type],
-    pct: totalAll > 0 ? ((currentRow[ASSET_LABELS[type]] || 0) / totalAll) * 100 : 0,
-  }))
 
   // Current pension allocation
   const currentPensionRow = pensionChartData[pensionChartData.length - 1] ?? {}
@@ -428,71 +426,7 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
       <div className="lg:columns-2 lg:gap-5 [&>*]:break-inside-avoid">
       {/* Portfolio chart */}
       {(totalAll > 0 || activeTypes.length > 0) && (
-        <div className="card p-4 mb-4">
-          <div className="flex justify-between items-baseline mb-3">
-            <div className="text-xs font-semibold text-muted uppercase tracking-label">Portfolio</div>
-            {monthDiff !== null && (
-              <div className={`flex items-center gap-1 text-label font-semibold tabular-nums ${monthDiff >= 0 ? 'text-positive' : 'text-negative'}`}>
-                {monthDiff >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                {monthDiff >= 0 ? '+' : ''}{fmtK(monthDiff)}
-              </div>
-            )}
-          </div>
-
-          <AllocationBar segments={allocationSegments} />
-
-          {hasHistory && (
-            <ResponsiveContainer width="100%" height={160}>
-              <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis hide />
-                <Tooltip content={<ChartTooltip />} />
-                {activeTypes.map(type => (
-                  <Area
-                    key={type}
-                    type="monotone"
-                    dataKey={ASSET_LABELS[type]}
-                    name={ASSET_LABELS[type]}
-                    stackId="a"
-                    stroke={ASSET_COLORS[type]}
-                    fill={ASSET_COLORS[type]}
-                    fillOpacity={0.8}
-                    strokeWidth={0}
-                  />
-                ))}
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-
-          {/* Allocation breakdown */}
-          <div className="mt-3 space-y-2">
-            {activeTypes.map(type => {
-              const value = currentRow[ASSET_LABELS[type]] || 0
-              const pct = totalAll > 0 ? (value / totalAll) * 100 : 0
-              if (value === 0) return null
-              return (
-                <div key={type}>
-                  <div className="flex justify-between items-baseline mb-1">
-                    <span className="text-xs font-medium text-ink flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-sm shrink-0 inline-block" style={{ background: ASSET_COLORS[type] }} />
-                      {ASSET_LABELS[type]}
-                    </span>
-                    <span className="text-xs tabular-nums text-muted">
-                      {fmt(value)} <span className="text-caption">{pct.toFixed(0)}%</span>
-                    </span>
-                  </div>
-                  <div className="h-[6px] bg-surface rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.max(pct, 0.5)}%`, background: ASSET_COLORS[type] }} />
-                  </div>
-                </div>
-              )
-            })}
-            <div className="flex justify-between text-xs pt-2 mt-1 border-t border-border">
-              <span className="text-muted font-medium">Total assets</span>
-              <span className="tabular-nums font-bold text-positive">{fmt(totalAll)}</span>
-            </div>
-          </div>
-        </div>
+        <PortfolioCarousel points={chartData} series={activeTypes.map(type => ({ key: ASSET_LABELS[type], color: ASSET_COLORS[type] }))} total={totalAll} change={monthDiff} />
       )}
 
       {/* Each month starts with last month's balances automatically; just update what's changed. */}
