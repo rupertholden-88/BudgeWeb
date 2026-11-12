@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { fmt, Owner, Debt, upcomingRenewals, householdCostSplit, monthlyInterest, energySwitchReminders, debtPayoff, isMortgage } from '@/lib/models'
+import { itemAmountForMonth, fmt, Owner, Debt, upcomingRenewals, householdCostSplit, monthlyInterest, energySwitchReminders, debtPayoff, isMortgage } from '@/lib/models'
 import { buildFinancialSummary, hashSummary } from '@/lib/financialSummary'
 import { useApiKey } from '@/hooks/useApiKey'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
@@ -9,6 +9,7 @@ import { ShieldCheck, AlertTriangle, Scale, TrendingUp, TrendingDown, CalendarCl
 import { insurancePolicies, insuranceGaps } from '@/lib/insurance'
 import { StatCard } from './ui'
 import CombineCards from './CombineCards'
+import JointHistory from './JointHistory'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -487,7 +488,7 @@ export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth, onO
     const ownerName = (o: Owner) => o === 'NIAMH' ? n1 : o === 'RUPERT' ? n2 : null
     const rows = data.categories
       .filter(c => c.type === 'EXPENSE')
-      .map(c => ({ name: ownerName(c.owner) ? `${c.label} · ${ownerName(c.owner)}` : c.label, amount: c.items.reduce((a, i) => a + i.amount, 0) }))
+      .map(c => ({ name: ownerName(c.owner) ? `${c.label} · ${ownerName(c.owner)}` : c.label, amount: c.items.reduce((a, i) => a + itemAmountForMonth(i), 0) }))
     const debtPayments = data.debts.reduce((a, d) => a + d.monthlyPayment, 0)
     if (debtPayments > 0) rows.push({ name: data.debts.some(isMortgage) ? 'Mortgage & debt payments' : 'Debt payments', amount: debtPayments })
     return rows.filter(c => c.amount > 0).sort((a, b) => b.amount - a.amount)
@@ -535,6 +536,8 @@ export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth, onO
       </div>
 
       <div className="lg:columns-2 lg:gap-5 [&>*]:break-inside-avoid">
+
+      <JointHistory data={data} />
 
       {/* Time-sensitive first: 0% expiries, then renewals; then Fair Share,
           the thing most often opened this screen for; the optional AI check after. */}

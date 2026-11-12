@@ -1,4 +1,4 @@
-import { BudgetData, Owner, PolicyDetails, daysUntil, isInsuranceItem, isMortgage } from './models'
+import { itemAmountForMonth, BudgetData, Owner, PolicyDetails, daysUntil, isInsuranceItem, isMortgage } from './models'
 
 /**
  * What a policy covers, worked out from its name. "Home insurance" usually
@@ -97,7 +97,7 @@ export function insurancePolicies(data: BudgetData): Policy[] {
       return {
         id: i.id, catKey: c.key, label: i.label, kind, coverTo,
         owner: c.owner, propertyId: i.propertyId, provider: i.insuranceProvider, cover: i.insuranceCoverAmount,
-        monthly: i.amount, yearly: details.premiumAnnual && !details.paysMonthly ? details.premiumAnnual : i.amount * 12,
+        monthly: itemAmountForMonth(i), yearly: details.premiumAnnual && !details.paysMonthly ? details.premiumAnnual : i.amount * (i.paymentMonths?.length ?? 12),
         renewalDate, days, autoRenews: !!i.autoRenews,
         status: coverTo && new Date(coverTo).getTime() > Date.now() ? 'covered' as const : statusOf(days), yearProgress, details,
       }
