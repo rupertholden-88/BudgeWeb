@@ -15,7 +15,23 @@ export interface LineItem { id: string; label: string; amount: number; priority:
   /** Overrides Budge's guess of whether this is a subscription or contract (shown on Renewals). */
   recurring?: 'subscription' | 'contract' | 'none'
   /** Chosen icon (a key of ITEM_ICONS); otherwise guessed from the name. */
-  icon?: string }
+  icon?: string
+  /** Full amount is charged only in these calendar months (1–12). Absent means every month. */
+  paymentMonths?: number[]
+  /** Optional day of the month the bill is charged. */
+  paymentDay?: number }
+export const PAYMENT_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+/** Calendar-month cash cost: never spread an infrequent bill across the year. */
+export function itemAmountForMonth(item: LineItem, now = new Date()): number {
+  return !item.paymentMonths || item.paymentMonths.includes(now.getMonth() + 1) ? item.amount : 0
+}
+
+export function paymentScheduleLabel(item: LineItem): string {
+  const months = item.paymentMonths?.map(m => PAYMENT_MONTHS[m - 1]).join(', ') ?? 'Every month'
+  return `${months}${item.paymentDay ? ` · day ${item.paymentDay}` : ''}`
+}
+
 /** Detects an insurance line by its label — no separate flag to set, so the
  * extra fields just appear on anything already named as insurance. */
 /** Insurance by name: anything called insurance, plus cover that rarely is ("Life cover"). */
@@ -252,7 +268,7 @@ export interface PolicyDetails {
   lastYearAnnual?: number
 }
 
-export interface SpendSnapshot { date: string; totalInc: number; totalExp: number; totalSav: number }
+export interface SpendSnapshot { date: string; totalInc: number; totalExp: number; totalSav: number; jointRequired?: number }
 /** Birth month as YYYY-MM — stored rather than an age so it never goes stale. */
 export interface Dependant { id: string; born: string; name?: string }
 export type FinancialHealthStatus = 'strong' | 'solid' | 'attention' | 'at_risk'
@@ -338,12 +354,12 @@ export function defaultBudgetData(): BudgetData {
 
 /**
  * The month's totals. One-offs due this month count as spending unless paid
- * from savings; pass `{ oneOffs: false }` for a typical month, which is what
- * averages and the health check should judge.
+ * from savings; pass `{ oneOffs: false }` to exclude one-offs. Scheduled
+ * bills still count in full only in their selected calendar months.
  */
-export function calcTotals(budget: BudgetData, opts: { oneOffs?: boolean } = {}): Totals {
-  const sum = (cats: Category[]) => cats.reduce((acc, c) => acc + c.items.reduce((a, i) => a + i.amount, 0), 0)
-  const oneOffs = opts.oneOffs === false ? [] : oneOffsFor(budget).filter(o => !o.fromSavings && o.amount > 0)
+export function calcTotals(budget: BudgetData, opts: { oneOffs?: boolean; now?: Date } = {}): Totals {
+  const sum = (cats: Category[]) => cats.reduce((acc, c) => acc + c.items.reduce((a, i) => a + itemAmountForMonth(i, opts.now), 0), 0)
+  const oneOffs = opts.oneOffs === false ? [] : oneOffsFor(budget, opts.now).filter(o => !o.fromSavings && o.amount > 0)
   const oneOffFor = (owner: Owner) => oneOffs.filter(o => o.owner === owner).reduce((a, o) => a + o.amount, 0)
   const incN = sum(budget.categories.filter(c => c.owner === 'NIAMH' && c.type === 'INCOME'))
   const incR = sum(budget.categories.filter(c => c.owner === 'RUPERT' && c.type === 'INCOME'))
@@ -392,7 +408,7 @@ export function propertySummaries(data: BudgetData) {
       .flatMap(c => c.items.filter(i => i.propertyId === p.id).map(i => ({ ...i, category: c.label, catKey: c.key, owner: c.owner })))
     const mortgageBalance = debts.reduce((a, d) => a + d.currentBalance, 0)
     const mortgagePayment = debts.reduce((a, d) => a + d.monthlyPayment, 0)
-    const runningCosts = items.reduce((a, i) => a + i.amount, 0)
+    const runningCosts = items.reduce((a, i) => a + itemAmountForMonth(i), 0)
     const energyAnnual = (['electricity', 'gas'] as Fuel[])
       .map(f => tariffAnnualCost(p.energy?.[f]))
       .filter((c): c is number => c != null)
@@ -429,7 +445,7 @@ export function householdCostSplit(budget: BudgetData, totals: Totals) {
   const sharedFor = (owner: Owner) => {
     const fromItems = budget.categories
       .filter(c => c.owner === owner && c.type === 'EXPENSE')
-      .reduce((a, c) => a + c.items.filter(i => i.sharedContribution).reduce((b, i) => b + i.amount, 0), 0)
+      .reduce((a, c) => a + c.items.filter(i => i.sharedContribution).reduce((b, i) => b + itemAmountForMonth(i), 0), 0)
     const fromDebts = budget.debts
       .filter(d => d.owner === owner && d.sharedContribution)
       .reduce((a, d) => a + d.monthlyPayment, 0)
@@ -549,7 +565,7 @@ export function upcomingRenewals(data: BudgetData) {
       .map(i => ({
         id: i.id,
         label: i.label,
-        amount: i.amount,
+        amount: itemAmountForMonth(i),
         category: c.label,
         owner: c.owner,
         date: i.renewalDate!,

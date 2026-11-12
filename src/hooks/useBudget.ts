@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore'
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth'
 import { db, auth, provider } from '@/lib/firebase'
-import { BudgetData, Category, OneOff, PolicyDetails, LineItem, Debt, Owner, EntryType, AssetType, Asset, DebtType, Property, Fuel, EnergyTariff, defaultBudgetData, calcTotals, monthlyInterest, Totals, SpendSnapshot, FinancialHealthCache } from '@/lib/models'
+import { BudgetData, Category, OneOff, PolicyDetails, LineItem, Debt, Owner, EntryType, AssetType, Asset, DebtType, Property, Fuel, EnergyTariff, defaultBudgetData, calcTotals, monthlyInterest, Totals, SpendSnapshot, FinancialHealthCache, monthKey } from '@/lib/models'
 
 function uuid() { return crypto.randomUUID() }
 
@@ -260,6 +260,10 @@ export function useBudget() {
 
   const updateItemAmount = (catKey: string, itemId: string, amount: number) => {
     mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.map(i => i.id === itemId ? { ...i, amount } : i) }) }))
+  }
+
+  const updateItemPaymentSchedule = (catKey: string, itemId: string, fields: Pick<LineItem, 'paymentMonths' | 'paymentDay'>) => {
+    mutate(b => ({ ...b, categories: b.categories.map(c => c.key !== catKey ? c : { ...c, items: c.items.map(i => i.id === itemId ? { ...i, ...fields } : i) }) }))
   }
 
   const addItem = (catKey: string, label: string) => {
@@ -641,20 +645,21 @@ export function useBudget() {
   }
 
   const totals: Totals = calcTotals(data)
-  // A typical month, without this month's one-offs: for averages and the health check.
+  // This month without one-offs; scheduled bills keep their full charge.
   const regularTotals: Totals = calcTotals(data, { oneOffs: false })
 
   // Auto-snapshot current month's spend whenever budget changes
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 7)
-    if (totals.totalInc === 0 && totals.totalExp === 0 && totals.totalSav === 0) return
+    if (authLoading || cloudLoading || localLoading) return
+    const today = monthKey()
+    const jointRequired = totals.expJoint + totals.debtJoint + totals.savJoint
     const existing = (data.spendHistory || []).find((s: SpendSnapshot) => s.date === today)
-    if (existing && existing.totalInc === totals.totalInc && existing.totalExp === totals.totalExp && existing.totalSav === totals.totalSav) return
+    if (existing && existing.totalInc === totals.totalInc && existing.totalExp === totals.totalExp && existing.totalSav === totals.totalSav && existing.jointRequired === jointRequired) return
     mutate(b => {
-      const snap: SpendSnapshot = { date: today, totalInc: totals.totalInc, totalExp: totals.totalExp, totalSav: totals.totalSav }
+      const snap: SpendSnapshot = { date: today, totalInc: totals.totalInc, totalExp: totals.totalExp, totalSav: totals.totalSav, jointRequired }
       return { ...b, spendHistory: [...(b.spendHistory || []).filter((s: SpendSnapshot) => s.date !== today), snap].sort((a, z) => a.date.localeCompare(z.date)) }
     })
-  }, [data.categories, data.debts, data.oneOffs]) // eslint-disable-line
+  }, [data.categories, data.debts, data.oneOffs, authLoading, cloudLoading, localLoading]) // eslint-disable-line
 
   // Carry last month's balances into a new month as soon as the app has loaded,
   // not only when Assets is opened — otherwise on the 1st, Analysis, net worth
@@ -677,7 +682,7 @@ export function useBudget() {
     signIn, signOutUser, refreshFromCloud,
     updateOwnerName, updateBirthMonth, addDependant, updateDependant, renameDependant, removeDependant,
     addCategory, renameCategory, deleteCategory,
-    updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, toggleItemAutoRenew, updateItemInsurance, toggleItemShared, updateItemProperty, recordFinancialHealthRun,
+    updateItemPaymentSchedule, updateItemAmount, addItem, addItemWithAmount, resyncInterest, copyForwardAssets, moveAssetsToLastMonth, removeItem, renameItem, updateItemRenewal, toggleItemAutoRenew, updateItemInsurance, toggleItemShared, updateItemProperty, recordFinancialHealthRun,
     updateGrossIncome, updatePayday, addProperty, updateProperty, updatePropertyEnergy, deleteProperty,
     addOneOff, updateOneOff, deleteOneOff, setOneOffDone, savePolicy, removePolicy,
     addAsset, updateAsset, updateAssetFields, deleteAsset,

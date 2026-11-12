@@ -2,7 +2,7 @@
 import { insurancePolicies } from '@/lib/insurance'
 
 import { useState, useEffect, useRef } from 'react'
-import { Owner, Fuel, EnergyTariff, TariffOption, fmt, propertySummaries, tariffAnnualCost, quotedAnnualCost, exitFeeFreeFrom, daysUntil, ENERGY_VAT } from '@/lib/models'
+import { itemAmountForMonth, Owner, Fuel, EnergyTariff, TariffOption, fmt, propertySummaries, tariffAnnualCost, quotedAnnualCost, exitFeeFreeFrom, daysUntil, ENERGY_VAT } from '@/lib/models'
 import type { TariffSearchRequest } from '@/app/api/energy-tariffs/route'
 import { useApiKey } from '@/hooks/useApiKey'
 import { Plus, Home, Zap, Flame, Search, ExternalLink, KeyRound, ShieldPlus, ChevronRight } from 'lucide-react'
@@ -333,7 +333,7 @@ function EnergySection({ summary, budget }: { summary: Summary; budget: BudgetHo
   const annual = summary.energyAnnualCost
   const monthly = annual != null ? annual / 12 : null
   const energyItems = summary.items.filter(i => /gas|electric|energy|power/i.test(i.label))
-  const budgeted = energyItems.reduce((a, i) => a + i.amount, 0)
+  const budgeted = energyItems.reduce((a, i) => a + itemAmountForMonth(i), 0)
   const gap = monthly != null && energyItems.length > 0 ? budgeted - monthly : null
 
   return (
@@ -486,7 +486,7 @@ function PropertyCard({ summary, ownerName, budget, focused, onFocusHandled, onO
                   {items.map(i => (
                     <div key={i.id} className="flex justify-between text-xs gap-2">
                       <span className="text-muted truncate">{i.label} <span className="text-caption">· {i.category}</span></span>
-                      <span className="tabular-nums font-semibold shrink-0">{fmt(i.amount)}</span>
+                      <span className="tabular-nums font-semibold shrink-0">{fmt(itemAmountForMonth(i))}</span>
                     </div>
                   ))}
                   <div className="flex justify-between text-xs pt-1.5 mt-1 border-t border-border font-semibold">

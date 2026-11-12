@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  Category, LineItem, TabFilter, Owner, EntryType, Debt, Property, fmt, daysUntil, isInsuranceItem,
+  itemAmountForMonth, paymentScheduleLabel, PAYMENT_MONTHS, Category, LineItem, TabFilter, Owner, EntryType, Debt, Property, fmt, daysUntil, isInsuranceItem,
   debtPayoff, isMortgage, propertySummaries, nextPayday, energySwitchReminders, householdCostSplit,
   OneOff, monthKey, PayPeriod, BudgetData, paydayFor, periodFor, upcomingRenewals,
 } from '@/lib/models'
@@ -383,12 +383,43 @@ function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, o
         <NumberInput
           value={item.amount || undefined}
           onChange={v => updateItemAmount(cat.key, item.id, v ?? 0)}
-          ariaLabel={`Amount per month for ${item.label}`}
+          ariaLabel={`Amount per ${item.paymentMonths ? "payment" : "month"} for ${item.label}`}
           className="amount-input num"
         />
-        <span className="suffix">a month</span>
+        <span className="suffix">{item.paymentMonths ? "per payment" : "a month"}</span>
       </label>
-      {focus === 'amount' && <AutoFocus selector='input[aria-label^="Amount per month"]' />}
+      {focus === 'amount' && <AutoFocus selector='input[aria-label^="Amount per "]' />}
+
+      {isExpense && (
+        <div className="py-3 border-t border-line">
+          <label className="block text-[15px] text-ink mb-2" htmlFor="payment-frequency">Charged</label>
+          <select id="payment-frequency" className={`${inputClass} w-full`} value={item.paymentMonths ? 'selected' : 'monthly'}
+            onChange={e => budget.updateItemPaymentSchedule(cat.key, item.id, { paymentMonths: e.target.value === 'monthly' ? undefined : [new Date().getMonth() + 1] })}>
+            <option value="monthly">Every month</option>
+            <option value="selected">Only in selected months</option>
+          </select>
+          {item.paymentMonths && <>
+            <div className="grid grid-cols-3 gap-2 mt-3" role="group" aria-label="Months charged">
+              {PAYMENT_MONTHS.map((month, index) => {
+                const selected = item.paymentMonths!.includes(index + 1)
+                return <button key={month} aria-pressed={selected}
+                  disabled={selected && item.paymentMonths!.length === 1}
+                  className={`min-h-[44px] rounded-xl text-label cursor-pointer ${selected ? 'bg-ink text-on-ink' : 'bg-fill text-ink'}`}
+                  onClick={() => budget.updateItemPaymentSchedule(cat.key, item.id, { paymentMonths: selected ? item.paymentMonths!.filter(m => m !== index + 1) : [...item.paymentMonths!, index + 1].sort((a, b) => a - b) })}>{month}</button>
+              })}
+            </div>
+            <p className="text-caption text-muted mt-2 mb-0">Enter the full amount of each bill. It counts only in the selected calendar months, not spread across the year. This month: {fmt(itemAmountForMonth(item))}.</p>
+          </>}
+          {/water/i.test(item.label) && <button className="min-h-[44px] text-label underline text-ink cursor-pointer" onClick={() => budget.updateItemPaymentSchedule(cat.key, item.id, { paymentMonths: [5, 11], paymentDay: 13 })}>Use Thames Water dates: 13 May & 13 November</button>}
+          <SheetRow label="Payment day (optional)">
+            <select aria-label="Payment day" value={item.paymentDay ?? ''} className={`${inputClass} w-full`}
+              onChange={e => budget.updateItemPaymentSchedule(cat.key, item.id, { paymentDay: e.target.value ? Number(e.target.value) : undefined })}>
+              <option value="">Not set</option>
+              {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+            </select>
+          </SheetRow>
+        </div>
+      )}
 
       {moving && <MoveSheet type={cat.type} title={`Move ${item.label}`} current={[{ catKey: cat.key, owner: cat.owner }]} budget={budget} ownerName={ownerName} onMove={move} onClose={() => setMoving(false)} />}
 
@@ -509,6 +540,7 @@ function ItemRow({ item, onOpen }: { item: LineItem; onOpen: () => void }) {
     <button onClick={onOpen} className="w-full flex items-center gap-3 pl-5 min-h-[52px] py-2 text-left border-t border-line cursor-pointer">
       <span className="flex-1 min-w-0">
         <span className="block text-[15px] text-ink truncate">{item.label}</span>
+        {item.paymentMonths && <span className="block text-caption text-muted">{fmt(item.amount)} per payment · {paymentScheduleLabel(item)}{itemAmountForMonth(item) === 0 ? ' · Not charged this month' : ''}</span>}
         {(flag || item.sharedContribution) && (
           <span className="block text-caption text-muted truncate">
             {flag && <span className={`font-medium ${flag.cls}`}>{flag.text}</span>}
@@ -517,7 +549,7 @@ function ItemRow({ item, onOpen }: { item: LineItem; onOpen: () => void }) {
           </span>
         )}
       </span>
-      <span className={`text-[15px] ${item.amount > 0 ? 'text-ink' : 'text-faint'}`}>{item.amount > 0 ? <Money value={item.amount} /> : '—'}</span>
+      <span className={`text-[15px] ${itemAmountForMonth(item) > 0 ? 'text-ink' : 'text-faint'}`}>{itemAmountForMonth(item) > 0 ? <Money value={itemAmountForMonth(item)} /> : '—'}</span>
       <ChevronRight size={16} className="text-faint shrink-0" aria-hidden="true" />
     </button>
   )
@@ -548,7 +580,7 @@ function CategoryGroup({ cat, items, ownerName, budget, onOpenItem, extraFlag, a
   const [renaming, setRenaming] = useState(false)
   const [nameDraft, setNameDraft] = useState(cat.label)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const total = items.reduce((a, i) => a + i.amount, 0)
+  const total = items.reduce((a, i) => a + itemAmountForMonth(i), 0)
   const submit = () => { if (newLabel.trim()) { addItem(cat.key, newLabel.trim()); setNewLabel(''); setAdding(false) } }
 
   return (
@@ -973,7 +1005,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
     .filter(v => !propertyId || v.items.length > 0)
     .sort((a, b) => OWNER_ORDER.indexOf(a.cat.owner) - OWNER_ORDER.indexOf(b.cat.owner))
   const byType = (t: EntryType) => visible.filter(v => v.cat.type === t)
-  const sum = (vs: typeof visible) => vs.reduce((a, v) => a + v.items.reduce((b, i) => b + i.amount, 0), 0)
+  const sum = (vs: typeof visible) => vs.reduce((a, v) => a + v.items.reduce((b, i) => b + itemAmountForMonth(i), 0), 0)
   const itemCount = (vs: typeof visible) => vs.reduce((a, v) => a + v.items.length, 0)
 
   const visibleDebts = data.debts.filter(d => propertyId ? d.propertyId === propertyId : !ownerTab || d.owner === ownerTab)

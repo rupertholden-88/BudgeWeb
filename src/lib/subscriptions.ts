@@ -1,4 +1,4 @@
-import { BudgetData, Owner, isInsuranceItem } from './models'
+import { itemAmountForMonth, BudgetData, Owner, isInsuranceItem } from './models'
 
 /** Streaming, apps, memberships and the like, by name. */
 const SUBSCRIPTION = /netflix|spotify|disney|prime video|amazon prime|\bprime\b|apple (music|tv|one|arcade)|icloud|youtube|now tv|\bsky\b|paramount|britbox|discovery\+|audible|kindle unlimited|xbox|playstation|ps plus|nintendo|game pass|patreon|substack|google one|dropbox|onedrive|microsoft 365|office 365|adobe|chatgpt|claude|openai|\bgym\b|puregym|peloton|strava|headspace|\bcalm\b|duolingo|newspaper|the times|guardian|economist|magazine|tv licen[cs]e|subscription|membership|\bnetflix\b|\bapp\b|hello ?fresh|gousto|graze|ocado smart|deliver(y|oo) plus|uber one/i
@@ -33,7 +33,7 @@ export function subscriptions(data: BudgetData): Subscription[] {
     .filter(c => c.type === 'EXPENSE')
     .flatMap(c => c.items.flatMap(i => {
       const kind = subscriptionKind(i.label, c.label, i.recurring)
-      return kind ? [{ id: i.id, catKey: c.key, label: i.label, owner: c.owner, amount: i.amount, kind, renewalDate: i.renewalDate, autoRenews: i.autoRenews, icon: i.icon }] : []
+      return kind ? [{ id: i.id, catKey: c.key, label: i.label, owner: c.owner, amount: itemAmountForMonth(i), kind, renewalDate: i.renewalDate, autoRenews: i.autoRenews, icon: i.icon }] : []
     }))
     .sort((a, b) => b.amount - a.amount)
 }
