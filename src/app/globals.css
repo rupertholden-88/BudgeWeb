@@ -532,3 +532,10 @@ button:focus-visible {
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible { outline-offset: -1px !important; }
+
+/* Portfolio slides move together, with a gentle fade and a resizing frame. */
+.portfolio-viewport { overflow: hidden; transition: height 420ms cubic-bezier(.22, 1, .36, 1); }
+.portfolio-track { display: flex; align-items: flex-start; transition: transform 420ms cubic-bezier(.22, 1, .36, 1); }
+.portfolio-slide { flex: 0 0 100%; min-width: 0; opacity: .25; transition: opacity 320ms ease; }
+.portfolio-slide.is-active { opacity: 1; }
+.portfolio-slide[aria-hidden="true"] { pointer-events: none; }

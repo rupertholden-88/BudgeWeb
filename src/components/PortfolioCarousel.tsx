@@ -1,0 +1,109 @@
+'use client'
+
+import { useEffect, useId, useRef, useState } from 'react'
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { fmt } from '@/lib/models'
+
+type Point = { month: string; total: number | null; [key: string]: string | number | null }
+type Series = { key: string; color: string }
+
+function axisMoney(value: number) {
+  return Math.abs(value) >= 1000 ? `£${Number((value / 1000).toFixed(1))}k` : `£${Math.round(value)}`
+}
+
+function focusedDomain([min, max]: [number, number]): [number, number] {
+  const pad = Math.max((max - min) * 0.2, Math.abs(max) * 0.01, 1)
+  return [Math.max(0, Math.floor(min - pad)), Math.ceil(max + pad)]
+}
+
+function ValueTooltip({ active, payload, label }: any) {
+  const value = payload?.[0]?.value
+  if (!active || value == null) return null
+  return <div className="rounded-xl border border-line bg-panel px-3 py-2 shadow-lg text-label">
+    <div className="text-muted">{label}</div><div className="font-semibold num text-ink">{fmt(value)}</div>
+  </div>
+}
+
+function Trend({ points, seriesKey, color, compact = false }: { points: Point[]; seriesKey: string; color: string; compact?: boolean }) {
+  const gradient = useId().replace(/:/g, '')
+  const values = points.filter(p => typeof p[seriesKey] === 'number')
+  if (!values.length) return <p className="text-label text-muted py-6">No balances recorded yet.</p>
+  return <>
+    <div aria-hidden="true" className="w-full min-w-0" style={{ height: compact ? 126 : 224 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={points} margin={{ top: 12, right: 12, left: 0, bottom: 0 }} accessibilityLayer={false}>
+          <defs><linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity={0.2} /><stop offset="100%" stopColor={color} stopOpacity={0.02} /></linearGradient></defs>
+          <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 5" />
+          <XAxis dataKey="month" axisLine={false} tickLine={false} minTickGap={24} tick={{ fontSize: 10, fill: 'var(--muted)' }} />
+          <YAxis width={54} axisLine={false} tickLine={false} tickCount={compact ? 3 : 5} domain={focusedDomain} tickFormatter={axisMoney} tick={{ fontSize: 10, fill: 'var(--muted)' }} />
+          <Tooltip content={<ValueTooltip />} cursor={{ stroke: 'var(--muted)', strokeDasharray: '3 3' }} />
+          <Area type="linear" dataKey={seriesKey} stroke={color} strokeWidth={2.5} fill={`url(#${gradient})`} connectNulls={false} dot={{ r: 3, fill: 'var(--panel)', strokeWidth: 2 }} activeDot={{ r: 5, stroke: 'var(--panel)', strokeWidth: 2 }} isAnimationActive={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+    <table className="sr-only"><caption>{seriesKey === 'total' ? 'Total portfolio value' : seriesKey} by month</caption><tbody>{points.map(p => <tr key={p.month}><th>{p.month}</th><td>{typeof p[seriesKey] === 'number' ? fmt(p[seriesKey] as number) : 'Not recorded'}</td></tr>)}</tbody></table>
+    {values.length === 1 && <p className="text-caption text-muted mt-1">One month recorded. Your trend will build as you save more balances.</p>}
+  </>
+}
+
+export default function PortfolioCarousel({ points, series, total, change }: { points: Point[]; series: Series[]; total: number; change: number | null }) {
+  const [slide, setSlide] = useState(0)
+  const [height, setHeight] = useState<number>()
+  const first = useRef<HTMLDivElement>(null)
+  const second = useRef<HTMLDivElement>(null)
+  const touch = useRef<{ x: number; y: number } | null>(null)
+  const id = useId()
+  useEffect(() => {
+    const panel = slide === 0 ? first.current : second.current
+    if (!panel) return
+    const observer = new ResizeObserver(() => setHeight(panel.getBoundingClientRect().height))
+    observer.observe(panel)
+    setHeight(panel.getBoundingClientRect().height)
+    return () => observer.disconnect()
+  }, [slide])
+  const latest = points[points.length - 1]
+  return <section className="card p-4 sm:p-5 mb-4 portfolio-carousel" aria-label="Portfolio charts" aria-roledescription="carousel"
+    onKeyDown={e => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); setSlide(e.key === 'ArrowRight' ? 1 : 0) } }}
+    onTouchStart={e => { e.stopPropagation(); touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY } }}
+    onTouchMove={e => e.stopPropagation()}
+    onTouchCancel={e => { e.stopPropagation(); touch.current = null }}
+    onTouchEnd={e => { e.stopPropagation(); const start = touch.current; touch.current = null; if (!start) return; const dx = e.changedTouches[0].clientX - start.x; const dy = e.changedTouches[0].clientY - start.y; if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.5) setSlide(dx < 0 ? 1 : 0) }}>
+    <div className="flex items-center justify-between gap-3 mb-4">
+      <span className="text-caption font-semibold uppercase tracking-label text-muted">Portfolio</span>
+      <span className="text-caption text-muted num" aria-live="polite">{slide + 1} / 2 · {slide === 0 ? 'Total value' : 'By asset'}</span>
+    </div>
+    <div className="seg grid-cols-2 mb-4" role="group" aria-label="Portfolio view">
+      {['Total value', 'By asset'].map((label, i) => <button key={label} aria-pressed={slide === i} aria-controls={`${id}-${i}`} onClick={() => setSlide(i)}><span className="lbl">{label}</span></button>)}
+    </div>
+    <div className="portfolio-viewport" style={{ height }}>
+      <div className="portfolio-track" style={{ transform: `translateX(-${slide * 100}%)` }}>
+        <div ref={first} id={`${id}-0`} role="group" aria-roledescription="slide" aria-label="1 of 2: Total value" aria-hidden={slide !== 0} className={`portfolio-slide ${slide === 0 ? 'is-active' : ''}`}>
+          <div className="text-[34px] leading-tight font-semibold tracking-tight num">{fmt(total)}</div>
+          <p className={`text-label mt-1 mb-3 ${change == null || change === 0 ? 'text-muted' : change > 0 ? 'text-positive' : 'text-negative'}`}>
+            {change == null ? 'No previous-month balance to compare' : `${change > 0 ? '+' : change < 0 ? '−' : ''}${fmt(Math.abs(change))} vs last month`}
+          </p>
+          <Trend points={points} seriesKey="total" color="var(--positive)" />
+          <p className="text-caption text-muted mt-2 mb-4">Focused £ scale to show smaller changes. Gaps mean no recorded balance.</p>
+          <div className="border-t border-line pt-3 space-y-2">
+            {series.filter(s => typeof latest?.[s.key] === 'number' && Number(latest[s.key]) > 0).map(s => <div key={s.key} className="flex items-center justify-between gap-2 text-label"><span className="flex items-center gap-2 text-muted"><span className="w-2 h-2 rounded-full" style={{ background: s.color }} />{s.key}</span><span className="num font-medium">{fmt(latest[s.key] as number)}</span></div>)}
+          </div>
+        </div>
+        <div ref={second} id={`${id}-1`} role="group" aria-roledescription="slide" aria-label="2 of 2: By asset" aria-hidden={slide !== 1} className={`portfolio-slide ${slide === 1 ? 'is-active' : ''}`}>
+          <h3 className="text-[22px] font-semibold mt-0 mb-1">A closer look</h3>
+          <p className="text-caption text-muted mt-0 mb-4">Each asset type has its own £ scale.</p>
+          <div className="space-y-3">{series.map(s => <div key={s.key} className="rounded-2xl border border-line px-2 pt-3 pb-1">
+            <div className="flex justify-between gap-2 items-center px-2 mb-1 text-label"><span className="flex gap-2 items-center font-medium"><span className="w-2 h-2 rounded-full" style={{ background: s.color }} />{s.key}</span><span className="font-semibold num">{typeof latest?.[s.key] === 'number' ? fmt(latest[s.key] as number) : '—'}</span></div>
+            <Trend points={points} seriesKey={s.key} color={s.color} compact />
+          </div>)}</div>
+        </div>
+      </div>
+    </div>
+    <div className="flex justify-between items-center mt-3 border-t border-line pt-2">
+      <button aria-label="Previous portfolio slide" disabled={slide === 0} onClick={() => setSlide(0)} className="min-h-[44px] min-w-[44px] grid place-items-center rounded-full disabled:opacity-25 text-muted"><ChevronLeft size={18} /></button>
+      <span className="text-caption text-muted">{slide === 0 ? 'Swipe for asset trends' : 'Swipe for total value'}</span>
+      <button aria-label="Next portfolio slide" disabled={slide === 1} onClick={() => setSlide(1)} className="min-h-[44px] min-w-[44px] grid place-items-center rounded-full disabled:opacity-25 text-muted"><ChevronRight size={18} /></button>
+    </div>
+    <p className="text-caption text-muted mb-0 mt-1">Balance changes include deposits and withdrawals. Pensions shown separately below.</p>
+  </section>
+}
