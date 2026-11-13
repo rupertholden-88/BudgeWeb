@@ -7,6 +7,7 @@ import { StatCard, ConfirmDelete, AmountCell, TapToEdit, ExpandButton, DeleteAct
 import PropertiesSection from './PropertiesSection'
 import PortfolioCarousel from './PortfolioCarousel'
 import PensionOverview from './PensionOverview'
+import { pensionHistory } from '@/lib/pensionHistory'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -338,36 +339,9 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
   })
   const activeTypes = REGULAR_ASSET_TYPES.filter(type => chartData.some(row => Number(row[ASSET_LABELS[type]]) > 0))
 
-  // A missing pension entry is unknown, not a zero balance before it was added.
-  const pensionOwners = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(owner => ({
-    key: owner, label: owner === 'NIAMH' ? n1 : owner === 'RUPERT' ? n2 : n3,
-    color: owner === 'NIAMH' ? 'var(--niamh)' : owner === 'RUPERT' ? 'var(--rupert)' : 'var(--joint)',
-  }))
-  // Asset ids change between monthly snapshots; match pots by owner and name.
-  const pensionPotKey = (owner: Owner, label: string) => `pot:${owner}:${label.trim().toLowerCase()}`
-  const pensionPots = Array.from(new Map(data.savingsHistory
-    .filter(s => chartMonths.includes(s.date.slice(0, 7)))
-    .flatMap(s => (Array.isArray(s.assets) ? s.assets : []).filter(a => a.type === 'PENSION').map(a => [pensionPotKey(s.owner, a.label), {
-      key: pensionPotKey(s.owner, a.label), label: a.label, owner: s.owner, ownerLabel: s.owner === 'NIAMH' ? n1 : s.owner === 'RUPERT' ? n2 : n3,
-      color: s.owner === 'NIAMH' ? 'var(--niamh)' : s.owner === 'RUPERT' ? 'var(--rupert)' : 'var(--joint)',
-    }] as const))).values())
-  const pensionChartData = chartMonths.map(month => {
-    const row: { month: string; total: number | null; [key: string]: string | number | null } = { month: formatMonth(month), total: null }
-    pensionOwners.forEach(({ key }) => {
-      const pensions = data.savingsHistory.filter(s => s.owner === key && s.date.slice(0, 7) === month)
-        .flatMap(s => Array.isArray(s.assets) ? s.assets : []).filter(a => a.type === 'PENSION')
-      row[key] = pensions.length ? pensions.reduce((sum, a) => sum + (a.amount || 0), 0) : null
-    })
-    pensionPots.forEach(pot => {
-      const entries = data.savingsHistory.filter(s => s.date.slice(0, 7) === month)
-        .flatMap(s => (Array.isArray(s.assets) ? s.assets : []).filter(a => a.type === 'PENSION' && pensionPotKey(s.owner, a.label) === pot.key))
-      row[pot.key] = entries.length ? entries.reduce((sum, a) => sum + a.amount, 0) : null
-    })
-    const recorded = pensionOwners.map(o => row[o.key]).filter((v): v is number => typeof v === 'number')
-    row.total = recorded.length ? recorded.reduce((sum, v) => sum + v, 0) : null
-    return row
-  })
-  const activePensionOwners = pensionOwners.filter(o => pensionChartData.some(row => typeof row[o.key] === 'number'))
+  const pension = pensionHistory(data, chartMonths, today)
+  const pensionPots = pension.pots
+  const pensionChartData = pension.rows.map(row => ({ ...row, month: formatMonth(row.month) }))
   const previousPensions = data.savingsHistory.filter(s => s.date.slice(0, 7) === lastMonth)
     .flatMap(s => Array.isArray(s.assets) ? s.assets : []).filter(a => a.type === 'PENSION')
   const pensionChange = previousPensions.length ? totalPensions - previousPensions.reduce((sum, a) => sum + (a.amount || 0), 0) : null
@@ -470,8 +444,8 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
         )}
         {pensionContributions.total === 0 && <div className="mb-4" />}
 
-        {activePensionOwners.length > 0 && (
-          <PensionOverview points={pensionChartData} pots={pensionPots} total={totalPensions} change={pensionChange} />
+        {pensionPots.length > 0 && (
+          <PensionOverview points={pensionChartData} pots={pensionPots} total={totalPensions} change={pensionChange} onHistoryNames={(pot, names) => updateAssetFields(pot.owner, today, pot.assetId, { pensionHistoryNames: names })} />
         )}
 
         <PensionOwnerPanel owner="NIAMH"  name={n1} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />

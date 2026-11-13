@@ -582,7 +582,7 @@ export function useBudget() {
   const updateAsset = (owner: Owner, date: string, assetId: string, amount: number, interestRate?: number, institution?: string, label?: string, type?: AssetType) => {
     mutate(b => {
       const snap = getOrCopySnapshot(b, owner, date)
-      const updated = { ...snap, assets: snap.assets.map(a => a.id === assetId ? { ...a, amount, interestRate, institution, ...(label !== undefined && { label }), ...(type !== undefined && { type }) } : a) }
+      const updated = { ...snap, assets: snap.assets.map(a => a.id === assetId ? { ...a, amount, interestRate, institution, ...(label !== undefined && { label, ...(a.type === 'PENSION' && label.trim().toLowerCase() !== a.label.trim().toLowerCase() && { pensionHistoryNames: Array.from(new Set([...(a.pensionHistoryNames ?? []), a.label])) }) }), ...(type !== undefined && { type }) } : a) }
       return { ...b, savingsHistory: [...b.savingsHistory.filter(s => !(s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7))), updated].sort((a, z) => a.date.localeCompare(z.date)) }
     })
   }
@@ -591,7 +591,7 @@ export function useBudget() {
   const updateAssetFields = (owner: Owner, date: string, assetId: string, fields: Partial<Asset>) => {
     mutate(b => {
       const snap = getOrCopySnapshot(b, owner, date)
-      const updated = { ...snap, assets: snap.assets.map(a => a.id === assetId ? { ...a, ...fields } : a) }
+      const updated = { ...snap, assets: snap.assets.map(a => a.id === assetId ? { ...a, ...fields, ...(a.type === 'PENSION' && fields.label !== undefined && fields.label.trim().toLowerCase() !== a.label.trim().toLowerCase() && { pensionHistoryNames: Array.from(new Set([...(fields.pensionHistoryNames ?? a.pensionHistoryNames ?? []), a.label])) }) } : a) }
       return { ...b, savingsHistory: [...b.savingsHistory.filter(s => !(s.owner === owner && s.date.slice(0, 7) === date.slice(0, 7))), updated].sort((a, z) => a.date.localeCompare(z.date)) }
     })
   }
