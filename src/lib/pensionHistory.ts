@@ -11,8 +11,6 @@ export function pensionHistory(data: BudgetData, months: string[], today: string
       ownerLabel: owner === 'NIAMH' ? data.nameNiamh || 'Person 1' : owner === 'RUPERT' ? data.nameRupert || 'Person 2' : data.nameJoint || 'Joint',
       color: owner === 'NIAMH' ? 'var(--niamh)' : owner === 'RUPERT' ? 'var(--rupert)' : 'var(--joint)',
       historyNames: asset.pensionHistoryNames ?? [],
-      earlierNames: Array.from(new Set(data.savingsHistory.filter(s => s.owner === owner && s.date.slice(0, 7) < today)
-        .flatMap(s => (s.assets ?? []).filter(a => a.type === 'PENSION' && !assets.some(current => normal(current.label) === normal(a.label))).map(a => a.label)))),
     }))
   })
   const rows = months.map(month => {
