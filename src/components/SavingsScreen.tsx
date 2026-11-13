@@ -445,7 +445,7 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
         {pensionContributions.total === 0 && <div className="mb-4" />}
 
         {pensionPots.length > 0 && (
-          <PensionOverview points={pensionChartData} pots={pensionPots} total={totalPensions} change={pensionChange} onHistoryNames={(pot, names) => updateAssetFields(pot.owner, today, pot.assetId, { pensionHistoryNames: names })} />
+          <PensionOverview points={pensionChartData} pots={pensionPots} total={totalPensions} change={pensionChange} />
         )}
 
         <PensionOwnerPanel owner="NIAMH"  name={n1} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
