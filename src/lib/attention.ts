@@ -1,3 +1,4 @@
+import { mortgageReviews } from './mortgage'
 import { BudgetData, Owner, Fuel, upcomingRenewals, energySwitchReminders, debtPayoff, isMortgage, fmt } from './models'
 
 /**
@@ -83,6 +84,13 @@ export function needsAttention(data: BudgetData): AttentionItem[] {
         sortKey: r.status === 'open' ? r.daysToEnd : r.daysToFree,
       })
     }
+  }
+
+  for (const review of mortgageReviews(data)) {
+    if (review.stage === 'upcoming') continue
+    items.push({ id: `mortgage:${review.debt.id}`, severity: 'warn', when: review.days < 0 ? 'Date passed' : `${review.days} days`, whenSub: 'deal ends',
+      title: `${review.debt.label}: review your mortgage`, body: review.stage === 'ended' ? 'Deal-end date passed. Confirm your current rate and payment.' : `Your current deal ends ${day(review.date)}. Explore how a different rate would change your payment.`,
+      owner: review.debt.owner, meta: `${ownerName(review.debt.owner)} · ${fmt(review.debt.monthlyPayment)}/mo`, action: { type: 'debt', debtId: review.debt.id }, sortKey: review.days })
   }
 
   // Debts: a payment that never clears the balance, a 0% deal ending soon, or expensive borrowing.

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Owner, Asset, AssetType, fmt, netWorth, monthlyInterest, annualInterest, blendedAer, isCapped, monthKey } from '@/lib/models'
 import { Plus } from 'lucide-react'
-import { StatCard, ConfirmDelete, AmountCell, TapToEdit, ExpandButton, DeleteAction, Field, NumberInput, inputClass, useLongPress, ownerBorderClass } from './ui'
+import { ConfirmDelete, AmountCell, TapToEdit, ExpandButton, DeleteAction, Field, NumberInput, inputClass, useLongPress, ownerBorderClass } from './ui'
 import PropertiesSection from './PropertiesSection'
 import PortfolioCarousel from './PortfolioCarousel'
 import PensionOverview from './PensionOverview'
@@ -281,7 +281,7 @@ function PensionOwnerPanel({ owner, name, budget, addAsset, updateAsset, updateA
   )
 }
 
-export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled, onOpenInsurance }: { budget: BudgetHook; focusPropertyId?: string | null; onFocusHandled?: () => void; onOpenInsurance?: (policyId?: string) => void }) {
+export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled, onOpenInsurance, onOpenMortgage, section = 'accounts' }: { section?: 'accounts' | 'pensions' | 'property'; onOpenMortgage?: (id: string) => void; budget: BudgetHook; focusPropertyId?: string | null; onFocusHandled?: () => void; onOpenInsurance?: (policyId?: string) => void }) {
   const { data, addAsset, updateAsset, updateAssetFields, deleteAsset, resyncInterest } = budget
   const today = monthKey()
 
@@ -356,32 +356,13 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
   const totalMonthly = byOwner.reduce((a, o) => a + o.monthly, 0)
 
   return (
-    <div className="h-full overflow-y-auto px-5 pt-1 pb-[calc(32px+env(safe-area-inset-bottom))]">
-
-      {/* Summary stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
-        <StatCard
-          label="Savings"
-          value={fmtK(totalAll)}
-          sub={monthDiff !== null ? `${monthDiff >= 0 ? '+' : ''}${fmtK(monthDiff)} vs last mo` : undefined}
-          intent={totalAll > 0 ? 'positive' : 'neutral'}
-        />
-        <StatCard label="Pensions" value={fmtK(totalPensions)} intent={totalPensions > 0 ? 'positive' : 'neutral'} />
-        <StatCard
-          label="Property"
-          value={worth.property > 0 ? fmtK(worth.property) : '—'}
-          sub={worth.property > 0 ? 'estimated value' : 'add below'}
-          intent="neutral"
-        />
-        <StatCard
-          label="Net worth"
-          value={fmtK(worth.total)}
-          sub={worth.debts > 0 ? `after ${fmtK(worth.debts)} owed` : undefined}
-          intent={worth.total > 0 ? 'positive' : worth.total < 0 ? 'negative' : 'neutral'}
-        />
-      </div>
+    <div className="px-5 pt-5 pb-[calc(32px+env(safe-area-inset-bottom))]">
 
       <div className="lg:columns-2 lg:gap-5 [&>*]:break-inside-avoid">
+      {section === 'accounts' && <>
+      <div className="flex items-baseline justify-between gap-3 mb-4">
+        <div><h2 className="text-[22px] leading-7 font-semibold tracking-tight m-0">Cash, savings & investments</h2><p className="text-label text-muted mt-1 mb-0">Your accounts and current balances.</p></div>
+      </div>
       {/* Portfolio chart */}
       {(totalAll > 0 || activeTypes.length > 0) && (
         <PortfolioCarousel points={chartData} series={activeTypes.map(type => ({ key: ASSET_LABELS[type], color: ASSET_COLORS[type] }))} total={totalAll} change={monthDiff} />
@@ -425,10 +406,11 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
         </div>
       )}
 
-      <PropertiesSection budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={onFocusHandled} onOpenInsurance={onOpenInsurance} />
+      </>}
+      {section === 'property' && <PropertiesSection budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={onFocusHandled} onOpenInsurance={onOpenInsurance} onOpenMortgage={onOpenMortgage} /> }
 
       {/* Pensions section */}
-      <div className="mt-6 pt-6 border-t-2 border-pension-light">
+      {section === 'pensions' && <div>
         <div className="flex justify-between items-baseline mb-1">
           <h2 className="font-serif text-xl m-0 text-pension">Pensions</h2>
           <div className={`text-lg font-bold tabular-nums ${totalPensions > 0 ? 'text-pension' : 'text-muted'}`}>
@@ -451,7 +433,7 @@ export default function SavingsScreen({ budget, focusPropertyId, onFocusHandled,
         <PensionOwnerPanel owner="NIAMH"  name={n1} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
         <PensionOwnerPanel owner="RUPERT" name={n2} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
         <PensionOwnerPanel owner="JOINT"  name={n3} budget={data} today={today} addAsset={addAsset} updateAsset={updateAsset} updateAssetFields={updateAssetFields} deleteAsset={deleteAsset} />
-      </div>
+      </div>}
       </div>
     </div>
   )

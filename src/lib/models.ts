@@ -84,7 +84,16 @@ export function isCapped(a: InterestBearing): boolean {
   return !!a.rateCap && a.rateCap > 0
 }
 export interface SavingsSnapshot { date: string; owner: Owner; assets: Asset[] }
-export interface Debt { id: string; owner: Owner; type: DebtType; label: string; currentBalance: number; monthlyPayment: number; interestRate: number; isZeroPercent: boolean; zeroPercentExpiryDate?: string; institution?: string; sharedContribution?: boolean; propertyId?: string }
+export interface MortgageDetails {
+  repaymentType?: 'repayment' | 'interestOnly'
+  maturityDate?: string
+  dealEnds?: string
+  balanceDate?: string
+  rateType?: 'fixed' | 'tracker' | 'variable'
+  /** Distinguishes a confirmed 0% rate from an unset legacy value. */
+  rateConfirmed?: boolean
+}
+export interface Debt { id: string; owner: Owner; type: DebtType; label: string; currentBalance: number; monthlyPayment: number; interestRate: number; isZeroPercent: boolean; zeroPercentExpiryDate?: string; institution?: string; sharedContribution?: boolean; propertyId?: string; mortgage?: MortgageDetails }
 /**
  * A home the household owns. Mortgages link to it via `Debt.propertyId` and
  * running costs via `LineItem.propertyId`, so equity and true monthly cost

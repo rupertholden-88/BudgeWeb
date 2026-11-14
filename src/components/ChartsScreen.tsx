@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { localDate } from '@/lib/mortgage'
 import { itemAmountForMonth, fmt, Owner, Debt, upcomingRenewals, householdCostSplit, monthlyInterest, energySwitchReminders, debtPayoff, isMortgage } from '@/lib/models'
 import { buildFinancialSummary, hashSummary } from '@/lib/financialSummary'
 import { useApiKey } from '@/hooks/useApiKey'
@@ -400,7 +401,7 @@ export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth, onO
     const rows = data.debts
       .filter(d => d.currentBalance > 0)
       .map(d => {
-        const p = debtPayoff(d)
+        const p = isMortgage(d) && d.mortgage?.repaymentType === 'interestOnly' ? { months: null, interest: 0 } : debtPayoff(d)
         const naive = d.monthlyPayment > 0 ? Math.ceil(d.currentBalance / d.monthlyPayment) : null
         return { debt: d, months: p.months, interest: p.months == null ? null : p.interest, naive }
       })
@@ -796,7 +797,9 @@ export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth, onO
                     <div className="flex justify-between items-baseline mb-1">
                       <span className="text-body font-medium text-ink truncate pr-2">{debt.label}</span>
                       <span className="text-xs tabular-nums text-muted shrink-0">
-                        {months == null
+                        {isMortgage(debt) && debt.mortgage?.repaymentType === 'interestOnly'
+                          ? <span>Interest-only</span>
+                          : months == null
                           ? <span className="text-negative font-semibold">never at this rate</span>
                           : <>{months} mo · <span className="text-ink font-semibold">{addMonths(months)}</span></>
                         }
@@ -809,7 +812,7 @@ export default function ChartsScreen({ budget, onOpenProperty, onOpenWealth, onO
                       />
                     </div>
                     <div className="text-caption text-muted mt-1">
-                      {fmt(debt.currentBalance)} at {debt.isZeroPercent ? `0%${debt.interestRate ? `, then ${debt.interestRate}%` : ''}` : `${debt.interestRate}%`}
+                      {debt.mortgage?.repaymentType === 'interestOnly' && <>Capital due {localDate(debt.mortgage.maturityDate)?.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) ?? 'at mortgage end'} · </>}{fmt(debt.currentBalance)} at {debt.isZeroPercent ? `0%${debt.interestRate ? `, then ${debt.interestRate}%` : ''}` : `${debt.interestRate}%`}
                       {interest != null && interest >= 1 && ` · ${fmt(interest)} interest to come`}
                       {!isMortgage(debt) && naive != null && months != null && months > naive &&
                         ` · ${months - naive} mo longer than the balance suggests`}

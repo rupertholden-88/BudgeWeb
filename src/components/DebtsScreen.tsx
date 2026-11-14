@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Owner, DebtType, Debt, Property, fmt, debtPayoff, paymentToClear, daysUntil } from '@/lib/models'
 import { Plus, Home, Merge } from 'lucide-react'
 import { ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, NumberInput, inputClass, useLongPress, ownerBorderClass, MonthInput } from './ui'
@@ -137,7 +137,8 @@ function CombineWith({ debt, others, onCombine }: { debt: Debt; others: Debt[]; 
   )
 }
 
-function DebtCard({ debt, ownerName, properties, onUpdate, onDelete, others, onCombine }: {
+function DebtCard({ debt, ownerName, properties, onUpdate, onDelete, others, onCombine, onOpenMortgage }: {
+  onOpenMortgage?: (id: string) => void;
   debt: Debt; ownerName: string; properties: Property[]
   onUpdate: (id: string, fields: Partial<Debt>) => void
   onDelete: (id: string) => void
@@ -154,7 +155,7 @@ function DebtCard({ debt, ownerName, properties, onUpdate, onDelete, others, onC
   // Amortised, not balance ÷ payment — interest makes the real figure longer,
   // and a payment below the monthly interest never clears it at all.
   // Simulated month by month, so a 0% deal switches to its follow-on rate when it ends.
-  const months = debt.currentBalance > 0 && debt.monthlyPayment > 0 ? debtPayoff(debt).months : undefined
+  const months = debt.type === 'MORTGAGE' ? undefined : debt.currentBalance > 0 && debt.monthlyPayment > 0 ? debtPayoff(debt).months : undefined
   const property = properties.find(p => p.id === debt.propertyId)
   const securable = debt.type === 'MORTGAGE' || debt.type === 'OTHER' || debt.type === 'PERSONAL_LOAN'
 
@@ -201,15 +202,20 @@ function DebtCard({ debt, ownerName, properties, onUpdate, onDelete, others, onC
             )}
           </div>
           <div className="text-right shrink-0">
-            <div className="font-serif font-bold text-lg tabular-nums text-negative leading-tight">{fmt(debt.currentBalance)}</div>
+            <div className={`font-serif font-bold text-lg tabular-nums ${debt.type === 'MORTGAGE' ? 'text-ink' : 'text-negative'} leading-tight`}>{fmt(debt.currentBalance)}</div>
             {debt.monthlyPayment > 0 && <div className="text-label text-muted">{fmt(debt.monthlyPayment)}/mo</div>}
           </div>
           <ExpandButton expanded={expanded} onClick={() => setExpanded(e => !e)} label={expanded ? 'Collapse debt details' : 'Expand debt details'} />
         </div>
 
+        {debt.type === 'MORTGAGE' && onOpenMortgage && <button onClick={() => onOpenMortgage(debt.id)} className="w-full px-3 py-3 min-h-[48px] border-t border-line flex justify-between items-center gap-3 text-left cursor-pointer">
+          <span><span className="block text-[15px] font-semibold">Mortgage planner</span><span className="block text-caption text-muted">{debt.mortgage?.dealEnds ? `Deal ends ${new Date(debt.mortgage.dealEnds + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Deal details, renewal and rate scenarios'}</span></span>
+          <span className="text-muted" aria-hidden="true">→</span>
+        </button>}
+
         {expanded && (
           <div className="px-3 pb-2 border-t border-border">
-            <PanelSection title="Figures">
+            {debt.type !== 'MORTGAGE' && <PanelSection title="Figures">
               <div className="grid grid-cols-3 gap-2">
                 {([
                   { label: 'Balance £', value: debt.currentBalance, key: 'currentBalance' },
@@ -247,7 +253,7 @@ function DebtCard({ debt, ownerName, properties, onUpdate, onDelete, others, onC
                 placeholder="Lender (optional)"
                 className={`${inputClass} mt-2 w-full`}
               />
-            </PanelSection>
+            </PanelSection>}
 
             {debt.type !== 'MORTGAGE' && debt.currentBalance > 0 && (
               <PanelSection title="Pay it off">
@@ -302,9 +308,12 @@ function DebtCard({ debt, ownerName, properties, onUpdate, onDelete, others, onC
   )
 }
 
-export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
+export default function DebtsScreen({ budget, onOpenMortgage }: { budget: BudgetHook; onOpenMortgage?: (id: string) => void }) {
   const { data, addDebt, updateDebt, deleteDebt, combineDebts, totals } = budget
   const [adding, setAdding] = useState(false)
+  const addForm = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (adding) addForm.current?.scrollIntoView({ block: 'nearest' }) }, [adding])
+  const startAdding = (type: DebtType) => { setNewType(type); setAdding(true) }
   const [newLabel, setNewLabel] = useState('')
   const [newOwner, setNewOwner] = useState<Owner>('JOINT')
   const [newType, setNewType] = useState<DebtType>('CREDIT_CARD')
@@ -315,7 +324,9 @@ export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
   const properties = data.properties ?? []
 
   return (
-    <div className="h-full overflow-y-auto px-5 pt-1 pb-[calc(32px+env(safe-area-inset-bottom))]">
+    <div className="px-5 pt-5 pb-[calc(32px+env(safe-area-inset-bottom))]">
+      <h2 className="text-[22px] font-semibold tracking-tight m-0">Mortgages, loans & cards</h2>
+      <p className="text-label text-muted mt-1 mb-5">Your outstanding balances and monthly payments.</p>
       <div className="flex justify-between items-baseline mb-4">
         <h2 className="text-[22px] leading-7 font-semibold tracking-[-0.01em] m-0">Total owed</h2>
         <div className={`text-[22px] font-bold tabular-nums ${totalBalance > 0 ? 'text-negative' : 'text-muted'}`}>{fmt(totalBalance)}</div>
@@ -336,27 +347,30 @@ export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
         </div>
       )}
 
-      <div className="lg:columns-2 lg:gap-5 [&>*]:break-inside-avoid">
-        {data.debts.map(d => (
-          <DebtCard
+      {([['MORTGAGE', 'Mortgages'], ['OTHER', 'Other borrowing']] as const).map(([group, title]) => {
+        const debts = data.debts.filter(debt => group === 'MORTGAGE' ? debt.type === 'MORTGAGE' : debt.type !== 'MORTGAGE')
+        return <section key={group} className="mb-5" aria-label={title}>
+          <div className="flex items-center justify-between gap-3 mb-2"><h3 className="text-[19px] font-semibold m-0">{title}</h3><button onClick={() => startAdding(group === 'MORTGAGE' ? 'MORTGAGE' : 'CREDIT_CARD')} className="text-label text-ink-2 min-h-[44px] flex items-center gap-1.5 cursor-pointer"><Plus size={16} /> {group === 'MORTGAGE' ? 'Add mortgage' : 'Add debt'}</button></div>
+          {debts.length === 0 ? <p className="text-label text-muted mt-0 mb-2">{group === 'MORTGAGE' ? 'No mortgage added. Add one to track its balance and plan for a new rate.' : 'No other borrowing added.'}</p> : <div className="lg:columns-2 lg:gap-5 [&>*]:break-inside-avoid">{debts.map(d => <DebtCard
             key={d.id} debt={d} ownerName={ownerName(d.owner)} properties={properties} onUpdate={updateDebt} onDelete={deleteDebt}
-            others={data.debts.filter(o => o.id !== d.id && o.type !== 'MORTGAGE')}
+            others={data.debts.filter(o => o.id !== d.id && o.type !== 'MORTGAGE')} onOpenMortgage={onOpenMortgage}
             onCombine={(ids, fields) => combineDebts(d.id, ids, fields)}
-          />
-        ))}
-      </div>
+          />)}</div>}
+        </section>
+      })}
 
       {data.debts.length === 0 && !adding && (
         <div className="text-center text-muted mt-8 text-sm">No debts added yet.</div>
       )}
 
       {adding ? (
-        <div className="card p-3 mt-2">
+        <div ref={addForm} className="card p-3 mt-2">
           <input
             value={newLabel}
             onChange={e => setNewLabel(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') submit() }}
-            placeholder="Debt name…"
+            aria-label="Debt name"
+            placeholder={newType === 'MORTGAGE' ? "Mortgage name, e.g. Main loan" : "Debt name…"}
             autoFocus
             className={`${inputClass} w-full mb-2`}
           />
@@ -377,7 +391,7 @@ export default function DebtsScreen({ budget }: { budget: BudgetHook }) {
         </div>
       ) : (
         <button
-          onClick={() => setAdding(true)}
+          onClick={() => startAdding('CREDIT_CARD')}
           className="flex items-center justify-center gap-2 mt-3 w-full min-h-[52px] border-2 border-dashed border-line-2 rounded-xl text-ink-2 text-[15px] cursor-pointer bg-transparent"
         >
           <Plus size={14} /> Add debt
