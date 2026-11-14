@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { useBudget } from '@/hooks/useBudget'
 import BudgetScreen from '@/components/BudgetScreen'
 import WealthScreen from '@/components/WealthScreen'
+import MortgagePlanner from '@/components/MortgagePlanner'
 import Brand from '@/components/Brand'
 import SettingsScreen from '@/components/SettingsScreen'
 import { TabFilter } from '@/lib/models'
@@ -109,6 +110,8 @@ export default function HomePage() {
   const [focusPolicyId, setFocusPolicyId] = useState<string | null>(null)
   const openInsurance = (from: Screen, policyId?: string) => { setInsuranceFrom(from); setFocusPolicyId(policyId ?? null); setScreen('insurance') }
   const navScreen: Screen = screen === 'insurance' ? insuranceFrom : screen
+  const [focusBorrowing, setFocusBorrowing] = useState(false)
+  const [mortgageId, setMortgageId] = useState<string | null>(null)
   const [setupDone, setSetupDone] = useState(false)
   const [toast, setToast] = useState<{ msg: string; action?: { label: string; run: () => void } } | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -116,7 +119,7 @@ export default function HomePage() {
   const { data, user, authLoading, cloudLoading, localLoading, signIn, signOutUser, updateOwnerName } = budget
   // Renewals that need acting on badge the Renewals tab; everything else badges Analysis.
   const attention = needsAttention(data)
-  const renewalCount = attention.filter(a => a.action.type === 'renewal').length
+  const renewalCount = attention.filter(a => a.action.type === 'renewal' || a.id.startsWith('mortgage:')).length
   const attentionCount = attention.length - renewalCount
   // A property filter outlives its property if that property is deleted.
   const activeTab: TabFilter = tab.startsWith('property:') && !(data.properties ?? []).some(p => `property:${p.id}` === tab) ? 'ALL' : tab
@@ -269,6 +272,8 @@ export default function HomePage() {
           </div>
         </header>
 
+        {mortgageId && <MortgagePlanner key={mortgageId} budget={budget} debtId={mortgageId} onClose={() => setMortgageId(null)} />}
+
         <main
           className="flex-1 overflow-hidden touch-pan-y"
           onTouchStart={handleTouchStart}
@@ -276,11 +281,11 @@ export default function HomePage() {
         >
           {/* A comfortable column on tablets; wider, two-column screens on desktop. */}
           <div key={screen} className="h-full mx-auto w-full max-w-[640px] lg:max-w-[1080px] lg:pt-6 screen-enter">
-            {screen === 'budget'   && <BudgetScreen   budget={budget} tab={activeTab} onTabChange={setTab} onNavigateToDebts={() => setScreen('wealth')} onOpenInsurance={id => openInsurance('budget', id)} onOpenRenewals={() => setScreen('renewals')} onToast={showToast} />}
+            {screen === 'budget'   && <BudgetScreen   budget={budget} tab={activeTab} onTabChange={setTab} onNavigateToDebts={() => { setFocusBorrowing(true); setScreen('wealth') }} onOpenInsurance={id => openInsurance('budget', id)} onOpenRenewals={() => setScreen('renewals')} onToast={showToast} />}
             {screen === 'charts'   && <ChartsScreen   budget={budget} onOpenProperty={id => { setFocusPropertyId(id); setScreen('wealth') }} onOpenWealth={() => setScreen('wealth')} onOpenBudget={() => setScreen('budget')} onOpenRenewals={() => setScreen('renewals')} />}
-            {screen === 'renewals' && <RenewalsScreen budget={budget} onOpenInsurance={id => openInsurance('renewals', id)} onUploadInsurance={() => openInsurance('renewals', '__upload')} onToast={showToast} onOpenProperty={id => { setFocusPropertyId(id); setScreen('wealth') }} />}
+            {screen === 'renewals' && <RenewalsScreen budget={budget} onOpenMortgage={setMortgageId} onOpenInsurance={id => openInsurance('renewals', id)} onUploadInsurance={() => openInsurance('renewals', '__upload')} onToast={showToast} onOpenProperty={id => { setFocusPropertyId(id); setScreen('wealth') }} />}
             {screen === 'insurance' && <InsuranceScreen budget={budget} backLabel={NAV.find(n => n.id === insuranceFrom)?.label ?? 'Back'} onBack={() => setScreen(insuranceFrom)} focusPolicyId={focusPolicyId} onFocusHandled={() => setFocusPolicyId(null)} onToast={showToast} onOpenSettings={() => setScreen('settings')} />}
-            {screen === 'wealth'   && <WealthScreen   budget={budget} focusPropertyId={focusPropertyId} onFocusHandled={() => setFocusPropertyId(null)} onOpenInsurance={id => openInsurance('wealth', id)} />}
+            {screen === 'wealth'   && <WealthScreen   budget={budget} focusBorrowing={focusBorrowing} onBorrowingFocusHandled={() => setFocusBorrowing(false)} onOpenMortgage={setMortgageId} focusPropertyId={focusPropertyId} onFocusHandled={() => setFocusPropertyId(null)} onOpenInsurance={id => openInsurance('wealth', id)} />}
             {screen === 'settings' && <SettingsScreen budget={budget} onToast={showToast} />}
           </div>
         </main>

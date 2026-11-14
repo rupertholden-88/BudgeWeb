@@ -373,7 +373,7 @@ function EnergySection({ summary, budget }: { summary: Summary; budget: BudgetHo
   )
 }
 
-function PropertyCard({ summary, ownerName, budget, focused, onFocusHandled, onOpenInsurance }: { summary: Summary; ownerName: (o: Owner) => string; budget: BudgetHook; focused?: boolean; onFocusHandled?: () => void; onOpenInsurance?: (policyId?: string) => void }) {
+function PropertyCard({ summary, ownerName, budget, focused, onFocusHandled, onOpenInsurance, onOpenMortgage }: { onOpenMortgage?: (id: string) => void; summary: Summary; ownerName: (o: Owner) => string; budget: BudgetHook; focused?: boolean; onFocusHandled?: () => void; onOpenInsurance?: (policyId?: string) => void }) {
   const { updateProperty, deleteProperty } = budget
   const { property: p, debts, items, mortgageBalance, mortgagePayment, runningCosts, monthlyTotal, equity, ltvPct } = summary
   const [expanded, setExpanded] = useState(!!focused)
@@ -434,6 +434,12 @@ function PropertyCard({ summary, ownerName, budget, focused, onFocusHandled, onO
             <div className="text-sm font-bold tabular-nums text-expense-text">{monthlyTotal > 0 ? fmt(monthlyTotal) : '—'}</div>
           </div>
         </div>
+
+        {onOpenMortgage && debts.filter(d => d.type === 'MORTGAGE').map(debt => <button key={debt.id} onClick={() => onOpenMortgage(debt.id)} className="w-full border-t border-line px-3 py-3 flex items-center gap-3 text-left cursor-pointer min-h-[60px]">
+          <Home size={18} className="text-muted shrink-0" />
+          <span className="flex-1 min-w-0"><span className="block text-[15px] font-medium">Mortgage & renewal</span><span className="block text-caption text-muted">{debt.label}{debt.mortgage?.dealEnds ? ` · Deal ends ${fmtDate(debt.mortgage.dealEnds)}` : ' · Add deal details'}</span></span>
+          <span className="text-label num shrink-0">{fmt(debt.monthlyPayment)}/mo</span><ChevronRight size={16} className="text-muted shrink-0" />
+        </button>)}
 
         {expanded && (
           <div className="px-3 pb-2 border-t border-border">
@@ -563,7 +569,7 @@ function PropertyCard({ summary, ownerName, budget, focused, onFocusHandled, onO
   )
 }
 
-export default function PropertiesSection({ budget, focusPropertyId, onFocusHandled, onOpenInsurance }: { budget: BudgetHook; focusPropertyId?: string | null; onFocusHandled?: () => void; onOpenInsurance?: (policyId?: string) => void }) {
+export default function PropertiesSection({ budget, focusPropertyId, onFocusHandled, onOpenInsurance, onOpenMortgage }: { onOpenMortgage?: (id: string) => void; budget: BudgetHook; focusPropertyId?: string | null; onFocusHandled?: () => void; onOpenInsurance?: (policyId?: string) => void }) {
   const { data, addProperty } = budget
   const [adding, setAdding] = useState(false)
   const [label, setLabel] = useState('')
@@ -574,7 +580,7 @@ export default function PropertiesSection({ budget, focusPropertyId, onFocusHand
   const submit = () => { if (label.trim()) { addProperty(label.trim(), owner); setLabel(''); setAdding(false) } }
 
   return (
-    <div className="mt-6 pt-6 border-t-2 border-border">
+    <div>
       <div className="flex justify-between items-baseline mb-3">
         <h2 className="font-serif text-xl m-0 flex items-center gap-2">Property</h2>
         {summaries.length > 0 && (
@@ -585,7 +591,7 @@ export default function PropertiesSection({ budget, focusPropertyId, onFocusHand
         )}
       </div>
 
-      {summaries.map(s => <PropertyCard key={s.property.id} summary={s} ownerName={ownerName} budget={budget} focused={s.property.id === focusPropertyId} onFocusHandled={onFocusHandled} onOpenInsurance={onOpenInsurance} />)}
+      {summaries.map(s => <PropertyCard key={s.property.id} summary={s} ownerName={ownerName} budget={budget} focused={s.property.id === focusPropertyId} onFocusHandled={onFocusHandled} onOpenInsurance={onOpenInsurance} onOpenMortgage={onOpenMortgage} />)}
 
       {summaries.length === 0 && !adding && (
         <p className="text-xs text-muted mt-0 mb-3 leading-relaxed">
@@ -599,7 +605,7 @@ export default function PropertiesSection({ budget, focusPropertyId, onFocusHand
             value={label}
             onChange={e => setLabel(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') submit() }}
-            placeholder="e.g. Home, Norfolk"
+            placeholder="e.g. Home, rental property"
             autoFocus
             className={`${inputClass} w-full mb-2`}
           />

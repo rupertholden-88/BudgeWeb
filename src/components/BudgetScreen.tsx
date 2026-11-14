@@ -324,7 +324,7 @@ export function MoveSheet({ type, title, current, budget, ownerName, onMove, onC
   )
 }
 
-function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, onOpenInsurance, onMoved, onToast }: {
+export function ItemSheet({ cat, item, properties, budget, ownerName, focus, onClose, onOpenInsurance, onMoved, onToast }: {
   cat: Category; item: LineItem; properties: Property[]; budget: BudgetHook
   ownerName: (o: Owner) => string; focus: 'amount' | 'date'; onClose: () => void; onOpenInsurance?: (itemId: string) => void
   onMoved: (catKey: string) => void; onToast?: (msg: string, action?: { label: string; run: () => void }) => void

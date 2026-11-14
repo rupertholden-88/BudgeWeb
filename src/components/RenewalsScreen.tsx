@@ -1,16 +1,20 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Shield, ShieldAlert, Zap, Repeat, TrendingUp, Upload, ChevronRight, Plus, Check, Circle, CheckCircle2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Shield, ShieldAlert, Zap, Repeat, TrendingUp, Upload, Home, ChevronRight, Plus, Check, Circle, CheckCircle2 } from 'lucide-react'
 import { ItemIcon, IconChooser } from '@/lib/itemIcons'
 import { Owner, fmt, upcomingRenewals, isInsuranceItem } from '@/lib/models'
 import { insurancePolicies, insuranceGaps } from '@/lib/insurance'
 import { subscriptions, subscriptionKind, type Subscription } from '@/lib/subscriptions'
-import { OwnerDot, Sheet, MoveSheet, type MoveTo } from './BudgetScreen'
+import { OwnerDot, Sheet, ItemSheet, MoveSheet, type MoveTo } from './BudgetScreen'
 import { RenewalBar } from './ui'
+import SubTabs from './SubTabs'
+import { mortgageReviews } from '@/lib/mortgage'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
-type Filter = 'all' | 'insurance' | 'energy' | 'subs'
+type Filter = 'overview' | 'insurance' | 'contracts' | 'subscriptions' | 'mortgages'
+const FILTERS: Filter[] = ['overview', 'insurance', 'contracts', 'subscriptions', 'mortgages']
+type RenewalEvent = ReturnType<typeof upcomingRenewals>[number] & { mortgageId?: string; mortgageStage?: string }
 
 const day = (d: string, year = true) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(year ? { year: 'numeric' } : {}) })
 const daysText = (days: number) => days < 0 ? 'Date passed' : days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days} days`
@@ -20,15 +24,40 @@ const daysText = (days: number) => days < 0 ? 'Date passed' : days === 0 ? 'Toda
  * contracts and subscriptions. All of them renew, and all are worth a check
  * before they do.
  */
-export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty, onUploadInsurance, onToast }: {
+export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty, onUploadInsurance, onOpenMortgage, onToast }: {
   budget: BudgetHook
   onOpenInsurance: (policyId?: string) => void
   onOpenProperty: (propertyId: string) => void
   onUploadInsurance: () => void
+  onOpenMortgage: (debtId: string) => void
   onToast?: (msg: string, action?: { label: string; run: () => void }) => void
 }) {
   const { data, updateItemRecurring, updateItemIcon } = budget
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter, setFilter] = useState<Filter>('overview')
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const scrollPositions = useRef<Partial<Record<Filter, number>>>({})
+  const [restored, setRestored] = useState(false)
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('budge-renewals-navigation') || '{}')
+      if (FILTERS.includes(saved.tab)) setFilter(saved.tab)
+      scrollPositions.current = saved.scroll || {}
+    } catch {}
+    setRestored(true)
+  }, [])
+  useEffect(() => {
+    if (!restored) return
+    const frame = requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollPositions.current[filter] || 0 })
+    return () => cancelAnimationFrame(frame)
+  }, [filter, restored])
+  const saveScroll = () => {
+    if (!restored) return
+    scrollPositions.current[filter] = scrollRef.current?.scrollTop || 0
+    try { sessionStorage.setItem('budge-renewals-navigation', JSON.stringify({ tab: filter, scroll: scrollPositions.current })) } catch {}
+  }
+  const [billToEdit, setBillToEdit] = useState<{ catKey: string; itemId: string } | null>(null)
+  const billCategory = data.categories.find(c => c.key === billToEdit?.catKey)
+  const billItem = billCategory?.items.find(i => i.id === billToEdit?.itemId)
   const [person, setPerson] = useState<Owner | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [marking, setMarking] = useState(false)
@@ -39,7 +68,14 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
   const [emptied, setEmptied] = useState<{ key: string; label: string; owner: Owner }[]>([])
   const ownerName = (o: Owner) => o === 'NIAMH' ? data.nameNiamh || 'Person 1' : o === 'RUPERT' ? data.nameRupert || 'Person 2' : data.nameJoint || 'Joint'
 
-  const renewals = useMemo(() => upcomingRenewals(data), [data])
+  const reviews = useMemo(() => mortgageReviews(data), [data])
+  const renewals: RenewalEvent[] = useMemo(() => [...upcomingRenewals(data), ...reviews.map(review => ({
+    id: `mortgage:${review.debt.id}`, mortgageId: review.debt.id, mortgageStage: review.stage,
+    label: review.debt.label, category: 'Mortgage deal ends', owner: review.debt.owner,
+    amount: review.debt.monthlyPayment, provider: review.debt.institution,
+    date: review.date, days: review.days, coverAmount: undefined,
+    autoRenews: undefined, isInsurance: false, isEnergy: false, exitFeeFreeFrom: null,
+  }))].sort((a, b) => a.date.localeCompare(b.date)), [data, reviews])
   const subs = useMemo(() => subscriptions(data), [data])
   const editing = subs.find(x => x.id === editingId) ?? null
   const setEditing = (x: Subscription | null) => setEditingId(x?.id ?? null)
@@ -47,17 +83,18 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
   const policies = useMemo(() => insurancePolicies(data), [data])
   const gaps = useMemo(() => insuranceGaps(data, policies), [data, policies])
   const subIds = new Set(subs.map(s => s.id))
-  const kindOf = (r: typeof renewals[number]): Filter => r.isEnergy ? 'energy' : r.isInsurance ? 'insurance' : subIds.has(r.id) ? 'subs' : 'all'
-  const shown = renewals.filter(r => filter === 'all' || kindOf(r) === filter)
+  const kindOf = (r: RenewalEvent): Filter => r.mortgageId ? 'mortgages' : r.isInsurance ? 'insurance' : r.isEnergy ? 'contracts' : subs.find(s => s.id === r.id)?.kind === 'subscription' ? 'subscriptions' : 'contracts'
+  const shown = renewals.filter(r => filter === 'overview' || kindOf(r) === filter)
 
   // A month across everything here, counting each bill once.
   const seen = new Set<string>()
   const monthly = [...renewals, ...subs].reduce((a, r) => { if (seen.has(r.id)) return a; seen.add(r.id); return a + (r.amount || 0) }, 0)
   const next = renewals.find(r => r.days >= 0)
-  const dueSoon = renewals.filter(r => r.days <= 60).length
+  const dueSoon = renewals.filter(r => r.days >= 0 && r.days <= 60).length
 
-  const perPerson = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(o => ({ owner: o, total: subs.filter(s => s.owner === o).reduce((a, s) => a + s.amount, 0) })).filter(p => p.total > 0)
-  const subsShown = subs.filter(s => !person || s.owner === person)
+  const listedSubs = subs.filter(s => filter === 'contracts' ? s.kind === 'contract' : filter === 'subscriptions' ? s.kind === 'subscription' : true)
+  const perPerson = (['NIAMH', 'RUPERT', 'JOINT'] as Owner[]).map(o => ({ owner: o, total: listedSubs.filter(s => s.owner === o).reduce((a, s) => a + s.amount, 0) })).filter(p => p.total > 0)
+  const subsShown = listedSubs.filter(s => !person || s.owner === person)
   const picked = subs.filter(x => selected.has(x.id))
   const toggle = (id: string) => setSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const stopSelecting = () => { setSelecting(false); setSelected(new Set()); setMovingSel(false) }
@@ -84,26 +121,44 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
   }
 
   const openRenewal = (r: typeof renewals[number]) => {
-    if (r.isEnergy) onOpenProperty(r.id.split(':')[0])
+    if (r.mortgageId) onOpenMortgage(r.mortgageId)
+    else if (r.isEnergy) onOpenProperty(r.id.split(':')[0])
     else if (r.isInsurance) onOpenInsurance(r.id)
-    else { const s = subs.find(x => x.id === r.id); if (s) setEditing(s) }
+    else { const s = subs.find(x => x.id === r.id); if (s) setEditing(s); else { const cat = data.categories.find(c => c.items.some(i => i.id === r.id)); if (cat) setBillToEdit({ catKey: cat.key, itemId: r.id }) } }
   }
-  const tappable = (r: typeof renewals[number]) => r.isEnergy || r.isInsurance || subIds.has(r.id)
+  const tappable = (r: typeof renewals[number]) => !!r.mortgageId || r.isEnergy || r.isInsurance || subIds.has(r.id) || data.categories.some(c => c.items.some(i => i.id === r.id))
 
   const yearly = policies.reduce((a, p) => a + p.yearly, 0)
   const missing = gaps.filter(g => g.severity === 'gap')
   const checks = gaps.filter(g => g.severity === 'check')
 
   return (
-    <div className="h-full overflow-y-auto px-5 pt-2 pb-[calc(32px+env(safe-area-inset-bottom))]">
+    <div className="h-full flex flex-col">
+      {billCategory && billItem && <ItemSheet cat={billCategory} item={billItem} properties={data.properties ?? []} budget={budget} ownerName={ownerName} focus="date" onClose={() => setBillToEdit(null)} onMoved={catKey => setBillToEdit(value => value ? { ...value, catKey } : value)} onOpenInsurance={onOpenInsurance} onToast={onToast} />}
+      <div className="px-5 pt-2 shrink-0">
       <h1 className="text-[30px] leading-[36px] font-semibold tracking-[-0.02em] m-0">Renewals</h1>
-      <p className="text-[15px] text-muted mt-0.5 mb-4">Everything you’re signed up to, soonest first.</p>
+      <p className="text-[15px] text-muted mt-0.5 mb-4">Deal endings, policy renewals and subscriptions, in one place.</p>
 
+      <SubTabs id="renewals" label="Renewal categories" tabs={[
+        { value: 'overview', label: 'Overview' }, { value: 'insurance', label: 'Insurance' },
+        { value: 'contracts', label: 'Contracts' }, { value: 'subscriptions', label: 'Subscriptions' },
+        { value: 'mortgages', label: 'Mortgages' },
+      ]} value={filter} onChange={next => {
+        scrollPositions.current[filter] = scrollRef.current?.scrollTop || 0
+        setFilter(next); setPerson(null); stopSelecting()
+        try { sessionStorage.setItem('budge-renewals-navigation', JSON.stringify({ tab: next, scroll: scrollPositions.current })) } catch {}
+      }} />
+      </div>
+
+      <div ref={scrollRef} onScroll={saveScroll} className="flex-1 min-h-0 overflow-y-auto px-5 pt-4 pb-[calc(32px+env(safe-area-inset-bottom))]">
+      {FILTERS.filter(section => section !== filter).map(section => <div key={section} hidden role="tabpanel" id={`renewals-panel-${section}`} aria-labelledby={`renewals-tab-${section}`} />)}
+      <div role="tabpanel" id={`renewals-panel-${filter}`} aria-labelledby={`renewals-tab-${filter}`} tabIndex={0} className="outline-none">
+        {filter === 'overview' && (
       <div className="grid grid-cols-3 gap-2 mb-4">
         {[
-          { k: 'A month', v: fmt(monthly) },
-          { k: 'Next due', v: next ? day(next.date, false) : '—' },
-          { k: 'Due in 60 days', v: dueSoon === 0 ? 'None' : String(dueSoon), bad: dueSoon > 0 },
+          { k: 'Tracked / month', v: fmt(monthly) },
+          { k: 'Next deal date', v: next ? day(next.date, false) : '—' },
+          { k: 'Next 60 days', v: dueSoon === 0 ? 'None' : String(dueSoon), bad: dueSoon > 0 },
         ].map(t => (
           <div key={t.k} className="card px-3 py-2.5 min-w-0">
             <div className="text-caption text-muted truncate">{t.k}</div>
@@ -111,21 +166,16 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
           </div>
         ))}
       </div>
+        )}
 
-      <div className="seg grid-cols-4 lg:max-w-[560px]" role="group" aria-label="Show">
-        {([['all', 'All'], ['insurance', 'Insurance'], ['energy', 'Energy'], ['subs', 'Subs']] as [Filter, string][]).map(([f, l]) => (
-          <button key={f} aria-pressed={filter === f} onClick={() => setFilter(f)}><span className="lbl">{l}</span></button>
-        ))}
-      </div>
-
-      <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+      <div className={filter === 'insurance' || filter === 'mortgages' ? 'lg:max-w-[760px]' : 'lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start'}>
         <div className="min-w-0">
-          {filter !== 'subs' || shown.length > 0 ? (
+          {filter !== 'subscriptions' || shown.length > 0 ? (
             <>
-              <h2 className="text-[20px] font-semibold tracking-[-0.01em] mt-6 mb-2.5">Coming up</h2>
+              <h2 className="text-[20px] font-semibold tracking-[-0.01em] mt-6 mb-2.5">{filter === 'mortgages' ? 'Mortgage deal dates' : 'Dated renewals & deal endings'}</h2>
               {shown.length === 0 ? (
                 <p className="text-[15px] text-muted m-0">
-                  {filter === 'energy' ? 'No fixed energy deals recorded. Add tariffs to your homes on Wealth.' : 'Nothing with a renewal date yet. Add one to any bill on Budget.'}
+                  {filter === 'mortgages' ? 'No mortgage deal end dates recorded. Add deal details on Wealth.' : filter === 'contracts' ? 'No contract end dates recorded. Add a contract end date on Budget, or a fixed energy deal on Wealth.' : 'Nothing with a renewal date yet. Add one to any bill on Budget.'}
                 </p>
               ) : (
                 <div className="card overflow-hidden">
@@ -133,8 +183,8 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
                     const body = (
                       <>
                         <div className="flex items-start gap-3">
-                          <span className={`w-10 h-10 rounded-xl grid place-items-center shrink-0 ${r.isEnergy ? 'bg-warn-tint text-warn' : r.isInsurance ? 'bg-rupert-light text-rupert-text' : 'bg-fill text-ink-2'}`}>
-                            {r.isEnergy ? <Zap size={19} aria-hidden="true" /> : r.isInsurance ? <Shield size={19} aria-hidden="true" /> : <ItemIcon label={r.label} chosen={iconOf(r.id)} fallback={subIds.has(r.id) ? 'repeat' : 'bill'} />}
+                          <span className={`w-10 h-10 rounded-xl grid place-items-center shrink-0 ${r.mortgageId ? 'bg-fill text-ink-2' : r.isEnergy ? 'bg-warn-tint text-warn' : r.isInsurance ? 'bg-rupert-light text-rupert-text' : 'bg-fill text-ink-2'}`}>
+                            {r.mortgageId ? <Home size={19} aria-hidden="true" /> : r.isEnergy ? <Zap size={19} aria-hidden="true" /> : r.isInsurance ? <Shield size={19} aria-hidden="true" /> : <ItemIcon label={r.label} chosen={iconOf(r.id)} fallback={subIds.has(r.id) ? 'repeat' : 'bill'} />}
                           </span>
                           <div className="flex-1 min-w-0">
                             <div className="text-[16px] font-semibold text-ink leading-tight">{r.label}</div>
@@ -146,7 +196,9 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
                           </div>
                         </div>
                         <div className="pl-[52px]">
-                          {r.isEnergy
+                          {r.mortgageId
+                            ? <span className={`pill ${r.days <= 30 ? 'pill-warn' : ''} mt-1.5 whitespace-normal`}>{r.days < 0 ? 'Deal end date passed · confirm your current rate' : r.mortgageStage === 'upcoming' ? 'Mortgage deal end · plan ahead' : 'Time to review your mortgage'}</span>
+                            : r.isEnergy
                             ? <span className="pill pill-warn mt-1.5 whitespace-normal"><TrendingUp size={12} aria-hidden="true" /> Rolls onto a variable rate{r.exitFeeFreeFrom ? ` · no exit fee from ${day(r.exitFeeFreeFrom, false)}` : ''}</span>
                             : r.autoRenews
                               ? <span className="pill mt-1.5 whitespace-normal"><Repeat size={12} aria-hidden="true" /> Auto-renews · check the new price</span>
@@ -166,7 +218,17 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
             </>
           ) : null}
 
-          {(filter === 'all' || filter === 'insurance') && (
+          {filter === 'mortgages' && <div className="mt-5">
+            <h2 className="text-[20px] font-semibold mb-2.5">Your mortgages</h2>
+            <p className="text-label text-muted mt-0 mb-3">Review a deal or explore how a different rate could change your payment. These dates are deal endings, not payment due dates.</p>
+            <div className="card overflow-hidden">{data.debts.filter(d => d.type === 'MORTGAGE').map(debt => <button key={debt.id} onClick={() => onOpenMortgage(debt.id)} className="flex items-center gap-3 text-left w-full min-h-[64px] px-4 py-3 border-t border-line first:border-t-0">
+              <Home size={20} className="text-ink-2 shrink-0" />
+              <span className="flex-1 min-w-0"><span className="block text-[16px] font-semibold">{debt.label}</span><span className="block text-label text-muted">{ownerName(debt.owner)} · {reviews.find(r => r.debt.id === debt.id) ? `Deal ends ${day(reviews.find(r => r.debt.id === debt.id)!.date)}` : 'Add your deal end date'}</span></span>
+              <ChevronRight size={18} className="text-faint shrink-0" />
+            </button>)}{!data.debts.some(d => d.type === 'MORTGAGE') && <p className="text-[15px] text-muted px-4 py-3 m-0">No mortgages recorded. Add one under Wealth → Borrowing.</p>}</div>
+          </div>}
+
+          {(filter === 'overview' || filter === 'insurance') && (
             <>
               <h2 className="flex items-baseline justify-between text-[20px] font-semibold tracking-[-0.01em] mt-7 mb-2.5">
                 Insurance
@@ -197,11 +259,11 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
         </div>
 
         <div className="min-w-0">
-          {(filter === 'all' || filter === 'subs') && (
+          {(filter === 'overview' || filter === 'subscriptions' || filter === 'contracts') && (
             <>
               <h2 className="flex items-baseline justify-between text-[20px] font-semibold tracking-[-0.01em] mt-7 mb-2.5">
-                Subscriptions & contracts
-                {subs.length > 1 && (
+                {filter === 'contracts' ? 'Contracts' : filter === 'subscriptions' ? 'Subscriptions' : 'Subscriptions & contracts'}
+                {listedSubs.length > 1 && (
                   <button onClick={() => selecting ? stopSelecting() : setSelecting(true)} className="text-[15px] font-semibold text-ink-2 underline underline-offset-[3px] min-h-[44px] -my-3 cursor-pointer">
                     {selecting ? 'Cancel' : 'Select'}
                   </button>
@@ -230,7 +292,7 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
               <div className="card overflow-hidden">
                 {subsShown.length === 0 && (
                   <p className="text-[15px] text-muted m-0 px-4 py-3.5">
-                    {subs.length === 0 ? 'None found in your bills yet. Mark any bill as a subscription below.' : `Nothing for ${ownerName(person!)}.`}
+                    {listedSubs.length === 0 ? `None found in your bills yet. Mark a bill as a ${filter === 'contracts' ? 'contract' : 'subscription'} below.` : `Nothing for ${ownerName(person!)}.`}
                   </p>
                 )}
                 {subsShown.map(s => {
@@ -251,7 +313,7 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 text-[16px] font-semibold text-ink leading-tight"><span className="truncate">{s.label}</span> <OwnerDot owner={s.owner} label={ownerName(s.owner)} /></div>
                           <div className="text-label text-muted mt-0.5">
-                            {ownerName(s.owner)} · {s.kind === 'contract' ? (s.renewalDate ? `contract ends ${day(s.renewalDate)}` : 'contract · add its end date on Budget') : s.renewalDate ? `renews ${day(s.renewalDate)}` : 'rolling monthly'}
+                            {ownerName(s.owner)} · {s.kind === 'contract' ? (s.renewalDate ? `contract ends ${day(s.renewalDate)}` : 'contract · add its end date on Budget') : s.renewalDate ? `renews ${day(s.renewalDate)}` : 'Rolling subscription · no end date recorded'}
                           </div>
                         </div>
                         <div className="text-right shrink-0">
@@ -265,7 +327,7 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
                 })}
                 {!selecting && (
                   <button onClick={() => setMarking(true)} className="w-full flex items-center gap-2.5 px-4 min-h-[52px] border-t border-line text-[15px] font-semibold text-ink cursor-pointer">
-                    <Plus size={18} aria-hidden="true" /> Mark a bill as a subscription
+                    <Plus size={18} aria-hidden="true" /> Mark a bill as a {filter === 'contracts' ? 'contract' : 'subscription'}
                     <ChevronRight size={18} className="text-faint ml-auto" aria-hidden="true" />
                   </button>
                 )}
@@ -274,6 +336,8 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
             </>
           )}
         </div>
+      </div>
+
       </div>
 
       {selecting && (
@@ -323,14 +387,14 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
       )}
 
       {marking && (
-        <Sheet title="Mark a bill as a subscription" onClose={() => setMarking(false)}>
+        <Sheet title={`Mark a bill as a ${filter === 'contracts' ? 'contract' : 'subscription'}`} onClose={() => setMarking(false)}>
           {(() => {
             const bills = data.categories.filter(c => c.type === 'EXPENSE').flatMap(c => c.items
               .filter(i => !isInsuranceItem(i.label) && !subscriptionKind(i.label, c.label, i.recurring))
               .map(i => ({ ...i, catKey: c.key, owner: c.owner, cat: c.label })))
             if (bills.length === 0) return <p className="text-[15px] text-muted">Every bill is already listed.</p>
             return bills.map(b => (
-              <button key={b.id} onClick={() => { updateItemRecurring(b.catKey, b.id, 'subscription'); setMarking(false) }}
+              <button key={b.id} onClick={() => { updateItemRecurring(b.catKey, b.id, filter === 'contracts' ? 'contract' : 'subscription'); setMarking(false) }}
                 className="w-full flex items-center gap-3 text-left py-3 border-t border-line min-h-[52px] cursor-pointer">
                 <OwnerDot owner={b.owner} label={ownerName(b.owner)} />
                 <span className="flex-1 min-w-0">
@@ -343,6 +407,7 @@ export default function RenewalsScreen({ budget, onOpenInsurance, onOpenProperty
           })()}
         </Sheet>
       )}
+      </div>
     </div>
   )
 }

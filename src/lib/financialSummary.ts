@@ -80,7 +80,7 @@ export interface FinancialSummary {
   netWorth: number
   debts: {
     totalBalance: number
-    items: { type: string; securedOnProperty: boolean; balance: number; monthlyPayment: number; aprPct: number; isZeroPercent: boolean; zeroPercentDaysLeft: number | null; monthsToClear: number | null }[]
+    items: { type: string; securedOnProperty: boolean; balance: number; monthlyPayment: number; aprPct: number; isZeroPercent: boolean; zeroPercentDaysLeft: number | null; monthsToClear: number | null; repaymentType?: 'repayment' | 'interestOnly'; capitalDueAtEnd?: boolean; mortgageEnds?: string }[]
   }
   /** paidPerMonth / netPerMonth exclude mortgages, which are reported on their own. */
   interest: { earnedPerMonth: number; paidPerMonth: number; netPerMonth: number; mortgageInterestPerMonth: number }
@@ -252,7 +252,8 @@ export function buildFinancialSummary(data: BudgetData, totals: Totals): Financi
         aprPct: d.isZeroPercent ? 0 : d.interestRate,
         isZeroPercent: d.isZeroPercent,
         zeroPercentDaysLeft: d.isZeroPercent && d.zeroPercentExpiryDate ? daysUntil(d.zeroPercentExpiryDate) : null,
-        monthsToClear: debtPayoff(d).months,
+        monthsToClear: d.type === 'MORTGAGE' && d.mortgage?.repaymentType === 'interestOnly' ? null : debtPayoff(d).months,
+        ...(d.type === 'MORTGAGE' && { repaymentType: d.mortgage?.repaymentType, capitalDueAtEnd: d.mortgage?.repaymentType === 'interestOnly', mortgageEnds: d.mortgage?.maturityDate }),
       })),
     },
     interest: { earnedPerMonth: Math.round(earned), paidPerMonth: Math.round(paid), netPerMonth: Math.round(earned - paid), mortgageInterestPerMonth: Math.round(mortgagePaid) },
