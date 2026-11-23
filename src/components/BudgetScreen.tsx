@@ -113,6 +113,7 @@ function Hero({ label, value, suffix, negative, headNote, pair, segments, legend
           </div>
         </>
       )}
+      {topUps && topUps.length > 0 && <p className="text-caption text-muted mt-3 mb-0">Top-ups below are already included in this month’s total.</p>}
       {topUps && topUps.length > 0 && topUps.map(t => (
         <div key={t.id} className="flex items-center gap-3 mt-3.5 pt-3 border-t border-line">
           {t.done
@@ -1045,26 +1046,23 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
     if (newCatLabel.trim()) { addCategory(newCatOwner, newCatType, newCatLabel.trim()); setNewCatLabel(''); setAddingCat(false) }
   }
 
-  // The joint account transfer: what each person moves in so the joint pot is covered.
-  // Joint one-offs due before payday are a separate top-up, since this period's
-  // transfer has already gone in; ones planned into a transfer raise it.
+  // The headline is the full period's joint funding requirement, including
+  // one-offs that need a separate top-up. Done marks funding, not a discount.
   const jointPot = totals.expJoint + totals.savJoint + totals.debtJoint
-  const transferPot = jointPot - totals.oneOffTopUpJoint
-  const jointEach = transferPot / 2
-  const plannedJoint = totals.oneOffJoint - totals.oneOffTopUpJoint
+  const jointEach = jointPot / 2
   const split = householdCostSplit(data, totals)
   const jointSegments: Segment[] = [
     { label: 'Bills', value: totals.expJoint - totals.oneOffJoint, color: 'var(--chart-1)' },
     { label: 'Debts', value: totals.debtJoint, color: 'var(--chart-2)' },
     { label: 'Saving', value: totals.savJoint, color: 'var(--chart-3)' },
-    { label: 'One-off', value: plannedJoint, color: 'var(--chart-4)' },
+    { label: 'One-offs', value: totals.oneOffJoint, color: 'var(--chart-4)' },
   ]
   const periodOneOffs = (data.oneOffs ?? []).filter(o => o.month === keyFor(o) && !o.fromSavings && o.amount > 0)
   const topUps: TopUp[] = periodOneOffs.filter(o => o.owner === 'JOINT' && o.topUp)
     .map(o => ({ id: o.id, label: o.label, each: o.amount / 2, done: !!o.done }))
-  const plannedNames = periodOneOffs.filter(o => o.owner === 'JOINT' && !o.topUp).map(o => o.label)
-  const headNote = plannedJoint > 0
-    ? <>Usually <span className="num">{fmt((transferPot - plannedJoint) / 2)}</span>, plus <span className="num">{fmt(plannedJoint / 2)}</span> for {plannedNames.slice(0, 2).join(' and ')}</>
+  const jointOneOffs = periodOneOffs.filter(o => o.owner === 'JOINT')
+  const headNote = totals.oneOffJoint > 0
+    ? <>Includes <span className="num">{fmt(totals.oneOffJoint / 2)}</span> each for {jointOneOffs.slice(0, 2).map(o => o.label).join(' and ')}{jointOneOffs.length > 2 ? ` and ${jointOneOffs.length - 2} more` : ''}.</>
     : undefined
   // Household costs one person pays straight from their own account.
   const directOwner: Owner | undefined = split.sharedByR > 0 && split.sharedByN === 0 ? 'RUPERT' : split.sharedByN > 0 && split.sharedByR === 0 ? 'NIAMH' : undefined
@@ -1099,7 +1097,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
     }
     if (ownerTab === 'JOINT') {
       return <Hero
-        label="Into the joint account" value={transferPot} suffix={plannedJoint > 0 ? 'this month' : 'a month'}
+        label="Into the joint account" value={jointPot} suffix="this month" headNote={headNote}
         pair={[{ owner: 'NIAMH', label: `${ownerName('NIAMH')} puts in`, value: jointEach }, { owner: 'RUPERT', label: `${ownerName('RUPERT')} puts in`, value: jointEach }]}
         segments={jointSegments} legendEnd={{ label: 'Split', value: '50/50' }}
         topUps={topUps} onTopUp={budget.setOneOffDone}
@@ -1132,7 +1130,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
     }
     return <Hero
       label="Into the joint account this month" value={jointEach} suffix="each" headNote={headNote}
-      segments={jointSegments} legendEnd={{ label: 'Total', value: fmt(transferPot) }}
+      segments={jointSegments} legendEnd={{ label: 'Total', value: fmt(jointPot) }}
       topUps={topUps} onTopUp={budget.setOneOffDone}
       note={directNote}
       secondary={leftToSpend}
