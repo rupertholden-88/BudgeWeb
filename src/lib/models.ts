@@ -404,10 +404,13 @@ export function calcTotals(budget: BudgetData, opts: { oneOffs?: boolean; now?: 
 
 export const fmt = (n: number) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(n)
-/** Money paid or transferred: preserve pennies, but keep whole-pound values compact. */
-export const fmtMoney = (n: number) => {
-  const rounded = Math.round(n * 100) / 100
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: Number.isInteger(rounded) ? 0 : 2, maximumFractionDigits: 2 }).format(rounded)
+/** Display budget costs and funding in whole pounds, rounding the amount up.
+ * Normalize to pennies first so floating-point noise cannot add an extra pound.
+ * This is display-only: stored amounts and calculations retain their precision.
+ */
+export const fmtBudget = (n: number) => {
+  const pounds = Math.ceil(Math.round(Math.abs(n) * 100) / 100)
+  return fmt(n < 0 ? -pounds : pounds)
 }
 export type TabFilter = 'ALL' | 'NIAMH' | 'RUPERT' | 'JOINT' | `property:${string}`
 

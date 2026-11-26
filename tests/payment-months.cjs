@@ -56,11 +56,16 @@ test('12-month joint history preserves missing months and recorded zero, with fu
 })
 
 
-test('joint contributions retain half-pound shares and round floating-point pennies', () => {
-  const { fmtMoney } = model.exports
-  assert.equal(fmtMoney(315 / 2), '£157.50')
-  assert.equal(fmtMoney((3648 + 315) / 2), '£1,981.50')
-  assert.equal(fmtMoney(1824), '£1,824')
-  assert.equal(fmtMoney(0.1 + 0.2), '£0.30')
-  assert.equal(fmtMoney(-157.5), '-£157.50')
+test('budget costs and contributions round up for display without changing amounts', () => {
+  const { fmtBudget } = model.exports
+  const cost = 315, contribution = (3648 + cost) / 2
+  assert.equal(fmtBudget(cost / 2), '£158')
+  assert.equal(fmtBudget(contribution), '£1,982')
+  assert.equal(fmtBudget(1211.01), '£1,212')
+  assert.equal(fmtBudget(1824), '£1,824')
+  assert.equal(fmtBudget(0), '£0')
+  assert.equal(fmtBudget(100.00000000001), '£100')
+  assert.equal(fmtBudget(-157.5), '-£158')
+  assert.equal(cost, 315)
+  assert.equal(contribution, 1981.5)
 })

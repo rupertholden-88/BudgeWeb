@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Shield, ShieldAlert, Zap, Repeat, TrendingUp, Upload, Home, ChevronRight, Plus, Check, Circle, CheckCircle2 } from 'lucide-react'
 import { ItemIcon, IconChooser } from '@/lib/itemIcons'
-import { Owner, fmt, upcomingRenewals, isInsuranceItem } from '@/lib/models'
+import { Owner, fmtBudget as fmt, upcomingRenewals, isInsuranceItem } from '@/lib/models'
 import { insurancePolicies, insuranceGaps } from '@/lib/insurance'
 import { subscriptions, subscriptionKind, type Subscription } from '@/lib/subscriptions'
 import { OwnerDot, Sheet, ItemSheet, MoveSheet, type MoveTo } from './BudgetScreen'

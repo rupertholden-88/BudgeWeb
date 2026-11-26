@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  itemAmountForMonth, paymentScheduleLabel, PAYMENT_MONTHS, Category, LineItem, TabFilter, Owner, EntryType, Debt, Property, fmt, fmtMoney, daysUntil, isInsuranceItem,
+  itemAmountForMonth, paymentScheduleLabel, PAYMENT_MONTHS, Category, LineItem, TabFilter, Owner, EntryType, Debt, Property, fmtBudget as fmt, daysUntil, isInsuranceItem,
   debtPayoff, isMortgage, propertySummaries, nextPayday, energySwitchReminders, householdCostSplit,
   OneOff, monthKey, PayPeriod, BudgetData, paydayFor, periodFor, upcomingRenewals,
 } from '@/lib/models'
@@ -24,9 +24,9 @@ export function OwnerDot({ owner, label }: { owner: Owner; label?: string }) {
 
 /** A money figure with a smaller, quieter £ — read out as one number. */
 export function Money({ value }: { value: number }) {
-  const text = fmtMoney(Math.abs(value)).replace('£', '')
+  const text = fmt(Math.abs(value)).replace('£', '')
   return (
-    <span className="num" aria-label={`${value < 0 ? 'minus ' : ''}${fmtMoney(Math.abs(value))}`}>
+    <span className="num" aria-label={`${value < 0 ? 'minus ' : ''}${fmt(Math.abs(value))}`}>
       <span aria-hidden="true">{value < 0 ? '−' : ''}<span className="cur">£</span>{text}</span>
     </span>
   )
@@ -97,7 +97,7 @@ function Hero({ label, value, suffix, negative, headNote, pair, segments, legend
             {shown.map(s => <div key={s.label} className="h-full" style={{ flexGrow: s.value, background: s.color }} />)}
           </div>
           <div className={`flex gap-2 mt-2.5 num ${shown.length + (legendEnd ? 1 : 0) > 4 ? 'justify-between' : '[&>*]:flex-1'}`}>
-            {[...shown.map(s => ({ key: s.label, label: s.label, color: s.color as string | undefined, value: fmtMoney(s.value) as React.ReactNode })),
+            {[...shown.map(s => ({ key: s.label, label: s.label, color: s.color as string | undefined, value: fmt(s.value) as React.ReactNode })),
               ...(legendEnd ? [{ key: '_end', label: legendEnd.label, color: undefined, value: legendEnd.value }] : [])]
               .map((e, i, all) => {
                 const last = i === all.length - 1 && all.length > 1
@@ -113,6 +113,7 @@ function Hero({ label, value, suffix, negative, headNote, pair, segments, legend
           </div>
         </>
       )}
+      <p className="text-caption text-muted mt-2 mb-0">Amounts rounded up to whole pounds.</p>
       {topUps && topUps.length > 0 && <p className="text-caption text-muted mt-3 mb-0">Top-ups below are already included in this month’s total.</p>}
       {topUps && topUps.length > 0 && topUps.map(t => (
         <div key={t.id} className="flex items-center gap-3 mt-3.5 pt-3 border-t border-line">
@@ -120,7 +121,7 @@ function Hero({ label, value, suffix, negative, headNote, pair, segments, legend
             ? <Check size={16} className="text-pos shrink-0" aria-hidden="true" />
             : <span className="w-2 h-2 rounded-full shrink-0 bg-warn" aria-hidden="true" />}
           <span className={`flex-1 min-w-0 text-label ${t.done ? 'text-muted' : 'text-ink'}`}>
-            {t.done ? 'Topped up' : <>Top up <b className="font-semibold num">{fmtMoney(t.each)}</b> each</>} for {t.label}
+            {t.done ? 'Topped up' : <>Top up <b className="font-semibold num">{fmt(t.each)}</b> each</>} for {t.label}
           </span>
           <button
             onClick={() => onTopUp?.(t.id, !t.done)}
@@ -744,7 +745,7 @@ function OneOffSheet({ initial, budget, properties, ownerName, onClose }: {
       ? <>Won’t change the budget. When you mark it paid, {fmt(amount)} comes off {d.savingsFrom.label}.</>
       : 'Won’t change the budget. Add your savings on Wealth and it can come off the right pot when it’s paid.'
     : d.owner === 'JOINT'
-      ? due === 'now' && d.topUp ? `You each top up ${fmtMoney(amount / 2)}.` : `Adds ${fmtMoney(amount / 2)} each to that period’s joint requirement.`
+      ? due === 'now' && d.topUp ? `You each top up ${fmt(amount / 2)}.` : `Adds ${fmt(amount / 2)} each to that period’s joint requirement.`
       : `${who} has ${fmt(amount)} less to spend ${due === 'now' ? 'this pay period' : 'that period'}.`
   const canDone = !isNew && (d.fromSavings || (d.owner === 'JOINT' && d.topUp))
 
@@ -1069,7 +1070,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
     .map(o => ({ id: o.id, label: o.label, each: o.amount / 2, done: !!o.done }))
   const jointOneOffs = periodOneOffs.filter(o => o.owner === 'JOINT')
   const headNote = totals.oneOffJoint > 0
-    ? <>Includes <span className="num">{fmtMoney(totals.oneOffJoint / 2)}</span> each for {jointOneOffs.slice(0, 2).map(o => o.label).join(' and ')}{jointOneOffs.length > 2 ? ` and ${jointOneOffs.length - 2} more` : ''}.</>
+    ? <>Includes <span className="num">{fmt(totals.oneOffJoint / 2)}</span> each for {jointOneOffs.slice(0, 2).map(o => o.label).join(' and ')}{jointOneOffs.length > 2 ? ` and ${jointOneOffs.length - 2} more` : ''}.</>
     : undefined
   // Household costs one person pays straight from their own account.
   const directOwner: Owner | undefined = split.sharedByR > 0 && split.sharedByN === 0 ? 'RUPERT' : split.sharedByN > 0 && split.sharedByR === 0 ? 'NIAMH' : undefined
@@ -1137,7 +1138,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
     }
     return <Hero
       label="Into the joint account this month" value={jointEach} suffix="each" headNote={headNote}
-      segments={jointSegments} legendEnd={{ label: 'Total', value: fmtMoney(jointPot) }}
+      segments={jointSegments} legendEnd={{ label: 'Total', value: fmt(jointPot) }}
       topUps={topUps} onTopUp={budget.setOneOffDone}
       note={directNote}
       secondary={leftToSpend}
