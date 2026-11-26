@@ -8,10 +8,11 @@ import {
   OneOff, monthKey, PayPeriod, BudgetData, paydayFor, periodFor, upcomingRenewals,
 } from '@/lib/models'
 import { needsAttention } from '@/lib/attention'
-import { Plus, ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, X, Check, CalendarClock } from 'lucide-react'
+import { Plus, ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, X, Check, CalendarClock, Share2, MessageCircle, Copy } from 'lucide-react'
 import { ConfirmDelete, NumberInput, inputClass, useModal, RenewalBar } from './ui'
 import { subscriptionKind } from '@/lib/subscriptions'
 import { IconChooser } from '@/lib/itemIcons'
+import { budgetShare } from '@/lib/budgetShare'
 
 type BudgetHook = ReturnType<typeof import('@/hooks/useBudget').useBudget>
 
@@ -231,6 +232,47 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
       <span className="absolute top-[2px] w-[27px] h-[27px] rounded-full bg-panel shadow" style={{ left: checked ? 22 : 2 }} />
     </button>
   )
+}
+
+function MonthShareSheet({ data, onClose }: { data: BudgetData; onClose: () => void }) {
+  const [includePersonal, setIncludePersonal] = useState(false)
+  const [copyStatus, setCopyStatus] = useState('')
+  const preview = useRef<HTMLTextAreaElement>(null)
+  const message = budgetShare(data, includePersonal)
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.text)
+      setCopyStatus('Message copied. Paste it into WhatsApp or another app.')
+    } catch {
+      preview.current?.focus()
+      preview.current?.select()
+      setCopyStatus('Select and copy the message above, then paste it into WhatsApp.')
+    }
+  }
+  return <Sheet title="Share this month" onClose={onClose}>
+    <h2 className="text-[24px] leading-7 font-semibold mt-2 mb-2">Review the month together</h2>
+    <p className="text-label text-muted mt-0 mb-3">Share a breakdown from across your Budget, including joint costs and household bills paid directly. Your current screen filters don’t limit the message.</p>
+    <div className="flex items-center justify-between gap-3 py-3 border-y border-line mb-3">
+      <div>
+        <div className="text-[15px] font-semibold">Include personal costs</div>
+        <div className="text-caption text-muted">Adds both people’s own bills, debts, savings and one-offs.</div>
+      </div>
+      <div className="shrink-0"><Toggle checked={includePersonal} label="Include personal costs" onChange={value => { setIncludePersonal(value); setCopyStatus('') }} /></div>
+    </div>
+    <label htmlFor="month-share-preview" className="block text-label font-medium mb-2">Message preview</label>
+    <textarea id="month-share-preview" ref={preview} value={message.text} readOnly spellCheck={false}
+      className="w-full h-[30dvh] min-h-[160px] resize-none rounded-xl border border-line bg-panel p-3 text-[14px] leading-relaxed text-ink focus:outline-none focus:ring-2 focus:ring-ink"
+      aria-describedby="month-share-help" />
+    <p id="month-share-help" className="text-caption text-muted mt-2 mb-3">No income, account balances or sign-in links. You choose the chat and send the message in WhatsApp.</p>
+    <a href={`https://wa.me/?text=${encodeURIComponent(message.text)}`} target="_blank" rel="noopener noreferrer"
+      className="flex items-center justify-center gap-2 w-full min-h-[48px] rounded-xl bg-ink text-on-ink text-[15px] font-semibold no-underline">
+      <MessageCircle size={18} aria-hidden="true" /> Share to WhatsApp
+    </a>
+    <button onClick={copy} className="flex items-center justify-center gap-2 w-full min-h-[48px] rounded-xl text-ink text-[15px] font-semibold cursor-pointer mt-1">
+      <Copy size={17} aria-hidden="true" /> Copy message
+    </button>
+    <p role="status" className="text-caption text-muted m-0">{copyStatus}</p>
+  </Sheet>
 }
 
 function AutoFocus({ selector }: { selector: string }) {
@@ -946,6 +988,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
   const [newCatType, setNewCatType] = useState<EntryType>('EXPENSE')
   const [sheet, setSheet] = useState<{ catKey: string; itemId: string; focus: 'amount' | 'date' } | null>(null)
   const [oneOffSheet, setOneOffSheet] = useState<OneOffDraft | null>(null)
+  const [sharingMonth, setSharingMonth] = useState(false)
 
   const properties = data.properties ?? []
   const propertyId = tab.startsWith('property:') ? tab.slice('property:'.length) : null
@@ -1149,6 +1192,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
 
   return (
     <div className="h-full overflow-y-auto px-5 pb-[calc(32px+env(safe-area-inset-bottom))]">
+      {sharingMonth && <MonthShareSheet data={data} onClose={() => setSharingMonth(false)} />}
       {oneOffSheet && (
         <OneOffSheet
           key={oneOffSheet.id ?? 'new'} initial={oneOffSheet} budget={budget}
@@ -1238,6 +1282,10 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
           </ol>
         </section>
       ) : hero}
+
+      {!isEmpty && <button onClick={() => setSharingMonth(true)} className="w-full flex items-center justify-center gap-2 min-h-[48px] mt-3 rounded-xl bg-fill text-ink text-[15px] font-semibold cursor-pointer">
+        <Share2 size={17} aria-hidden="true" /> Share this month
+      </button>}
 
       {!isEmpty && (
         <button onClick={addOneOff} className="w-full flex items-center gap-3 min-h-[52px] mt-3 border-b border-line text-left cursor-pointer">
