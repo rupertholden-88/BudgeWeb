@@ -1,6 +1,6 @@
 'use client'
 
-import { BudgetData, fmt } from '@/lib/models'
+import { BudgetData, fmtBudget as fmt } from '@/lib/models'
 import { jointHistory } from '@/lib/jointHistory'
 
 export default function JointHistory({ data }: { data: BudgetData }) {
@@ -32,7 +32,7 @@ export default function JointHistory({ data }: { data: BudgetData }) {
           })}</tbody>
         </table>
       </div>
-      <p className="text-caption text-muted mt-3 mb-0">Includes joint bills, debt repayments, savings contributions and one-offs funded from income, including top-ups. Split 50/50. These are budget requirements, not bank transactions.</p>
+      <p className="text-caption text-muted mt-3 mb-0">Includes joint bills, debt repayments, savings contributions and one-offs funded from income, including top-ups. Split 50/50. Displayed amounts round up to whole pounds. These are budget requirements, not bank transactions.</p>
       <p className="text-caption text-muted mt-2 mb-0">* Current month updates as you edit. Previous months show their last saved budget. — means no joint-account history was recorded; older household totals cannot be used to calculate it. Infrequent bills count in their selected months.</p>
     </section>
   )

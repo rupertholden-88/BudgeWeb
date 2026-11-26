@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Owner, DebtType, Debt, Property, fmt, debtPayoff, paymentToClear, daysUntil } from '@/lib/models'
+import { Owner, DebtType, Debt, Property, fmt, fmtBudget, debtPayoff, paymentToClear, daysUntil } from '@/lib/models'
 import { Plus, Home, Merge } from 'lucide-react'
 import { ConfirmDelete, ExpandButton, PanelSection, DeleteAction, Field, NumberInput, inputClass, useLongPress, ownerBorderClass, MonthInput } from './ui'
 
@@ -203,7 +203,7 @@ function DebtCard({ debt, ownerName, properties, onUpdate, onDelete, others, onC
           </div>
           <div className="text-right shrink-0">
             <div className={`font-serif font-bold text-lg tabular-nums ${debt.type === 'MORTGAGE' ? 'text-ink' : 'text-negative'} leading-tight`}>{fmt(debt.currentBalance)}</div>
-            {debt.monthlyPayment > 0 && <div className="text-label text-muted">{fmt(debt.monthlyPayment)}/mo</div>}
+            {debt.monthlyPayment > 0 && <div className="text-label text-muted">{fmtBudget(debt.monthlyPayment)}/mo</div>}
           </div>
           <ExpandButton expanded={expanded} onClick={() => setExpanded(e => !e)} label={expanded ? 'Collapse debt details' : 'Expand debt details'} />
         </div>
@@ -341,7 +341,7 @@ export default function DebtsScreen({ budget, onOpenMortgage }: { budget: Budget
           ]).map(({ owner, total }) => (
             <div key={owner} className={`card px-2.5 py-2 text-center ${ownerBorderClass(owner)}`}>
               <div className="text-caption text-muted mb-0.5 truncate">{ownerName(owner)}</div>
-              <div className={`text-body font-bold tabular-nums ${total > 0 ? 'text-negative' : 'text-muted'}`}>{total > 0 ? `${fmt(total)}/mo` : '—'}</div>
+              <div className={`text-body font-bold tabular-nums ${total > 0 ? 'text-negative' : 'text-muted'}`}>{total > 0 ? `${fmtBudget(total)}/mo` : '—'}</div>
             </div>
           ))}
         </div>

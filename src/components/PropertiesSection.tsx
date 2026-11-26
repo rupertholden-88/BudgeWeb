@@ -2,7 +2,7 @@
 import { insurancePolicies } from '@/lib/insurance'
 
 import { useState, useEffect, useRef } from 'react'
-import { itemAmountForMonth, Owner, Fuel, EnergyTariff, TariffOption, fmt, propertySummaries, tariffAnnualCost, quotedAnnualCost, exitFeeFreeFrom, daysUntil, ENERGY_VAT } from '@/lib/models'
+import { itemAmountForMonth, Owner, Fuel, EnergyTariff, TariffOption, fmt, fmtBudget, propertySummaries, tariffAnnualCost, quotedAnnualCost, exitFeeFreeFrom, daysUntil, ENERGY_VAT } from '@/lib/models'
 import type { TariffSearchRequest } from '@/app/api/energy-tariffs/route'
 import { useApiKey } from '@/hooks/useApiKey'
 import { Plus, Home, Zap, Flame, Search, ExternalLink, KeyRound, ShieldPlus, ChevronRight } from 'lucide-react'
@@ -431,14 +431,14 @@ function PropertyCard({ summary, ownerName, budget, focused, onFocusHandled, onO
           </div>
           <div>
             <div className="text-caption text-muted mb-0.5">Costs / mo</div>
-            <div className="text-sm font-bold tabular-nums text-expense-text">{monthlyTotal > 0 ? fmt(monthlyTotal) : '—'}</div>
+            <div className="text-sm font-bold tabular-nums text-expense-text">{monthlyTotal > 0 ? fmtBudget(monthlyTotal) : '—'}</div>
           </div>
         </div>
 
         {onOpenMortgage && debts.filter(d => d.type === 'MORTGAGE').map(debt => <button key={debt.id} onClick={() => onOpenMortgage(debt.id)} className="w-full border-t border-line px-3 py-3 flex items-center gap-3 text-left cursor-pointer min-h-[60px]">
           <Home size={18} className="text-muted shrink-0" />
           <span className="flex-1 min-w-0"><span className="block text-[15px] font-medium">Mortgage & renewal</span><span className="block text-caption text-muted">{debt.label}{debt.mortgage?.dealEnds ? ` · Deal ends ${fmtDate(debt.mortgage.dealEnds)}` : ' · Add deal details'}</span></span>
-          <span className="text-label num shrink-0">{fmt(debt.monthlyPayment)}/mo</span><ChevronRight size={16} className="text-muted shrink-0" />
+          <span className="text-label num shrink-0">{fmtBudget(debt.monthlyPayment)}/mo</span><ChevronRight size={16} className="text-muted shrink-0" />
         </button>)}
 
         {expanded && (
@@ -497,7 +497,7 @@ function PropertyCard({ summary, ownerName, budget, focused, onFocusHandled, onO
                   ))}
                   <div className="flex justify-between text-xs pt-1.5 mt-1 border-t border-border font-semibold">
                     <span>Mortgage {fmt(mortgagePayment)} + running {fmt(runningCosts)}</span>
-                    <span className="tabular-nums text-expense-text">{fmt(monthlyTotal)}/mo</span>
+                    <span className="tabular-nums text-expense-text">{fmtBudget(monthlyTotal)}/mo</span>
                   </div>
                   {p.isLet && (p.monthlyRent ?? 0) > 0 && (
                     <div className="flex justify-between text-xs">

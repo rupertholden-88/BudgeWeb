@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ChevronRight, Landmark, PiggyBank, Home, CreditCard, Wallet } from 'lucide-react'
-import { fmt, monthKey, netWorth } from '@/lib/models'
+import { fmt, fmtBudget, monthKey, netWorth } from '@/lib/models'
 import SavingsScreen from './SavingsScreen'
 import DebtsScreen from './DebtsScreen'
 import SubTabs from './SubTabs'
@@ -114,7 +114,7 @@ export default function WealthScreen({ budget, focusBorrowing, onBorrowingFocusH
           <section className="mb-5" aria-label="Mortgage overview">
             <div className="flex justify-between items-center mb-2"><h2 className="text-[20px] font-semibold m-0">Mortgages</h2><button onClick={() => selectTab('borrowing')} className="min-h-[44px] text-label text-ink-2 cursor-pointer">View borrowing <ChevronRight size={15} className="inline" /></button></div>
             {mortgages.length === 0 ? <button onClick={() => selectTab('borrowing')} className="card p-4 w-full flex items-center gap-3 text-left cursor-pointer"><Home size={20} className="text-muted" /><span className="flex-1 text-[15px]">Add a mortgage to track its payment and deal end.</span><ChevronRight size={18} className="text-muted" /></button> : mortgages.map(debt => <button key={debt.id} onClick={() => onOpenMortgage(debt.id)} className="card p-4 w-full mb-2 flex items-center gap-3 text-left cursor-pointer">
-              <Home size={20} className="text-muted shrink-0" /><span className="flex-1 min-w-0"><strong className="block text-[15px] font-semibold">{debt.label}</strong><span className="block text-label text-muted mt-0.5">{debt.mortgage?.dealEnds ? `Deal ends ${new Date(debt.mortgage.dealEnds + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Add deal details to plan ahead'}</span></span><span className="text-right shrink-0"><strong className="block text-[17px] font-semibold num">{fmt(debt.monthlyPayment)}</strong><span className="text-caption text-muted">a month</span></span><ChevronRight size={17} className="text-muted shrink-0" />
+              <Home size={20} className="text-muted shrink-0" /><span className="flex-1 min-w-0"><strong className="block text-[15px] font-semibold">{debt.label}</strong><span className="block text-label text-muted mt-0.5">{debt.mortgage?.dealEnds ? `Deal ends ${new Date(debt.mortgage.dealEnds + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Add deal details to plan ahead'}</span></span><span className="text-right shrink-0"><strong className="block text-[17px] font-semibold num">{fmtBudget(debt.monthlyPayment)}</strong><span className="text-caption text-muted">a month</span></span><ChevronRight size={17} className="text-muted shrink-0" />
             </button>)}
           </section>
           {otherDebts.length > 0 && <button onClick={() => selectTab('borrowing')} className="w-full card p-4 flex items-center gap-3 text-left cursor-pointer"><CreditCard size={20} className="text-muted" /><span className="flex-1"><strong className="block text-[15px] font-medium">Other borrowing</strong><span className="text-label text-muted">Loans, cards and other balances</span></span><strong className="num">{fmt(otherDebts.reduce((sum, debt) => sum + debt.currentBalance, 0))}</strong><ChevronRight size={17} className="text-muted" /></button>}
