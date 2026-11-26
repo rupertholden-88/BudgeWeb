@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  itemAmountForMonth, paymentScheduleLabel, PAYMENT_MONTHS, Category, LineItem, TabFilter, Owner, EntryType, Debt, Property, fmt, daysUntil, isInsuranceItem,
+  itemAmountForMonth, paymentScheduleLabel, PAYMENT_MONTHS, Category, LineItem, TabFilter, Owner, EntryType, Debt, Property, fmt, fmtMoney, daysUntil, isInsuranceItem,
   debtPayoff, isMortgage, propertySummaries, nextPayday, energySwitchReminders, householdCostSplit,
   OneOff, monthKey, PayPeriod, BudgetData, paydayFor, periodFor, upcomingRenewals,
 } from '@/lib/models'
@@ -24,9 +24,9 @@ export function OwnerDot({ owner, label }: { owner: Owner; label?: string }) {
 
 /** A money figure with a smaller, quieter £ — read out as one number. */
 export function Money({ value }: { value: number }) {
-  const text = fmt(Math.abs(value)).replace('£', '')
+  const text = fmtMoney(Math.abs(value)).replace('£', '')
   return (
-    <span className="num" aria-label={`${value < 0 ? 'minus ' : ''}${fmt(Math.abs(value))}`}>
+    <span className="num" aria-label={`${value < 0 ? 'minus ' : ''}${fmtMoney(Math.abs(value))}`}>
       <span aria-hidden="true">{value < 0 ? '−' : ''}<span className="cur">£</span>{text}</span>
     </span>
   )
@@ -97,7 +97,7 @@ function Hero({ label, value, suffix, negative, headNote, pair, segments, legend
             {shown.map(s => <div key={s.label} className="h-full" style={{ flexGrow: s.value, background: s.color }} />)}
           </div>
           <div className={`flex gap-2 mt-2.5 num ${shown.length + (legendEnd ? 1 : 0) > 4 ? 'justify-between' : '[&>*]:flex-1'}`}>
-            {[...shown.map(s => ({ key: s.label, label: s.label, color: s.color as string | undefined, value: fmt(s.value) as React.ReactNode })),
+            {[...shown.map(s => ({ key: s.label, label: s.label, color: s.color as string | undefined, value: fmtMoney(s.value) as React.ReactNode })),
               ...(legendEnd ? [{ key: '_end', label: legendEnd.label, color: undefined, value: legendEnd.value }] : [])]
               .map((e, i, all) => {
                 const last = i === all.length - 1 && all.length > 1
@@ -120,7 +120,7 @@ function Hero({ label, value, suffix, negative, headNote, pair, segments, legend
             ? <Check size={16} className="text-pos shrink-0" aria-hidden="true" />
             : <span className="w-2 h-2 rounded-full shrink-0 bg-warn" aria-hidden="true" />}
           <span className={`flex-1 min-w-0 text-label ${t.done ? 'text-muted' : 'text-ink'}`}>
-            {t.done ? 'Topped up' : <>Top up <b className="font-semibold num">{fmt(t.each)}</b> each</>} for {t.label}
+            {t.done ? 'Topped up' : <>Top up <b className="font-semibold num">{fmtMoney(t.each)}</b> each</>} for {t.label}
           </span>
           <button
             onClick={() => onTopUp?.(t.id, !t.done)}
@@ -706,7 +706,7 @@ function savingsPots(data: BudgetData) {
 }
 
 type OneOffDraft = Omit<OneOff, 'id'> & { id?: string }
-type Due = 'now' | 'next' | 'later'
+type Due = 'past' | 'now' | 'next' | 'later'
 
 function OneOffSheet({ initial, budget, properties, ownerName, onClose }: {
   initial: OneOffDraft; budget: BudgetHook; properties: Property[]
@@ -724,8 +724,8 @@ function OneOffSheet({ initial, budget, properties, ownerName, onClose }: {
   const pots = savingsPots(data)
   const period = periodFor(data, d.owner)
   const potKey = (x?: { owner: Owner; label: string }) => x ? `${x.owner}|${x.label}` : ''
-  const due: Due = d.month === period.key ? 'now' : d.month === period.nextKey ? 'next' : 'later'
-  const setDue = (v: Due) => set(
+  const due: Due = d.month < period.key ? 'past' : d.month === period.key ? 'now' : d.month === period.nextKey ? 'next' : 'later'
+  const setDue = (v: Exclude<Due, 'past'>) => set(
     v === 'now' ? { month: period.key, topUp: true }
     : v === 'next' ? { month: period.nextKey, topUp: undefined }
     : { month: shiftKey(period.nextKey, 1), topUp: undefined },
@@ -734,8 +734,8 @@ function OneOffSheet({ initial, budget, properties, ownerName, onClose }: {
     ? { fromSavings: true, savingsFrom: d.savingsFrom ?? (pots.find(p => p.owner === d.owner) ?? pots[0]) ?? undefined }
     : { fromSavings: undefined, savingsFrom: undefined })
   const dueBy = new Date(period.next); dueBy.setDate(dueBy.getDate() - 1)
-  const dueLabels: Record<Due, string> = period.byPayday
-    ? { now: 'Before payday', next: 'After payday', later: 'Later' }
+  const dueLabels: Record<Exclude<Due, 'past'>, string> = period.byPayday
+    ? { now: 'This pay period', next: 'Next pay period', later: 'Later' }
     : { now: 'This month', next: 'Next month', later: 'Later' }
   const amount = d.amount || 0
   const who = ownerName(d.owner)
@@ -744,8 +744,8 @@ function OneOffSheet({ initial, budget, properties, ownerName, onClose }: {
       ? <>Won’t change the budget. When you mark it paid, {fmt(amount)} comes off {d.savingsFrom.label}.</>
       : 'Won’t change the budget. Add your savings on Wealth and it can come off the right pot when it’s paid.'
     : d.owner === 'JOINT'
-      ? due === 'now' ? `You each top up ${fmt(amount / 2)}.` : `Adds ${fmt(amount / 2)} each to that transfer.`
-      : `${who} has ${fmt(amount)} less to spend ${due === 'now' ? 'before payday' : 'that month'}.`
+      ? due === 'now' && d.topUp ? `You each top up ${fmtMoney(amount / 2)}.` : `Adds ${fmtMoney(amount / 2)} each to that period’s joint requirement.`
+      : `${who} has ${fmt(amount)} less to spend ${due === 'now' ? 'this pay period' : 'that period'}.`
   const canDone = !isNew && (d.fromSavings || (d.owner === 'JOINT' && d.topUp))
 
   return (
@@ -769,12 +769,18 @@ function OneOffSheet({ initial, budget, properties, ownerName, onClose }: {
         <span className="suffix">once</span>
       </label>
       {isNew && <AutoFocus selector='input[aria-label="One-off amount"]' />}
+      {due === 'past' && <div className="rounded-xl bg-fill p-4 my-3">
+        <p className="text-label text-ink mt-0 mb-2">Recorded for {monthName(d.month, true)}{period.byPayday ? ' payday' : ''}. It is not included in the current budget.</p>
+        <button onClick={() => { set({ month: period.key, topUp: undefined }); onClose() }} className="w-full min-h-[48px] rounded-xl bg-ink text-on-ink text-[15px] font-semibold">Move to this pay period</button>
+        <p className="text-caption text-muted mt-2 mb-0">Moves the existing cost. Its amount and paid or funded status stay the same.</p>
+      </div>}
+
       <input
         value={d.label}
         onChange={e => setD(x => ({ ...x, label: e.target.value }))}
         onBlur={() => { if (!isNew && d.label.trim() && d.label !== initial.label) updateOneOff(initial.id!, { label: d.label.trim() }) }}
         aria-label="What it’s for"
-        placeholder="What’s it for? e.g. Palmer Maintenance"
+        placeholder="What’s it for? e.g. Household repair"
         className="title-input w-full bg-transparent outline-none border-0 p-0 min-h-[44px] mt-2 text-ink placeholder:text-faint placeholder:font-normal"
       />
 
@@ -811,9 +817,9 @@ function OneOffSheet({ initial, budget, properties, ownerName, onClose }: {
           </div>
         ) : (
           <p className="text-caption text-muted mt-1.5 mb-0">
-            {due === 'now'
-              ? period.byPayday ? `Due by ${dayMonth(dueBy)}.` : `Due in ${monthName(period.key)}.`
-              : period.byPayday ? `Paid from the ${dayMonth(period.next)} payday.` : `Due in ${monthName(period.nextKey)}.`}
+            {due === 'past' ? `Recorded in ${monthName(d.month, true)}; choose a period above to move it.` : due === 'now'
+              ? period.byPayday ? `From ${dayMonth(period.start)} to ${dayMonth(dueBy)}.` : `Due in ${monthName(period.key)}.`
+              : period.byPayday ? `Paid from the next payday, ${dayMonth(period.next)}.` : `Due in ${monthName(period.nextKey)}.`}
           </p>
         )}
       </div>
@@ -881,7 +887,7 @@ function OneOffGroup({ now, upcoming, period, ownerName, onOpen, onAdd }: {
   const when = (key: string) => period.byPayday ? `${monthName(key, key.slice(0, 4) !== period.key.slice(0, 4))} payday` : monthName(key, key.slice(0, 4) !== period.key.slice(0, 4))
   const next = upcoming[0]
   const sub = now.length > 0
-    ? `${period.byPayday ? 'Due before payday' : 'This month'} · ${now.map(o => o.label).slice(0, 2).join(', ')}`
+    ? `${period.byPayday ? 'This pay period' : 'This month'} · ${now.map(o => o.label).slice(0, 2).join(', ')}`
     : next ? `Next: ${next.label}, ${when(next.month)}` : ''
   const row = (o: OneOff, whenText?: string) => {
     const status = [whenText, o.fromSavings ? (o.done ? 'Paid from savings' : 'From savings') : null, !o.fromSavings && o.done ? 'Topped up' : null].filter(Boolean).join(' · ')
@@ -1015,8 +1021,9 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
 
   const period = periodFor(data, 'JOINT')
   const keyFor = (o: OneOff) => periodFor(data, o.owner).key
-  const oneOffsShown = (data.oneOffs ?? [])
-    .filter(o => propertyId ? o.propertyId === propertyId : !ownerTab || o.owner === ownerTab)
+  const filteredOneOffs = (data.oneOffs ?? []).filter(o => propertyId ? o.propertyId === propertyId : !ownerTab || o.owner === ownerTab)
+  const pastOneOffs = filteredOneOffs.filter(o => o.month < keyFor(o)).sort((a, b) => b.month.localeCompare(a.month))
+  const oneOffsShown = filteredOneOffs
     .filter(o => o.month >= keyFor(o))
     .sort((a, b) => a.month.localeCompare(b.month))
   const oneOffsNow = oneOffsShown.filter(o => o.month === keyFor(o))
@@ -1027,7 +1034,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
     if (o) setOneOffSheet(o)
   }
   const addOneOff = () => {
-    // Whoever owns the home in view pays by default (Rupert for Mulberry Cottage), else the tab, else joint.
+    // Use the selected property's owner, the person in view, or the joint account.
     const owner: Owner = propertySummary?.property.owner ?? ownerTab ?? 'JOINT'
     setOneOffSheet({ label: '', amount: 0, owner, month: periodFor(data, owner).key, topUp: true, propertyId: propertyId ?? undefined })
   }
@@ -1062,7 +1069,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
     .map(o => ({ id: o.id, label: o.label, each: o.amount / 2, done: !!o.done }))
   const jointOneOffs = periodOneOffs.filter(o => o.owner === 'JOINT')
   const headNote = totals.oneOffJoint > 0
-    ? <>Includes <span className="num">{fmt(totals.oneOffJoint / 2)}</span> each for {jointOneOffs.slice(0, 2).map(o => o.label).join(' and ')}{jointOneOffs.length > 2 ? ` and ${jointOneOffs.length - 2} more` : ''}.</>
+    ? <>Includes <span className="num">{fmtMoney(totals.oneOffJoint / 2)}</span> each for {jointOneOffs.slice(0, 2).map(o => o.label).join(' and ')}{jointOneOffs.length > 2 ? ` and ${jointOneOffs.length - 2} more` : ''}.</>
     : undefined
   // Household costs one person pays straight from their own account.
   const directOwner: Owner | undefined = split.sharedByR > 0 && split.sharedByN === 0 ? 'RUPERT' : split.sharedByN > 0 && split.sharedByR === 0 ? 'NIAMH' : undefined
@@ -1130,7 +1137,7 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
     }
     return <Hero
       label="Into the joint account this month" value={jointEach} suffix="each" headNote={headNote}
-      segments={jointSegments} legendEnd={{ label: 'Total', value: fmt(jointPot) }}
+      segments={jointSegments} legendEnd={{ label: 'Total', value: fmtMoney(jointPot) }}
       topUps={topUps} onTopUp={budget.setOneOffDone}
       note={directNote}
       secondary={leftToSpend}
@@ -1240,6 +1247,14 @@ export default function BudgetScreen({ budget, tab, onTabChange, onNavigateToDeb
           </span>
         </button>
       )}
+
+      {pastOneOffs.length > 0 && <details className="mt-3 border-b border-line pb-2">
+        <summary className="min-h-[48px] flex items-center cursor-pointer text-[15px] text-ink-2 underline underline-offset-4">Previous one-off costs ({pastOneOffs.length})</summary>
+        <p className="text-caption text-muted mt-1 mb-2">Earlier costs are kept here. Open one to move it to this pay period if needed.</p>
+        {pastOneOffs.map(o => <button key={o.id} onClick={() => openOneOff(o.id)} className="flex items-center gap-3 w-full min-h-[60px] py-2 text-left border-t border-line">
+          <OwnerDot owner={o.owner} label={ownerName(o.owner)} /><span className="flex-1 min-w-0"><span className="block text-[15px] font-medium truncate">{o.label}</span><span className="block text-caption text-muted">{ownerName(o.owner)} · {monthName(o.month, true)}{o.done ? o.fromSavings ? ' · Paid from savings' : ' · Funded' : ''}</span></span><Money value={o.amount} /><ChevronRight size={16} className="text-muted shrink-0" />
+        </button>)}
+      </details>}
 
       </div>
       <div className="min-w-0 lg:pt-1 lg:[&>div:first-child]:mt-0">

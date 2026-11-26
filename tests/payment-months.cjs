@@ -54,3 +54,13 @@ test('12-month joint history preserves missing months and recorded zero, with fu
   assert.equal(rows[10].amount, 0)
   assert.equal(rows[11].amount, 510)
 })
+
+
+test('joint contributions retain half-pound shares and round floating-point pennies', () => {
+  const { fmtMoney } = model.exports
+  assert.equal(fmtMoney(315 / 2), '£157.50')
+  assert.equal(fmtMoney((3648 + 315) / 2), '£1,981.50')
+  assert.equal(fmtMoney(1824), '£1,824')
+  assert.equal(fmtMoney(0.1 + 0.2), '£0.30')
+  assert.equal(fmtMoney(-157.5), '-£157.50')
+})
